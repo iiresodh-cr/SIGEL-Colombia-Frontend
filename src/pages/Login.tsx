@@ -1,12 +1,26 @@
+import { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { auth, googleProvider } from '../config/firebase';
-import { signInWithPopup } from 'firebase/auth';
+import { signInWithRedirect } from 'firebase/auth'; // <-- 1. Cambiamos Popup por Redirect
 import { Box, Button, Typography, Paper, Container } from '@mui/material';
 import GoogleIcon from '@mui/icons-material/Google';
+import { useAuth } from '../context/AuthContext'; // <-- 2. Importamos el contexto
 
 const Login = () => {
+  const navigate = useNavigate();
+  const { currentUser } = useAuth(); // Obtenemos el usuario actual
+
+  // 3. Si el usuario ya está logueado (después de volver de Google), lo enviamos al Dashboard
+  useEffect(() => {
+    if (currentUser) {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [currentUser, navigate]);
+
   const handleGoogleLogin = async () => {
     try {
-      await signInWithPopup(auth, googleProvider);
+      // 4. Usamos redirección completa en lugar de ventana emergente
+      await signInWithRedirect(auth, googleProvider);
     } catch (error: any) {
       console.error("Error en la autenticación:", error.message);
     }
