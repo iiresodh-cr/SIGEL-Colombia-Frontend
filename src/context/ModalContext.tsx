@@ -12,7 +12,7 @@ import {
   CheckCircleOutlined as CheckCircleOutlinedIcon, 
   ErrorOutlined as ErrorOutlinedIcon, 
   InfoOutlined as InfoOutlinedIcon,
-  HelpOutline as HelpOutlineIcon
+  HelpOutlined as HelpOutlineIcon
 } from '@mui/icons-material';
 
 type ModalType = 'success' | 'error' | 'info' | 'confirm';
