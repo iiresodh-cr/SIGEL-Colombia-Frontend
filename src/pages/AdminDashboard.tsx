@@ -13,20 +13,25 @@ import {
   MenuItem, 
   Grid, 
   Button,
-  CircularProgress 
+  CircularProgress,
+  IconButton,
+  Tooltip
 } from '@mui/material';
+import DeleteIcon from '@mui/icons-material/Delete';
 import { adminService } from '../services/adminService';
 import { jepService } from '../services/jepService';
 import { AdminStats } from '../components/AdminStats';
 import { UserManagement } from '../components/UserManagement';
 import { FormExpediente } from '../components/FormExpediente';
 import { useModal } from '../context/ModalContext';
+import { useAuth } from '../context/AuthContext';
 
 const AdminDashboard = () => {
   const [users, setUsers] = useState<any[]>([]);
   const [stats, setStats] = useState({ totalVictimas: 0, totalCaso01: 0, totalCaso10: 0 });
   const [loading, setLoading] = useState(true);
   const { showModal } = useModal();
+  const { currentUser } = useAuth();
 
   const loadDashboardData = async () => {
     try {
@@ -59,14 +64,32 @@ const AdminDashboard = () => {
       await loadDashboardData();
       showModal('Rol Actualizado', `Se ha actualizado el rol de ${email} correctamente.`, 'success');
     } catch (error) {
-      showModal('Error', 'No se pudo actualizar el rol. Verifica los permisos.', 'error');
+      showModal('Error', 'No se pudo actualizar el rol.', 'error');
+    }
+  };
+
+  const handleDeleteUser = async (email: string) => {
+    // Seguridad: No permitir que el usuario actual se borre a sí mismo
+    if (email.toLowerCase() === currentUser?.email?.toLowerCase()) {
+      showModal('Acción no permitida', 'No puedes revocar tu propio acceso desde el panel.', 'error');
+      return;
+    }
+
+    if (window.confirm(`¿Estás seguro de que deseas revocar el acceso a ${email}? Esta acción es inmediata.`)) {
+      try {
+        await adminService.deleteUser(email);
+        await loadDashboardData();
+        showModal('Acceso Revocado', `El usuario ${email} ha sido eliminado del sistema.`, 'success');
+      } catch (error) {
+        showModal('Error', 'No se pudo eliminar al usuario.', 'error');
+      }
     }
   };
 
   const handleCrearExpediente = async (data: any) => {
     try {
       await jepService.crearExpediente(data);
-      showModal('Éxito', 'Macrocaso registrado correctamente en el sistema.', 'success');
+      showModal('Éxito', 'Macrocaso registrado correctamente.', 'success');
       await loadDashboardData();
     } catch (error) {
       showModal('Error de Registro', 'Hubo un error al registrar el expediente.', 'error');
@@ -122,7 +145,7 @@ const AdminDashboard = () => {
             <TableRow>
               <TableCell sx={{ fontWeight: 'bold' }}>Email</TableCell>
               <TableCell sx={{ fontWeight: 'bold' }}>Rol</TableCell>
-              <TableCell align="right" sx={{ fontWeight: 'bold' }}>Acción</TableCell>
+              <TableCell align="right" sx={{ fontWeight: 'bold' }}>Acciones</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -130,23 +153,41 @@ const AdminDashboard = () => {
               <TableRow key={u.uid} hover>
                 <TableCell>{u.email}</TableCell>
                 <TableCell>
-                  <Box sx={{ px: 1, py: 0.5, borderRadius: 1, bgcolor: '#f0fdf4', display: 'inline-block' }}>
+                  <Box sx={{ px: 1, py: 0.5, borderRadius: 1, bgcolor: '#f0fdf4', display: 'inline-block', fontWeight: 600 }}>
                     {u.role}
                   </Box>
                 </TableCell>
                 <TableCell align="right">
-                  {u.email !== 'webmaster@iiresodh.org' ? (
-                    <Select
-                      size="small"
-                      value={u.role}
-                      onChange={(e) => handleRoleChange(u.email, e.target.value)}
-                      sx={{ minWidth: 160 }}
-                    >
-                      <MenuItem value="Abogado">Abogado/a</MenuItem>
-                      <MenuItem value="Administrador">Administrador/a</MenuItem>
-                      <MenuItem value="Invitado">Invitado</MenuItem>
-                    </Select>
-                  ) : "Súper Administrador"}
+                  <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
+                    {u.email !== 'webmaster@iiresodh.org' ? (
+                      <>
+                        <Select
+                          size="small"
+                          value={u.role}
+                          onChange={(e) => handleRoleChange(u.email, e.target.value)}
+                          sx={{ minWidth: 160 }}
+                        >
+                          <MenuItem value="Abogado">Abogado/a</MenuItem>
+                          <MenuItem value="Administrador">Administrador/a</MenuItem>
+                          <MenuItem value="Invitado">Invitado</MenuItem>
+                        </Select>
+                        
+                        <Tooltip title="Revocar Acceso">
+                          <IconButton 
+                            color="error" 
+                            onClick={() => handleDeleteUser(u.email)}
+                            sx={{ bgcolor: '#fff5f5', '&:hover': { bgcolor: '#ffe3e3' } }}
+                          >
+                            <DeleteIcon />
+                          </IconButton>
+                        </Tooltip>
+                      </>
+                    ) : (
+                      <Typography variant="caption" sx={{ color: 'text.disabled', fontStyle: 'italic', pr: 2 }}>
+                        Sistema (Protegido)
+                      </Typography>
+                    )}
+                  </Box>
                 </TableCell>
               </TableRow>
             ))}

@@ -1,39 +1,56 @@
-import { collection, query, getDocs, doc, updateDoc, setDoc, getCountFromServer, where } from "firebase/firestore";
-import { db } from "../config/firebase";
+import { db } from '../config/firebase';
+import { 
+  collection, 
+  getDocs, 
+  doc, 
+  updateDoc, 
+  deleteDoc, 
+  query, 
+  where, 
+  setDoc,
+  getDoc 
+} from 'firebase/firestore';
 
 export const adminService = {
-  async getGlobalStats() {
-    const expedientesCol = collection(db, "expedientes");
-    
-    const qCaso01 = query(expedientesCol, where("macrocaso", "==", "Caso 01"));
-    const snapshot01 = await getCountFromServer(qCaso01);
-
-    const qCaso10 = query(expedientesCol, where("macrocaso", "==", "Caso 10"));
-    const snapshot10 = await getCountFromServer(qCaso10);
-
-    return {
-      totalExpedientes: snapshot01.data().count + snapshot10.data().count,
-      totalCaso01: snapshot01.data().count,
-      totalCaso10: snapshot10.data().count
-    };
+  // Obtener todos los usuarios autorizados
+  getAllUsers: async () => {
+    const querySnapshot = await getDocs(collection(db, "users"));
+    return querySnapshot.docs.map(doc => ({
+      uid: doc.id,
+      ...doc.data()
+    }));
   },
 
-  async invitarUsuario(email: string, role: string) {
+  // Pre-autorizar un nuevo correo institucional
+  invitarUsuario: async (email: string, role: string) => {
     const userRef = doc(db, "users", email.toLowerCase());
-    return await setDoc(userRef, {
+    await setDoc(userRef, {
       email: email.toLowerCase(),
       role: role,
-      fechaAutorizacion: new Date().toISOString()
+      createdAt: new Date().toISOString()
     });
   },
 
-  async updateUserRole(email: string, newRole: string) {
+  // Actualizar el rol de un usuario existente
+  updateUserRole: async (email: string, newRole: string) => {
     const userRef = doc(db, "users", email.toLowerCase());
-    return await updateDoc(userRef, { role: newRole });
+    await updateDoc(userRef, { role: newRole });
   },
 
-  async getAllUsers() {
-    const snapshot = await getDocs(collection(db, "users"));
-    return snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() }));
+  // NUEVA FUNCIÓN: Revocar acceso (Eliminar usuario)
+  deleteUser: async (email: string) => {
+    const userRef = doc(db, "users", email.toLowerCase());
+    await deleteDoc(userRef);
+  },
+
+  // Obtener estadísticas globales para el dashboard
+  getGlobalStats: async () => {
+    const expedientesSnap = await getDocs(collection(db, "expedientes"));
+    const docs = expedientesSnap.docs.map(d => d.data());
+    
+    return {
+      totalCaso01: docs.filter(d => d.macrocaso === 'Caso 01 - Secuestro').length,
+      totalCaso10: docs.filter(d => d.macrocaso === 'Caso 10 - Crímenes de guerra').length
+    };
   }
 };
