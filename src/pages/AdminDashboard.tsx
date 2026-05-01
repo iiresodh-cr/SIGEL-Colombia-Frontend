@@ -75,7 +75,7 @@ const AdminDashboard = () => {
   const handleCrearExpediente = async (data: any) => {
     try {
       await jepService.crearExpediente(data);
-      showModal('Éxito', 'Expediente dado de alta en la base de datos.', 'success');
+      showModal('Éxito', 'Expediente dado de alta correctamente.', 'success');
       await loadDashboardData();
     } catch (error) {
       showModal('Error', 'Hubo un problema al guardar.', 'error');
@@ -90,7 +90,6 @@ const AdminDashboard = () => {
 
       <AdminStats totalVictimas={stats.totalVictimas} totalCaso01={stats.totalCaso01} totalCaso10={stats.totalCaso10} />
 
-      {/* CORRECCIÓN DE GRID: Usando prop 'size' para compatibilidad con MUI v6 */}
       <Grid container spacing={4} sx={{ mt: 2 }}>
         <Grid size={{ xs: 12, lg: 5 }}>
           <UserManagement onUserAdded={loadDashboardData} />
@@ -110,7 +109,7 @@ const AdminDashboard = () => {
               <TableCell sx={{ fontWeight: 'bold' }}>Código</TableCell>
               <TableCell sx={{ fontWeight: 'bold' }}>Macrocaso</TableCell>
               <TableCell sx={{ fontWeight: 'bold' }}>Estado</TableCell>
-              <TableCell sx={{ fontWeight: 'bold' }}>Fecha</TableCell>
+              <TableCell sx={{ fontWeight: 'bold' }}>Fecha Registro</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -119,10 +118,12 @@ const AdminDashboard = () => {
             ) : (
               expedientes.map((exp) => (
                 <TableRow key={exp.id}>
-                  <TableCell sx={{ fontWeight: 'bold', color: '#003366' }}>{exp.codigo}</TableCell>
+                  {/* CORRECCIÓN: Usamos 'codigoExpediente' */}
+                  <TableCell sx={{ fontWeight: 'bold', color: '#003366' }}>{exp.codigoExpediente}</TableCell>
                   <TableCell>{exp.macrocaso}</TableCell>
                   <TableCell>{exp.estadoProcesal}</TableCell>
-                  <TableCell>{exp.createdAt ? new Date(exp.createdAt).toLocaleDateString() : 'N/A'}</TableCell>
+                  {/* CORRECCIÓN: Usamos 'fechaRegistro' */}
+                  <TableCell>{exp.fechaRegistro ? new Date(exp.fechaRegistro).toLocaleDateString() : 'N/A'}</TableCell>
                 </TableRow>
               ))
             )}

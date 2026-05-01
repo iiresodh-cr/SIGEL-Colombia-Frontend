@@ -10,13 +10,14 @@ import {
   query
 } from 'firebase/firestore';
 
-// Interfaz para dar superpoderes de tipado a TypeScript
+// Interfaz corregida según tu captura de Firebase
 interface Expediente {
   id: string;
+  codigoExpediente?: string;
   macrocaso?: string;
-  codigo?: string;
   estadoProcesal?: string;
-  createdAt: string;
+  fechaRegistro?: string;
+  resumenHechos?: string;
 }
 
 export const adminService = {
@@ -49,10 +50,10 @@ export const adminService = {
 
   getGlobalStats: async () => {
     const expedientesRef = collection(db, "expedientes");
-    const q = query(expedientesRef, orderBy("createdAt", "desc"));
+    // CORRECCIÓN: Ordenamos por 'fechaRegistro', que es el campo que existe en tu DB
+    const q = query(expedientesRef, orderBy("fechaRegistro", "desc"));
     const snapshot = await getDocs(q);
     
-    // Forzamos el tipo Expediente para que las líneas 53 y 56 funcionen
     const docs = snapshot.docs.map(d => ({ 
       id: d.id, 
       ...d.data() 
