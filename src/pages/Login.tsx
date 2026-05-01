@@ -1,16 +1,34 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { auth, googleProvider } from '../config/firebase';
-import { signInWithRedirect } from 'firebase/auth'; // <-- 1. Cambiamos Popup por Redirect
-import { Box, Button, Typography, Paper, Container } from '@mui/material';
+import { signInWithRedirect, getRedirectResult } from 'firebase/auth';
+import { Box, Button, Typography, Paper, Container, CircularProgress } from '@mui/material';
 import GoogleIcon from '@mui/icons-material/Google';
-import { useAuth } from '../context/AuthContext'; // <-- 2. Importamos el contexto
+import { useAuth } from '../context/AuthContext';
 
 const Login = () => {
   const navigate = useNavigate();
-  const { currentUser } = useAuth(); // Obtenemos el usuario actual
+  const { currentUser } = useAuth();
+  // Estado para mostrar un loader mientras vuelve de Google
+  const [isProcessing, setIsProcessing] = useState(true); 
 
-  // 3. Si el usuario ya está logueado (después de volver de Google), lo enviamos al Dashboard
+  useEffect(() => {
+    // Esta función "atrapa" al usuario cuando regresa de Google
+    const processRedirect = async () => {
+      try {
+        await getRedirectResult(auth);
+        // Si hay éxito, el AuthContext lo detectará automáticamente y cambiará el currentUser
+      } catch (error: any) {
+        console.error("Error al procesar la redirección:", error);
+        alert("Hubo un error al iniciar sesión: " + error.message);
+      } finally {
+        setIsProcessing(false); // Terminó de procesar, ocultar loader
+      }
+    };
+
+    processRedirect();
+  }, []);
+
   useEffect(() => {
     if (currentUser) {
       navigate('/dashboard', { replace: true });
@@ -19,12 +37,23 @@ const Login = () => {
 
   const handleGoogleLogin = async () => {
     try {
-      // 4. Usamos redirección completa en lugar de ventana emergente
+      setIsProcessing(true);
       await signInWithRedirect(auth, googleProvider);
     } catch (error: any) {
       console.error("Error en la autenticación:", error.message);
+      setIsProcessing(false);
     }
   };
+
+  // Pantalla de carga mientras se comunica con Google
+  if (isProcessing) {
+    return (
+      <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, #003366 0%, #001a33 100%)' }}>
+        <CircularProgress sx={{ color: 'white', mb: 2 }} />
+        <Typography sx={{ color: 'white' }}>Procesando acceso seguro...</Typography>
+      </Box>
+    );
+  }
 
   return (
     <Box 
