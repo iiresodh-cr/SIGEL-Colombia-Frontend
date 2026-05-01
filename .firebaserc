@@ -1,0 +1,18 @@
+{
+  "projects": {
+    "default": "sigel-colombia"
+  },
+  "targets": {
+    "sigel-colombia": {
+      "hosting": {
+        "app-principal": [
+          "sigel-colombia"
+        ],
+        "app-admin": [
+          "admin-sigel-colombia"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}
