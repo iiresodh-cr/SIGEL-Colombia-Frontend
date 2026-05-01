@@ -5,10 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build:admin": "tsc -b && vite build --mode admin --outDir dist-admin",
+    "build:principal": "tsc -b && vite build --mode principal --outDir dist-principal",
+    "build:all": "npm run build:admin && npm run build:principal",
     "lint": "eslint .",
     "preview": "vite preview"
-  },
+  }
   "dependencies": {
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
