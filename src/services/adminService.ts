@@ -5,14 +5,21 @@ import {
   doc, 
   updateDoc, 
   deleteDoc, 
-  query, 
-  where, 
   setDoc,
-  getDoc 
+  orderBy,
+  query
 } from 'firebase/firestore';
 
+// Interfaz para dar superpoderes de tipado a TypeScript
+interface Expediente {
+  id: string;
+  macrocaso?: string;
+  codigo?: string;
+  estadoProcesal?: string;
+  createdAt: string;
+}
+
 export const adminService = {
-  // Obtener todos los usuarios autorizados
   getAllUsers: async () => {
     const querySnapshot = await getDocs(collection(db, "users"));
     return querySnapshot.docs.map(doc => ({
@@ -21,7 +28,6 @@ export const adminService = {
     }));
   },
 
-  // Pre-autorizar un nuevo correo institucional
   invitarUsuario: async (email: string, role: string) => {
     const userRef = doc(db, "users", email.toLowerCase());
     await setDoc(userRef, {
@@ -31,26 +37,35 @@ export const adminService = {
     });
   },
 
-  // Actualizar el rol de un usuario existente
   updateUserRole: async (email: string, newRole: string) => {
     const userRef = doc(db, "users", email.toLowerCase());
     await updateDoc(userRef, { role: newRole });
   },
 
-  // NUEVA FUNCIÓN: Revocar acceso (Eliminar usuario)
   deleteUser: async (email: string) => {
     const userRef = doc(db, "users", email.toLowerCase());
     await deleteDoc(userRef);
   },
 
-  // Obtener estadísticas globales para el dashboard
   getGlobalStats: async () => {
-    const expedientesSnap = await getDocs(collection(db, "expedientes"));
-    const docs = expedientesSnap.docs.map(d => d.data());
+    const expedientesRef = collection(db, "expedientes");
+    const q = query(expedientesRef, orderBy("createdAt", "desc"));
+    const snapshot = await getDocs(q);
+    
+    // Forzamos el tipo Expediente para que las líneas 53 y 56 funcionen
+    const docs = snapshot.docs.map(d => ({ 
+      id: d.id, 
+      ...d.data() 
+    } as Expediente));
     
     return {
-      totalCaso01: docs.filter(d => d.macrocaso === 'Caso 01 - Secuestro').length,
-      totalCaso10: docs.filter(d => d.macrocaso === 'Caso 10 - Crímenes de guerra').length
+      allExpedientes: docs,
+      totalCaso01: docs.filter(d => 
+        String(d.macrocaso || "").includes('01')
+      ).length,
+      totalCaso10: docs.filter(d => 
+        String(d.macrocaso || "").includes('10')
+      ).length
     };
   }
 };
