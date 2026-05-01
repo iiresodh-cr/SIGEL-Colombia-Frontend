@@ -1,9 +1,11 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from '../context/AuthContext';
 import { ProtectedRoute } from '../components/ProtectedRoute';
+import { RoleGuard } from '../components/RoleGuard';
 import MainLayout from '../layouts/MainLayout';
 import Login from '../pages/Login';
 import Dashboard from '../pages/Dashboard';
+import AdminDashboard from '../pages/AdminDashboard'; // <-- Importamos tu panel de admin
 import ExpedienteDetalle from '../pages/ExpedienteDetalle';
 
 const AppRouter = () => {
@@ -11,28 +13,23 @@ const AppRouter = () => {
     <AuthProvider>
       <BrowserRouter>
         <Routes>
-          {/* Ruta Pública: Acceso inicial */}
           <Route path="/login" element={<Login />} />
 
-          {/* Rutas Privadas: Protegidas por AuthContext y ProtectedRoute */}
-          <Route 
-            element={
-              <ProtectedRoute>
-                <MainLayout />
-              </ProtectedRoute>
-            }
-          >
-            {/* Panel Principal */}
+          <Route element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
+            {/* Panel Principal General */}
             <Route path="/dashboard" element={<Dashboard />} />
             
-            {/* Gestión de JEP: Listado general de casos */}
-            <Route path="/expedientes" element={<div style={{ padding: '20px' }}>Listado de Macrocasos en Desarrollo</div>} />
+            {/* Panel Exclusivo de Administración */}
+            <Route path="/admin" element={
+              <RoleGuard allowedRoles={['SuperAdmin', 'Administrador']}>
+                <AdminDashboard />
+              </RoleGuard>
+            } />
             
-            {/* Gestión de JEP: Detalle, víctimas y bitácora (Ruta Dinámica) */}
+            <Route path="/expedientes" element={<div style={{ padding: '20px' }}>Listado de Macrocasos en Desarrollo</div>} />
             <Route path="/expedientes/:id" element={<ExpedienteDetalle />} />
           </Route>
 
-          {/* Redirecciones de Seguridad */}
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>

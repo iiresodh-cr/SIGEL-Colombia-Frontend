@@ -1,12 +1,15 @@
-import { Box, AppBar, Toolbar, Typography } from '@mui/material';
-import { Outlet } from 'react-router-dom';
+import { Box, AppBar, Toolbar, Typography, Button } from '@mui/material';
+import { Outlet, useNavigate, useLocation } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 const MainLayout = () => {
+  const { role } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation(); // Para saber en qué ruta estamos
+
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
       
-      {/* 1. AQUÍ VA EL TOQUE DE LA BANDERA */}
-      {/* Se coloca hasta arriba, antes de cualquier otro elemento visual */}
       <Box 
         sx={{ 
           height: '4px', 
@@ -15,18 +18,33 @@ const MainLayout = () => {
         }} 
       />
 
-      {/* 2. Barra de Navegación (Header Institucional) */}
       <AppBar position="static" color="primary" elevation={0}>
         <Toolbar>
-          <Typography variant="h6" sx={{ fontWeight: 700, letterSpacing: '1px' }}>
+          <Typography variant="h6" sx={{ fontWeight: 700, letterSpacing: '1px', flexGrow: 1 }}>
             SIGEL
           </Typography>
+          
+          <Button 
+            color="inherit" 
+            onClick={() => navigate('/dashboard')}
+            sx={{ mr: 2, opacity: location.pathname === '/dashboard' ? 1 : 0.7 }}
+          >
+            Panel General
+          </Button>
+
+          {/* Este botón solo aparece si eres SuperAdmin o Administrador */}
+          {(role === 'SuperAdmin' || role === 'Administrador') && (
+            <Button 
+              color="inherit" 
+              onClick={() => navigate('/admin')}
+              sx={{ opacity: location.pathname === '/admin' ? 1 : 0.7 }}
+            >
+              Administración
+            </Button>
+          )}
         </Toolbar>
       </AppBar>
 
-      {/* 3. Contenedor Dinámico */}
-      {/* El componente <Outlet /> es el espacio donde React Router inyectará 
-          tus pantallas (Dashboard, Expedientes, etc.) */}
       <Box component="main" sx={{ flexGrow: 1, p: 3, backgroundColor: 'background.default' }}>
         <Outlet />
       </Box>
