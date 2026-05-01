@@ -1,52 +1,50 @@
+import { db } from '../config/firebase';
 import { 
   collection, 
-  doc, 
   addDoc, 
-  getDoc, 
   getDocs, 
+  doc, 
+  getDoc, 
   query, 
-  serverTimestamp 
-} from "firebase/firestore";
-import { db } from "../config/firebase";
-import { ExpedienteJEP, VictimaJEP } from "../types/jep";
+  orderBy 
+} from 'firebase/firestore';
+
+interface Expediente {
+  id?: string;
+  codigoExpediente: string;
+  macrocaso: string;
+  estadoProcesal: string;
+  resumenHechos: string;
+  fechaRegistro: string;
+}
 
 export const jepService = {
-  // Obtener un expediente por ID
-  async getExpediente(id: string): Promise<ExpedienteJEP | null> {
-    const docRef = doc(db, "expedientes", id);
-    const docSnap = await getDoc(docRef);
-    return docSnap.exists() ? { id: docSnap.id, ...docSnap.data() } as ExpedienteJEP : null;
-  },
-
-  // Listar víctimas vinculadas a un expediente
-  async getVictimas(expedienteId: string): Promise<VictimaJEP[]> {
-    const victimasRef = collection(db, "expedientes", expedienteId, "victimas");
-    const snapshot = await getDocs(victimasRef);
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as VictimaJEP));
-  },
-
-  // Registrar nueva víctima manualmente
-  async addVictima(expedienteId: string, data: Omit<VictimaJEP, 'id' | 'expedienteId'>) {
-    const victimasRef = collection(db, "expedientes", expedienteId, "victimas");
-    return await addDoc(victimasRef, {
+  // Crear expediente (Usado por Admin)
+  crearExpediente: async (data: Omit<Expediente, 'id' | 'fechaRegistro'>) => {
+    return await addDoc(collection(db, "expedientes"), {
       ...data,
-      expedienteId,
-      fechaCreacion: serverTimestamp()
+      fechaRegistro: new Date().toISOString(),
+      fechaCreacion: new Date() // Para compatibilidad de consola
     });
   },
 
-  // Crear un nuevo expediente (Macrocaso) - USADO POR ADMIN
-  async crearExpediente(data: Omit<ExpedienteJEP, 'id'>) {
-    try {
-      const expedientesRef = collection(db, "expedientes");
-      const docRef = await addDoc(expedientesRef, {
-        ...data,
-        fechaCreacion: serverTimestamp()
-      });
-      return docRef.id;
-    } catch (error) {
-      console.error("Error al crear expediente en Firestore:", error);
-      throw error;
+  // Obtener todos para el listado (Usado por Usuarios)
+  getExpedientes: async () => {
+    const q = query(collection(db, "expedientes"), orderBy("fechaRegistro", "desc"));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(d => ({ 
+      id: d.id, 
+      ...d.data() 
+    } as Expediente));
+  },
+
+  // Obtener detalle de uno solo
+  getExpedienteById: async (id: string) => {
+    const docRef = doc(db, "expedientes", id);
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      return { id: docSnap.id, ...docSnap.data() } as Expediente;
     }
+    throw new Error("Expediente no encontrado");
   }
 };

@@ -7,6 +7,7 @@ import MainLayout from '../layouts/MainLayout';
 import Login from '../pages/Login';
 import Dashboard from '../pages/Dashboard';
 import AdminDashboard from '../pages/AdminDashboard';
+import Expedientes from '../pages/Expedientes'; // <-- Importación corregida
 import ExpedienteDetalle from '../pages/ExpedienteDetalle';
 
 const isAdminApp = import.meta.env.VITE_APP_TYPE === 'ADMIN';
@@ -32,7 +33,7 @@ const AppRouter = () => {
               
               {!isAdminApp && (
                 <>
-                  <Route path="/expedientes" element={<div style={{ padding: '20px' }}>Listado de Macrocasos en Desarrollo</div>} />
+                  <Route path="/expedientes" element={<Expedientes />} />
                   <Route path="/expedientes/:id" element={<ExpedienteDetalle />} />
                 </>
               )}
