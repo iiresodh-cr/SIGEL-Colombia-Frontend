@@ -99,11 +99,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       {!loading && children}
 
       {/* Modal Profesional para Accesos Denegados */}
-      <Dialog 
-        open={errorModal.show} 
-        // Evita que el usuario cierre el modal haciendo clic fuera de él
-        disableEscapeKeyDown
-      >
+      <Dialog open={errorModal.show}>
         <DialogTitle sx={{ color: 'error.main', fontWeight: 'bold' }}>
           {errorModal.title}
         </DialogTitle>
