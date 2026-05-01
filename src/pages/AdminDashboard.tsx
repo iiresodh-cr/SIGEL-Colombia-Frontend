@@ -68,22 +68,27 @@ const AdminDashboard = () => {
     }
   };
 
-  const handleDeleteUser = async (email: string) => {
-    // Seguridad: No permitir que el usuario actual se borre a sí mismo
+  const handleDeleteUser = (email: string) => {
     if (email.toLowerCase() === currentUser?.email?.toLowerCase()) {
       showModal('Acción no permitida', 'No puedes revocar tu propio acceso desde el panel.', 'error');
       return;
     }
 
-    if (window.confirm(`¿Estás seguro de que deseas revocar el acceso a ${email}? Esta acción es inmediata.`)) {
-      try {
-        await adminService.deleteUser(email);
-        await loadDashboardData();
-        showModal('Acceso Revocado', `El usuario ${email} ha sido eliminado del sistema.`, 'success');
-      } catch (error) {
-        showModal('Error', 'No se pudo eliminar al usuario.', 'error');
+    // USANDO EL NUEVO MODAL DE CONFIRMACIÓN PROFESIONAL
+    showModal(
+      '¿Revocar Acceso?', 
+      `¿Estás seguro de que deseas eliminar a ${email} del sistema? Esta acción es inmediata y no se puede deshacer.`, 
+      'confirm',
+      async () => {
+        try {
+          await adminService.deleteUser(email);
+          await loadDashboardData();
+          showModal('Acceso Revocado', `El usuario ${email} ha sido eliminado del sistema.`, 'success');
+        } catch (error) {
+          showModal('Error', 'No se pudo eliminar al usuario.', 'error');
+        }
       }
-    }
+    );
   };
 
   const handleCrearExpediente = async (data: any) => {
