@@ -20,11 +20,13 @@ import { jepService } from '../services/jepService';
 import { AdminStats } from '../components/AdminStats';
 import { UserManagement } from '../components/UserManagement';
 import { FormExpediente } from '../components/FormExpediente';
+import { useModal } from '../context/ModalContext';
 
 const AdminDashboard = () => {
   const [users, setUsers] = useState<any[]>([]);
   const [stats, setStats] = useState({ totalVictimas: 0, totalCaso01: 0, totalCaso10: 0 });
   const [loading, setLoading] = useState(true);
+  const { showModal } = useModal();
 
   const loadDashboardData = async () => {
     try {
@@ -55,18 +57,19 @@ const AdminDashboard = () => {
     try {
       await adminService.updateUserRole(email, role);
       await loadDashboardData();
+      showModal('Rol Actualizado', `Se ha actualizado el rol de ${email} correctamente.`, 'success');
     } catch (error) {
-      alert("Error al actualizar el rol.");
+      showModal('Error', 'No se pudo actualizar el rol. Verifica los permisos.', 'error');
     }
   };
 
   const handleCrearExpediente = async (data: any) => {
     try {
       await jepService.crearExpediente(data);
-      alert("Macrocaso registrado.");
+      showModal('Éxito', 'Macrocaso registrado correctamente en el sistema.', 'success');
       await loadDashboardData();
     } catch (error) {
-      alert("Error al registrar.");
+      showModal('Error de Registro', 'Hubo un error al registrar el expediente.', 'error');
     }
   };
 

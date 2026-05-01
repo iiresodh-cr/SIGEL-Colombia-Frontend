@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Box, TextField, Button, MenuItem, Typography, Paper, Grid } from '@mui/material';
 import { adminService } from '../services/adminService';
+import { useModal } from '../context/ModalContext';
 
 interface UserManagementProps {
   onUserAdded: () => void;
@@ -9,23 +10,24 @@ interface UserManagementProps {
 export const UserManagement = ({ onUserAdded }: UserManagementProps) => {
   const [email, setEmail] = useState('');
   const [role, setRole] = useState('Abogado');
+  const { showModal } = useModal();
 
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!email.toLowerCase().endsWith('@iiresodh.org')) {
-      alert("Error: Solo se permiten correos del dominio institucional @iiresodh.org");
+      showModal('Dominio Inválido', 'Solo se permiten correos del dominio institucional @iiresodh.org', 'error');
       return;
     }
 
     try {
       await adminService.invitarUsuario(email, role);
-      alert(`Usuario ${email} pre-autorizado correctamente.`);
+      showModal('Autorización Exitosa', `El usuario ${email} ha sido pre-autorizado correctamente.`, 'success');
       setEmail('');
       onUserAdded();
     } catch (error) {
       console.error("Error al autorizar usuario:", error);
-      alert("Hubo un error al intentar autorizar al usuario.");
+      showModal('Error del Sistema', 'Hubo un error al intentar autorizar al usuario en la base de datos.', 'error');
     }
   };
 
