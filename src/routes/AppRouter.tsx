@@ -32,7 +32,7 @@ const AppRouter = () => {
               
               {!isAdminApp && (
                 <>
-                  <Route path="/expedientes" element={<div style={{ padding: '20px' }}>Listado de Macrocasos</div>} />
+                  <Route path="/expedientes" element={<div style={{ padding: '20px' }}>Listado de Macrocasos en Desarrollo</div>} />
                   <Route path="/expedientes/:id" element={<ExpedienteDetalle />} />
                 </>
               )}

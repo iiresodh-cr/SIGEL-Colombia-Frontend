@@ -8,9 +8,12 @@ import {
   Button, 
   Box 
 } from '@mui/material';
-import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
-import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
-import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+// Importación desestructurada con los nombres exactos: CheckCircleOutlined, ErrorOutlined, InfoOutlined
+import { 
+  CheckCircleOutlined as CheckCircleOutlinedIcon, 
+  ErrorOutlined as ErrorOutlinedIcon, 
+  InfoOutlined as InfoOutlinedIcon 
+} from '@mui/icons-material';
 
 type ModalType = 'success' | 'error' | 'info';
 
@@ -38,9 +41,9 @@ export const ModalProvider = ({ children }: { children: ReactNode }) => {
   const getIcon = () => {
     switch (type) {
       case 'success': 
-        return <CheckCircleOutlineIcon sx={{ fontSize: 56, color: '#2e7d32', mb: 1 }} />;
+        return <CheckCircleOutlinedIcon sx={{ fontSize: 56, color: '#2e7d32', mb: 1 }} />;
       case 'error': 
-        return <ErrorOutlineIcon sx={{ fontSize: 56, color: '#d32f2f', mb: 1 }} />;
+        return <ErrorOutlinedIcon sx={{ fontSize: 56, color: '#d32f2f', mb: 1 }} />;
       default: 
         return <InfoOutlinedIcon sx={{ fontSize: 56, color: '#003366', mb: 1 }} />;
     }
