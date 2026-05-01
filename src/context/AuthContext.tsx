@@ -3,6 +3,7 @@ import { onAuthStateChanged, User, signOut } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
 import { UserRole } from '../types/user';
+import { Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Button } from '@mui/material';
 
 interface AuthContextType {
   currentUser: User | null;
@@ -18,41 +19,74 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [role, setRole] = useState<UserRole | null>(null);
   const [loading, setLoading] = useState(true);
+  
+  // Estado para controlar el Modal de Acceso Denegado
+  const [errorModal, setErrorModal] = useState({ show: false, title: '', message: '' });
 
   const logout = () => signOut(auth);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setLoading(true);
+
       if (user) {
-        // Bloqueo estricto de dominio
-        if (!user.email?.endsWith('@iiresodh.org')) {
+        try {
+          // 1. Bloqueo estricto por dominio
+          if (!user.email?.endsWith('@iiresodh.org')) {
+            await signOut(auth);
+            setErrorModal({ 
+              show: true, 
+              title: "Dominio no permitido", 
+              message: "El sistema SIGEL es de uso exclusivo para personal con cuentas institucionales (@iiresodh.org). Por favor, cambia de cuenta." 
+            });
+            setCurrentUser(null);
+            setRole(null);
+            setLoading(false);
+            return;
+          }
+
+          // 2. Lógica de Roles y Pre-autorización
+          if (user.email === SUPER_ADMIN_EMAIL) {
+            setRole('SuperAdmin');
+            setCurrentUser(user);
+          } else {
+            // Buscamos si el usuario fue creado previamente en el panel Admin
+            const userDocRef = doc(db, "users", user.email.toLowerCase());
+            const userDoc = await getDoc(userDocRef);
+
+            if (userDoc.exists()) {
+              setRole(userDoc.data().role as UserRole);
+              setCurrentUser(user);
+            } else {
+              // 3. Existe el dominio, pero NO está autorizado en la Base de Datos
+              await signOut(auth);
+              setErrorModal({ 
+                show: true, 
+                title: "Acceso Restringido", 
+                message: "Tu cuenta pertenece al IIRESODH, pero no tienes permisos asignados en el sistema SIGEL. Por favor, solicita acceso al administrador." 
+              });
+              setCurrentUser(null);
+              setRole(null);
+            }
+          }
+        } catch (error) {
+          console.error("Error durante la validación de seguridad:", error);
           await signOut(auth);
-          alert("Acceso denegado: Solo cuentas institucionales @iiresodh.org");
+          setErrorModal({ 
+            show: true, 
+            title: "Error de Conexión", 
+            message: "No pudimos verificar tus credenciales en este momento. Inténtalo nuevamente o contacta a soporte técnico." 
+          });
           setCurrentUser(null);
           setRole(null);
-          setLoading(false);
-          return;
-        }
-
-        setCurrentUser(user);
-
-        // Lógica de Roles
-        if (user.email === SUPER_ADMIN_EMAIL) {
-          setRole('SuperAdmin');
-        } else {
-          // Buscamos por email en minúsculas (ID del documento)
-          const userDoc = await getDoc(doc(db, "users", user.email.toLowerCase()));
-          if (userDoc.exists()) {
-            setRole(userDoc.data().role as UserRole);
-          } else {
-            setRole('Invitado');
-          }
         }
       } else {
+        // Usuario no autenticado
         setCurrentUser(null);
         setRole(null);
       }
+      
+      // Siempre liberamos el estado de carga al terminar
       setLoading(false);
     });
 
@@ -61,7 +95,34 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   return (
     <AuthContext.Provider value={{ currentUser, role, loading, logout }}>
+      {/* Solo renderizamos la app si ya terminó de validar la sesión */}
       {!loading && children}
+
+      {/* Modal Profesional para Accesos Denegados */}
+      <Dialog 
+        open={errorModal.show} 
+        // Evita que el usuario cierre el modal haciendo clic fuera de él
+        disableEscapeKeyDown
+      >
+        <DialogTitle sx={{ color: 'error.main', fontWeight: 'bold' }}>
+          {errorModal.title}
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText sx={{ color: 'text.primary', mt: 1 }}>
+            {errorModal.message}
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions sx={{ p: 2, pt: 0 }}>
+          <Button 
+            onClick={() => setErrorModal({ show: false, title: '', message: '' })} 
+            color="primary" 
+            variant="contained"
+            disableElevation
+          >
+            Entendido
+          </Button>
+        </DialogActions>
+      </Dialog>
     </AuthContext.Provider>
   );
 };
