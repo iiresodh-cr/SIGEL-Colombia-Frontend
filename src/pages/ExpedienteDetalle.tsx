@@ -1,118 +1,150 @@
 import React, { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
-import { Box, Typography, Divider, CircularProgress, Card, CardContent, Grid } from '@mui/material';
+import { useParams, useNavigate } from 'react-router-dom';
+import { 
+  Box, 
+  Typography, 
+  Paper, 
+  Grid, // Corrección: Importación estándar de MUI v6
+  Divider, 
+  Button, 
+  CircularProgress, 
+  List, 
+  ListItem, 
+  ListItemText, 
+  Chip,
+  IconButton 
+} from '@mui/material';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import { jepService } from '../services/jepService';
-import { ExpedienteJEP, VictimaJEP } from '../types/jep';
 import { FormVictima } from '../components/FormVictima';
-import { RoleGuard } from '../components/RoleGuard';
+import { useModal } from '../context/ModalContext';
 
 const ExpedienteDetalle = () => {
   const { id } = useParams<{ id: string }>();
-  const [expediente, setExpediente] = useState<ExpedienteJEP | null>(null);
-  const [victimas, setVictimas] = useState<VictimaJEP[]>([]);
+  const navigate = useNavigate();
+  const { showModal } = useModal();
+  
+  const [expediente, setExpediente] = useState<any>(null);
+  const [victimas, setVictimas] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showVictimaForm, setShowVictimaForm] = useState(false);
 
   useEffect(() => {
-    if (id) {
-      Promise.all([jepService.getExpediente(id), jepService.getVictimas(id)])
-        .then(([exp, vics]) => {
-          setExpediente(exp);
-          setVictimas(vics);
-        })
-        .catch(err => console.error("Error cargando datos del expediente:", err))
-        .finally(() => setLoading(false));
-    }
-  }, [id]);
+    const loadData = async () => {
+      if (!id) return;
+      try {
+        setLoading(true);
+        const [expData, victimasData] = await Promise.all([
+          jepService.getExpedienteById(id),
+          jepService.getVictimas(id)
+        ]);
+        setExpediente(expData);
+        setVictimas(victimasData);
+      } catch (error) {
+        console.error("Error:", error);
+        showModal('Error', 'No se pudo cargar la información.', 'error');
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadData();
+  }, [id, showModal]);
 
   const handleAddVictima = async (data: any) => {
-    if (id) {
-      try {
-        await jepService.addVictima(id, data);
-        const updated = await jepService.getVictimas(id);
-        setVictimas(updated);
-      } catch (error) {
-        console.error("Error al vincular víctima:", error);
-      }
+    if (!id) return;
+    try {
+      await jepService.addVictima(id, data);
+      const updated = await jepService.getVictimas(id);
+      setVictimas(updated);
+      setShowVictimaForm(false);
+      showModal('Éxito', 'Víctima vinculada correctamente.', 'success');
+    } catch (error) {
+      showModal('Error', 'No se pudo registrar la víctima.', 'error');
     }
   };
 
-  if (loading) return (
-    <Box sx={{ display: 'flex', justifyContent: 'center', mt: 10 }}>
-      <CircularProgress />
-    </Box>
-  );
+  if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', mt: 10 }}><CircularProgress /></Box>;
+  if (!expediente) return <Box sx={{ p: 4 }}><Typography>Expediente no encontrado</Typography></Box>;
 
   return (
-    <Box>
-      {/* Cabecera del Expediente JEP */}
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" color="primary" sx={{ fontWeight: 'bold' }}>
-          {expediente?.codigoExpediente} - {expediente?.macrocaso}
-        </Typography>
-        <Typography variant="body1" sx={{ mt: 1, color: 'text.secondary' }}>
-          {expediente?.resumenHechos}
-        </Typography>
-      </Box>
-      
-      <Divider sx={{ my: 4 }} />
+    <Box sx={{ p: 4 }}>
+      <Button 
+        startIcon={<ArrowBackIcon />} 
+        onClick={() => navigate('/expedientes')}
+        sx={{ mb: 3 }}
+      >
+        Volver al Listado
+      </Button>
 
-      {/* Listado de Víctimas - Visible para todos los roles autorizados */}
-      <Typography variant="h5" sx={{ mb: 3, fontWeight: 600 }}>
-        Directorio de Víctimas Vinculadas
-      </Typography>
-      
-      <Grid container spacing={3}>
-        {victimas.length > 0 ? (
-          victimas.map(v => (
-            <Grid size={{ xs: 12, md: 4 }} key={v.id}>
-              <Card variant="outlined" sx={{ height: '100%', borderRadius: 2 }}>
-                <CardContent>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 1 }}>
-                    {v.nombreCompleto}
-                  </Typography>
-                  <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
-                    📞 {v.telefono}
-                  </Typography>
-                  <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                    📍 {v.municipio}, {v.departamento}
-                  </Typography>
-                  <Typography 
-                    variant="caption" 
-                    sx={{ 
-                      bgcolor: 'secondary.light', 
-                      color: 'white', 
-                      px: 1, 
-                      py: 0.5, 
-                      borderRadius: 1,
-                      fontWeight: 'bold'
-                    }}
-                  >
-                    {v.estadoAcreditacion}
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-          ))
-        ) : (
-          <Grid size={{ xs: 12 }}>
-            <Typography variant="body2" color="text.secondary">
-              No hay víctimas vinculadas a este expediente todavía.
+      {/* Grid en MUI v6 utiliza 'container' y 'size' */}
+      <Grid container spacing={4}>
+        
+        {/* Información del Expediente */}
+        <Grid size={{ xs: 12, lg: 8 }}>
+          <Paper elevation={0} sx={{ p: 4, borderRadius: 3, border: '1px solid #e2e8f0' }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3, alignItems: 'flex-start' }}>
+              <Box>
+                <Typography variant="h4" sx={{ fontWeight: 800, color: '#003366' }}>
+                  {expediente.codigoExpediente}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Registrado: {expediente.fechaRegistro ? new Date(expediente.fechaRegistro).toLocaleDateString() : 'N/A'}
+                </Typography>
+              </Box>
+              <Chip label={expediente.estadoProcesal} color="primary" variant="outlined" sx={{ fontWeight: 600 }} />
+            </Box>
+            
+            <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1 }}>Macrocaso</Typography>
+            <Typography variant="body1" sx={{ mb: 3 }}>{expediente.macrocaso}</Typography>
+
+            <Divider sx={{ my: 3 }} />
+
+            <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1 }}>Resumen de los Hechos</Typography>
+            <Typography variant="body1" sx={{ whiteSpace: 'pre-line' }}>
+              {expediente.resumenHechos}
             </Typography>
-          </Grid>
-        )}
+          </Paper>
+        </Grid>
+
+        {/* Sección de Víctimas */}
+        <Grid size={{ xs: 12, lg: 4 }}>
+          <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid #e2e8f0', bgcolor: '#f8fafc' }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+              <Typography variant="h6" sx={{ fontWeight: 700 }}>Víctimas Vinculadas</Typography>
+              <IconButton color="primary" onClick={() => setShowVictimaForm(true)} size="small">
+                <PersonAddIcon />
+              </IconButton>
+            </Box>
+
+            {victimas.length === 0 ? (
+              <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic', py: 2 }}>
+                No hay víctimas registradas.
+              </Typography>
+            ) : (
+              <List sx={{ bgcolor: 'white', borderRadius: 2, mb: 2 }}>
+                {victimas.map((v) => (
+                  <ListItem key={v.id} divider>
+                    <ListItemText 
+                      primary={v.nombreCompleto} 
+                      secondary={`ID: ${v.documentoIdentidad}`} 
+                    />
+                  </ListItem>
+                ))}
+              </List>
+            )}
+
+            {showVictimaForm && (
+              <Box sx={{ mt: 2 }}>
+                <FormVictima 
+                  onSave={handleAddVictima} 
+                  onCancel={() => setShowVictimaForm(false)} 
+                />
+              </Box>
+            )}
+          </Paper>
+        </Grid>
       </Grid>
-
-      {/* Formulario de Registro - Protegido por Roles */}
-      <RoleGuard allowedRoles={['SuperAdmin', 'Administrador', 'Abogado']}>
-        <Box sx={{ mt: 6 }}>
-          <Divider sx={{ mb: 4 }}>
-            <Typography variant="overline" sx={{ px: 2, color: 'text.secondary' }}>
-              Zona de Registro Judicial
-            </Typography>
-          </Divider>
-          <FormVictima onSave={handleAddVictima} />
-        </Box>
-      </RoleGuard>
     </Box>
   );
 };

@@ -7,7 +7,7 @@ import MainLayout from '../layouts/MainLayout';
 import Login from '../pages/Login';
 import Dashboard from '../pages/Dashboard';
 import AdminDashboard from '../pages/AdminDashboard';
-import Expedientes from '../pages/Expedientes'; // <-- Importación corregida
+import Expedientes from '../pages/Expedientes';
 import ExpedienteDetalle from '../pages/ExpedienteDetalle';
 
 const isAdminApp = import.meta.env.VITE_APP_TYPE === 'ADMIN';
