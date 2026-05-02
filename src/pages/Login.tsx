@@ -71,7 +71,7 @@ const Login = () => {
             SIGEL
           </Typography>
           <Typography variant="body1" sx={{ mb: 4, color: 'text.secondary' }}>
-            Sistema de Gestión IIRESODH
+            Sistema de Gestión de Expedientes Legales
           </Typography>
           
           <Button 
@@ -89,7 +89,7 @@ const Login = () => {
               '&:hover': { bgcolor: '#f1f1f1', boxShadow: 2 }
             }}
           >
-            Continuar con Google Workspace
+            Continuar con tu cuenta de @iiresodh.org
           </Button>
           
           <Typography variant="caption" sx={{ display: 'block', mt: 4, color: 'text.disabled' }}>
