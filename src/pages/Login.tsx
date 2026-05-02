@@ -67,11 +67,14 @@ const Login = () => {
     >
       <Container maxWidth="xs">
         <Paper elevation={6} sx={{ p: 5, textAlign: 'center', borderRadius: 4 }}>
-          <Typography variant="h4" sx={{ mb: 1, fontWeight: 700, color: '#003366' }}>
+          <Typography variant="h4" sx={{ mb: 1, fontWeight: 700, color: '#E63946' }}>
             SIGEL
           </Typography>
           <Typography variant="body1" sx={{ mb: 4, color: 'text.secondary' }}>
             Sistema de Gestión de Expedientes Legales
+          </Typography>
+          <Typography variant="body1" sx={{ mb: 4, fontWeight: 700, color: '#003366' }}>
+            IIRESODH Colombia
           </Typography>
           
           <Button 
@@ -89,7 +92,7 @@ const Login = () => {
               '&:hover': { bgcolor: '#f1f1f1', boxShadow: 2 }
             }}
           >
-            Continuar con tu cuenta de @iiresodh.org
+            <strong>Ingresar con @iiresodh.org</strong>
           </Button>
           
           <Typography variant="caption" sx={{ display: 'block', mt: 4, color: 'text.disabled' }}>
