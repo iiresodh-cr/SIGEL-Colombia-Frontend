@@ -4,7 +4,7 @@ import {
   Box, 
   Typography, 
   Paper, 
-  Grid, // Corrección: Importación estándar de MUI v6
+  Grid, 
   Divider, 
   Button, 
   CircularProgress, 
@@ -17,30 +17,43 @@ import {
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import { jepService } from '../services/jepService';
+import { adminService } from '../services/adminService';
 import { FormVictima } from '../components/FormVictima';
 import { useModal } from '../context/ModalContext';
+import { useAuth } from '../context/AuthContext';
+import { Usuario } from '../types/user';
 
 const ExpedienteDetalle = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { showModal } = useModal();
+  const { currentUser, role } = useAuth();
   
   const [expediente, setExpediente] = useState<any>(null);
   const [victimas, setVictimas] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showVictimaForm, setShowVictimaForm] = useState(false);
+  
+  // Estado para manejar la lista de profesionales exigida por FormVictima
+  const [listaProfesionales, setListaProfesionales] = useState<{ abogados: Usuario[], psicosociales: Usuario[] }>({ 
+    abogados: [], 
+    psicosociales: [] 
+  });
 
   useEffect(() => {
     const loadData = async () => {
       if (!id) return;
       try {
         setLoading(true);
-        const [expData, victimasData] = await Promise.all([
+        // Cargamos simultáneamente el expediente, las víctimas y los profesionales
+        const [expData, victimasData, profsData] = await Promise.all([
           jepService.getExpedienteById(id),
-          jepService.getVictimas(id)
+          jepService.getVictimas(id),
+          adminService.getProfesionales()
         ]);
         setExpediente(expData);
         setVictimas(victimasData);
+        setListaProfesionales(profsData);
       } catch (error) {
         console.error("Error:", error);
         showModal('Error', 'No se pudo cargar la información.', 'error');
@@ -139,6 +152,9 @@ const ExpedienteDetalle = () => {
                 <FormVictima 
                   onSave={handleAddVictima} 
                   onCancel={() => setShowVictimaForm(false)} 
+                  profesionales={listaProfesionales}
+                  currentUserRole={role || ''}
+                  currentUserId={currentUser?.uid || ''}
                 />
               </Box>
             )}
