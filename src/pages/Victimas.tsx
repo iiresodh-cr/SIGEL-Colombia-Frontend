@@ -5,9 +5,10 @@ import {
   Dialog, DialogContent
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
-import VisibilityIcon from '@mui/icons-material/Visibility';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import { useNavigate } from 'react-router-dom';
+import { collection, query, getDocs } from 'firebase/firestore'; 
+import { db } from '../config/firebase'; 
 import { jepService } from '../services/jepService';
 import { adminService } from '../services/adminService';
 import { useAuth } from '../context/AuthContext';
@@ -22,7 +23,6 @@ const Victimas = () => {
   const [search, setSearch] = useState('');
   const [openModalVictima, setOpenModalVictima] = useState(false);
   
-  // Aquí está la corrección: Declaramos explícitamente los tipos en el useState
   const [listaProfesionales, setListaProfesionales] = useState<{ abogados: Usuario[], psicosociales: Usuario[] }>({ 
     abogados: [], 
     psicosociales: [] 
@@ -36,12 +36,27 @@ const Victimas = () => {
     if (!currentUser?.uid || !role) return;
     try {
       setLoading(true);
+      const isAdmin = role === 'admin' || role === 'superadmin';
       const tipoRol = (role === 'psicosocial') ? 'psicosocial' : 'abogado';
       
-      const [data, profs] = await Promise.all([
-        jepService.getVictimasAsignadas(currentUser.uid, tipoRol),
-        adminService.getProfesionales()
-      ]);
+      let data: Victima[] = [];
+      let profs;
+
+      if (isAdmin) {
+        // LÓGICA DE ADMINISTRADOR: Trae todas las víctimas de la base de datos
+        const q = query(collection(db, 'victimas'));
+        const snapshot = await getDocs(q);
+        data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Victima));
+        profs = await adminService.getProfesionales();
+      } else {
+        // LÓGICA DE ABOGADO/PSICOSOCIAL: Trae solo las asignadas a él
+        const [assignedData, profsData] = await Promise.all([
+          jepService.getVictimasAsignadas(currentUser.uid, tipoRol),
+          adminService.getProfesionales()
+        ]);
+        data = assignedData;
+        profs = profsData;
+      }
 
       setVictimas(data);
       setListaProfesionales(profs);
@@ -73,6 +88,8 @@ const Victimas = () => {
     v.identificacion.includes(search)
   );
 
+  const isAdmin = role === 'admin' || role === 'superadmin';
+
   if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', mt: 10 }}><CircularProgress /></Box>;
 
   return (
@@ -80,20 +97,20 @@ const Victimas = () => {
       <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Box>
           <Typography variant="h4" sx={{ fontWeight: 800, color: '#003366' }}>
-            Matriz de Seguimiento
+            {isAdmin ? 'Matriz Global de Víctimas' : 'Matriz de Seguimiento'}
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Casos activos bajo tu responsabilidad
+            {isAdmin ? 'Todos los casos activos de la organización' : 'Casos activos bajo tu responsabilidad'}
           </Typography>
         </Box>
         
         <Box sx={{ display: 'flex', gap: 2 }}>
           <TextField 
             size="small"
-            placeholder="Buscar..."
+            placeholder="Buscar por nombre o ID..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            sx={{ width: 250, bgcolor: 'white' }}
+            sx={{ width: 300, bgcolor: 'white' }}
             slotProps={{
               input: { startAdornment: <InputAdornment position="start"><SearchIcon /></InputAdornment> }
             }}
