@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { 
   Box, Typography, Paper, Table, TableBody, TableCell, TableHead, 
-  TableRow, TextField, InputAdornment, Button, CircularProgress, Chip 
+  TableRow, TextField, InputAdornment, Button, CircularProgress, Chip,
+  Dialog, DialogContent
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import VisibilityIcon from '@mui/icons-material/Visibility';
@@ -9,32 +10,63 @@ import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import { useNavigate } from 'react-router-dom';
 import { jepService } from '../services/jepService';
 import { useAuth } from '../context/AuthContext';
+import { useModal } from '../context/ModalContext';
 import { Victima } from '../types/jep';
+import { FormVictima } from '../components/FormVictima';
 
 const Victimas = () => {
   const [victimas, setVictimas] = useState<Victima[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  
+  // Estado para controlar si el modal de Nueva Víctima está abierto o cerrado
+  const [openModalVictima, setOpenModalVictima] = useState(false);
+  
   const navigate = useNavigate();
   const { currentUser, role } = useAuth();
+  const { showModal } = useModal();
+
+  const loadData = async () => {
+    if (!currentUser?.uid || !role) return;
+    try {
+      setLoading(true);
+      const tipoRol = (role === 'psicosocial') ? 'psicosocial' : 'abogado';
+      const data = await jepService.getVictimasAsignadas(currentUser.uid, tipoRol);
+      setVictimas(data);
+    } catch (error) {
+      console.error("Error al cargar la matriz de víctimas:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchData = async () => {
-      if (!currentUser?.uid || !role) return;
-      try {
-        setLoading(true);
-        // Si es Admin/Superadmin, idealmente traería todas. Por ahora, asumimos vista de profesional.
-        const tipoRol = (role === 'psicosocial') ? 'psicosocial' : 'abogado';
-        const data = await jepService.getVictimasAsignadas(currentUser.uid, tipoRol);
-        setVictimas(data);
-      } catch (error) {
-        console.error("Error al cargar la matriz de víctimas:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
+    loadData();
   }, [currentUser, role]);
+
+  // Función para guardar la nueva víctima en Firestore
+  const handleCrearVictima = async (data: Omit<Victima, 'id' | 'fecha_registro'>) => {
+    try {
+      if (!currentUser?.uid) return;
+
+      // Inyectamos el ID del usuario actual como el responsable asignado
+      const victimaToSave = {
+        ...data,
+        representacion: {
+          ...data.representacion,
+          [role === 'psicosocial' ? 'psicosocial_asignado_id' : 'juridico_asignado_id']: currentUser.uid
+        }
+      };
+
+      await jepService.createVictima(victimaToSave);
+      showModal('Éxito', 'La víctima fue registrada y asignada a tu matriz correctamente.', 'success');
+      setOpenModalVictima(false); // Cerramos el modal
+      await loadData(); // Recargamos la tabla para que aparezca la nueva víctima
+    } catch (error) {
+      console.error("Error al guardar la víctima:", error);
+      showModal('Error', 'Hubo un problema de conexión al intentar guardar.', 'error');
+    }
+  };
 
   const filteredData = victimas.filter(v => 
     v.nombre_completo.toLowerCase().includes(search.toLowerCase()) ||
@@ -73,8 +105,7 @@ const Victimas = () => {
             variant="contained" 
             startIcon={<PersonAddIcon />}
             sx={{ bgcolor: '#003366', '&:hover': { bgcolor: '#002244' } }}
-            // Por ahora solo es un botón visual, luego lo conectaremos al formulario
-            onClick={() => console.log("Abrir modal de creación")} 
+            onClick={() => setOpenModalVictima(true)} 
           >
             Nueva Víctima
           </Button>
@@ -140,6 +171,22 @@ const Victimas = () => {
           </TableBody>
         </Table>
       </Paper>
+
+      {/* ================= MODAL DE NUEVA VÍCTIMA ================= */}
+      <Dialog 
+        open={openModalVictima} 
+        onClose={() => setOpenModalVictima(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogContent sx={{ p: 0, bgcolor: '#f8fafc' }}>
+          <FormVictima 
+            onSave={handleCrearVictima} 
+            onCancel={() => setOpenModalVictima(false)} 
+          />
+        </DialogContent>
+      </Dialog>
+
     </Box>
   );
 };
