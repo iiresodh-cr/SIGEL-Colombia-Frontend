@@ -7,8 +7,9 @@ import MainLayout from '../layouts/MainLayout';
 import Login from '../pages/Login';
 import Dashboard from '../pages/Dashboard';
 import AdminDashboard from '../pages/AdminDashboard';
-import Victimas from '../pages/Victimas'; // Nuevo componente
-import VictimaDetalle from '../pages/VictimaDetalle'; // Nuevo componente
+import Victimas from '../pages/Victimas';
+import VictimaDetalle from '../pages/VictimaDetalle';
+import Eventos from '../pages/Eventos';
 
 const isAdminApp = import.meta.env.VITE_APP_TYPE === 'ADMIN';
 
@@ -31,11 +32,11 @@ const AppRouter = () => {
                 } />
               )}
               
-              {/* Rutas actualizadas para las víctimas */}
               {!isAdminApp && (
                 <>
                   <Route path="/victimas" element={<Victimas />} />
                   <Route path="/victimas/:id" element={<VictimaDetalle />} />
+                  <Route path="/eventos" element={<Eventos />} />
                 </>
               )}
             </Route>

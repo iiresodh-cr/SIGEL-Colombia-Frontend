@@ -48,17 +48,28 @@ export const jepService = {
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Interaccion));
   },
 
+  // ==========================================
+  // MÉTODOS PARA EVENTOS
+  // ==========================================
   getEventosProximos: async (): Promise<Evento[]> => {
-    const hoy = new Date().toISOString().split('T')[0];
-    const q = query(collection(db, EVENTOS_COLLECTION), where('fecha_inicio', '>=', hoy), orderBy('fecha_inicio', 'asc'), limit(10));
+    const q = query(
+      collection(db, EVENTOS_COLLECTION), 
+      orderBy('fecha_inicio', 'desc'), 
+      limit(20)
+    );
     const snapshot = await getDocs(q);
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Evento));
+  },
+
+  createEvento: async (data: Omit<Evento, 'id'>): Promise<string> => {
+    const docRef = await addDoc(collection(db, EVENTOS_COLLECTION), data);
+    return docRef.id;
   },
 
   // ==========================================
   // MÉTODOS PUENTE (Compatibilidad con UI antigua)
   // ==========================================
-  crearExpediente: async (data: any) => { console.log('Deprecated. Se usará crearVictima en Fase 4', data); },
+  crearExpediente: async (data: any) => { console.log('Deprecated. Se usará createVictima', data); },
   getExpedientes: async () => { return []; },
   getExpedienteById: async (id: string) => { return { id, codigoExpediente: 'TRANSICIÓN', macrocaso: 'Caso 01' }; },
   getVictimas: async (expedienteId: string) => { return []; },

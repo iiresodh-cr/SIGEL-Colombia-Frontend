@@ -29,11 +29,15 @@ const MainLayout = () => {
             </Button>
           )}
 
-          {/* Actualizado para apuntar a la nueva matriz de víctimas */}
           {!isAdminApp && (
-            <Button color="inherit" onClick={() => navigate('/victimas')}>
-              Matriz de Víctimas
-            </Button>
+            <>
+              <Button color="inherit" onClick={() => navigate('/victimas')}>
+                Matriz de Víctimas
+              </Button>
+              <Button color="inherit" onClick={() => navigate('/eventos')}>
+                Eventos y Talleres
+              </Button>
+            </>
           )}
         </Toolbar>
       </AppBar>
