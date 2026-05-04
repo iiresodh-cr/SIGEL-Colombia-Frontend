@@ -1,22 +1,26 @@
 import React, { useEffect, useState } from 'react';
 import { 
   Box, Typography, Divider, Paper, Table, TableBody, TableCell, TableHead, 
-  TableRow, Select, MenuItem, Grid, Button, CircularProgress, IconButton, Tooltip 
+  TableRow, Select, MenuItem, Button, CircularProgress, IconButton, Chip, Grid 
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
+import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import { adminService } from '../services/adminService';
-import { jepService } from '../services/jepService';
 import { AdminStats } from '../components/AdminStats';
 import { UserManagement } from '../components/UserManagement';
-import { FormExpediente } from '../components/FormExpediente';
+import { SustitucionMasiva } from '../components/SustitucionMasiva';
 import { useModal } from '../context/ModalContext';
 import { useAuth } from '../context/AuthContext';
+import { Usuario } from '../types/user';
+import { Victima } from '../types/jep';
 
 const AdminDashboard = () => {
-  const [users, setUsers] = useState<any[]>([]);
-  const [expedientes, setExpedientes] = useState<any[]>([]);
+  const [users, setUsers] = useState<Usuario[]>([]);
+  const [ultimasVictimas, setUltimasVictimas] = useState<Victima[]>([]);
   const [stats, setStats] = useState({ totalVictimas: 0, totalCaso01: 0, totalCaso10: 0 });
   const [loading, setLoading] = useState(true);
+  const [showSustitucion, setShowSustitucion] = useState(false);
+  
   const { showModal } = useModal();
   const { currentUser } = useAuth();
 
@@ -29,9 +33,9 @@ const AdminDashboard = () => {
       ]);
       
       setUsers(userList);
-      setExpedientes(statsData.allExpedientes);
+      setUltimasVictimas(statsData.ultimasVictimas);
       setStats({
-        totalVictimas: statsData.allExpedientes.length,
+        totalVictimas: statsData.totalVictimas,
         totalCaso01: statsData.totalCaso01,
         totalCaso10: statsData.totalCaso10
       });
@@ -61,100 +65,124 @@ const AdminDashboard = () => {
       showModal('Acción no permitida', 'No puedes borrarte a ti mismo.', 'error');
       return;
     }
-    showModal('¿Revocar Acceso?', `¿Eliminar a ${email}?`, 'confirm', async () => {
+    showModal('¿Revocar Acceso?', `¿Eliminar a ${email}? Esta persona ya no podrá entrar al SIGEL.`, 'confirm', async () => {
       try {
         await adminService.deleteUser(email);
         await loadDashboardData();
-        showModal('Acceso Revocado', 'Usuario eliminado.', 'success');
+        showModal('Acceso Revocado', 'Usuario eliminado de la base de datos.', 'success');
       } catch (error) {
         showModal('Error', 'No se pudo eliminar.', 'error');
       }
     });
   };
 
-  const handleCrearExpediente = async (data: any) => {
-    try {
-      await jepService.crearExpediente(data);
-      showModal('Éxito', 'Expediente dado de alta correctamente.', 'success');
-      await loadDashboardData();
-    } catch (error) {
-      showModal('Error', 'Hubo un problema al guardar.', 'error');
-    }
-  };
-
   if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', mt: 10 }}><CircularProgress /></Box>;
 
   return (
     <Box sx={{ p: 4 }}>
-      <Typography variant="h4" sx={{ fontWeight: 800, color: '#003366', mb: 4 }}>Administración Central SIGEL</Typography>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+        <Typography variant="h4" sx={{ fontWeight: 800, color: '#003366' }}>Administración Central SIGEL</Typography>
+        <Button 
+          variant="contained" 
+          startIcon={<SwapHorizIcon />} 
+          color="warning"
+          onClick={() => setShowSustitucion(!showSustitucion)}
+        >
+          {showSustitucion ? 'Cerrar Sustituciones' : 'Sustitución Masiva de Casos'}
+        </Button>
+      </Box>
 
-      <AdminStats totalVictimas={stats.totalVictimas} totalCaso01={stats.totalCaso01} totalCaso10={stats.totalCaso10} />
+      {showSustitucion ? (
+        <SustitucionMasiva 
+          usuarios={users} 
+          onComplete={() => {
+            setShowSustitucion(false);
+            loadDashboardData();
+          }} 
+        />
+      ) : (
+        <>
+          <AdminStats 
+            totalVictimas={stats.totalVictimas} 
+            totalCaso01={stats.totalCaso01} 
+            totalCaso10={stats.totalCaso10} 
+          />
 
-      <Grid container spacing={4} sx={{ mt: 2 }}>
-        <Grid size={{ xs: 12, lg: 5 }}>
-          <UserManagement onUserAdded={loadDashboardData} />
-        </Grid>
-        <Grid size={{ xs: 12, lg: 7 }}>
-          <FormExpediente onSave={handleCrearExpediente} />
-        </Grid>
-      </Grid>
+          <Grid container spacing={4} sx={{ mt: 2 }}>
+            <Grid size={{ xs: 12, lg: 5 }}>
+              <UserManagement onUserAdded={loadDashboardData} />
+            </Grid>
+            <Grid size={{ xs: 12, lg: 7 }}>
+              <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid #e2e8f0' }}>
+                <Typography variant="h6" sx={{ mb: 3, fontWeight: 700 }}>Últimas Víctimas Registradas</Typography>
+                <Table size="small">
+                  <TableHead sx={{ bgcolor: '#f8fafc' }}>
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: 'bold' }}>Nombre</TableCell>
+                      <TableCell sx={{ fontWeight: 'bold' }}>Casos</TableCell>
+                      <TableCell sx={{ fontWeight: 'bold' }}>Acreditación</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {ultimasVictimas.map((v) => (
+                      <TableRow key={v.id}>
+                        <TableCell sx={{ fontWeight: 600 }}>{v.nombre_completo}</TableCell>
+                        <TableCell>
+                          {v.representacion.caso.map(c => (
+                            <Chip key={c} label={c} size="small" sx={{ mr: 0.5, fontSize: '0.65rem' }} />
+                          ))}
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="caption">{v.estado_jep.estado_acreditacion}</Typography>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </Paper>
+            </Grid>
+          </Grid>
+        </>
+      )}
 
-      <Divider sx={{ my: 6 }}><Typography variant="overline" sx={{ px: 2 }}>Control de Expedientes Recientes</Typography></Divider>
+      <Divider sx={{ my: 6 }}><Typography variant="overline" sx={{ px: 2 }}>Personal Autorizado y Control de Roles</Typography></Divider>
       
-      <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid #e2e8f0', mb: 4 }}>
-        <Typography variant="h6" sx={{ mb: 3, fontWeight: 700 }}>Últimos Registros JEP</Typography>
-        <Table>
-          <TableHead sx={{ bgcolor: '#f8fafc' }}>
-            <TableRow>
-              <TableCell sx={{ fontWeight: 'bold' }}>Código</TableCell>
-              <TableCell sx={{ fontWeight: 'bold' }}>Macrocaso</TableCell>
-              <TableCell sx={{ fontWeight: 'bold' }}>Estado</TableCell>
-              <TableCell sx={{ fontWeight: 'bold' }}>Fecha Registro</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {expedientes.length === 0 ? (
-              <TableRow><TableCell colSpan={4} align="center">No hay expedientes registrados aún.</TableCell></TableRow>
-            ) : (
-              expedientes.map((exp) => (
-                <TableRow key={exp.id}>
-                  {/* CORRECCIÓN: Usamos 'codigoExpediente' */}
-                  <TableCell sx={{ fontWeight: 'bold', color: '#003366' }}>{exp.codigoExpediente}</TableCell>
-                  <TableCell>{exp.macrocaso}</TableCell>
-                  <TableCell>{exp.estadoProcesal}</TableCell>
-                  {/* CORRECCIÓN: Usamos 'fechaRegistro' */}
-                  <TableCell>{exp.fechaRegistro ? new Date(exp.fechaRegistro).toLocaleDateString() : 'N/A'}</TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </Paper>
-
-      <Divider sx={{ my: 6 }}><Typography variant="overline" sx={{ px: 2 }}>Personal Autorizado</Typography></Divider>
       <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid #e2e8f0' }}>
         <Table>
           <TableHead sx={{ bgcolor: '#f8fafc' }}>
             <TableRow>
-              <TableCell sx={{ fontWeight: 'bold' }}>Email</TableCell>
-              <TableCell sx={{ fontWeight: 'bold' }}>Rol</TableCell>
-              <TableCell align="right" sx={{ fontWeight: 'bold' }}>Acción</TableCell>
+              <TableCell sx={{ fontWeight: 'bold' }}>Email Institucional</TableCell>
+              <TableCell sx={{ fontWeight: 'bold' }}>Rol Actual</TableCell>
+              <TableCell align="right" sx={{ fontWeight: 'bold' }}>Acciones</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {users.map((u) => (
               <TableRow key={u.uid} hover>
-                <TableCell>{u.email}</TableCell>
-                <TableCell><Box sx={{ px: 1, py: 0.5, borderRadius: 1, bgcolor: '#f0fdf4', display: 'inline-block' }}>{u.role}</Box></TableCell>
+                <TableCell>{u.correo}</TableCell>
+                <TableCell>
+                  <Chip 
+                    label={u.rol} 
+                    size="small" 
+                    color={u.rol === 'superadmin' ? 'secondary' : 'default'} 
+                  />
+                </TableCell>
                 <TableCell align="right">
-                  {u.email !== 'webmaster@iiresodh.org' && (
+                  {u.correo !== 'webmaster@iiresodh.org' && (
                     <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
-                      <Select size="small" value={u.role} onChange={(e) => handleRoleChange(u.email, e.target.value)} sx={{ minWidth: 150 }}>
-                        <MenuItem value="Abogado">Abogado/a</MenuItem>
-                        <MenuItem value="Administrador">Administrador/a</MenuItem>
-                        <MenuItem value="Invitado">Invitado</MenuItem>
+                      <Select 
+                        size="small" 
+                        value={u.rol} 
+                        onChange={(e) => handleRoleChange(u.correo, e.target.value)} 
+                        sx={{ minWidth: 150 }}
+                      >
+                        <MenuItem value="abogado">Abogado/a</MenuItem>
+                        <MenuItem value="psicosocial">Psicosocial</MenuItem>
+                        <MenuItem value="admin">Administrador/a</MenuItem>
                       </Select>
-                      <IconButton color="error" onClick={() => handleDeleteUser(u.email)}><DeleteIcon /></IconButton>
+                      <IconButton color="error" onClick={() => handleDeleteUser(u.correo)}>
+                        <DeleteIcon />
+                      </IconButton>
                     </Box>
                   )}
                 </TableCell>
