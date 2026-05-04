@@ -110,5 +110,16 @@ export const adminService = {
     }
 
     return totalModificados;
+  },
+
+  // 7. Listar profesionales para el formulario de asignación
+  getProfesionales: async () => {
+    const q = query(collection(db, 'usuarios'));
+    const snapshot = await getDocs(q);
+    const todos = snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as Usuario));
+    return {
+      abogados: todos.filter(u => u.rol === 'abogado' || u.rol === 'admin' || u.rol === 'superadmin'),
+      psicosociales: todos.filter(u => u.rol === 'psicosocial')
+    };
   }
 };

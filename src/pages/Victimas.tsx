@@ -22,7 +22,7 @@ const Victimas = () => {
   const [search, setSearch] = useState('');
   const [openModalVictima, setOpenModalVictima] = useState(false);
   
-  // Aquí declaramos explícitamente los tipos para evitar el error de "never[]"
+  // Aquí está la corrección: Declaramos explícitamente los tipos en el useState
   const [listaProfesionales, setListaProfesionales] = useState<{ abogados: Usuario[], psicosociales: Usuario[] }>({ 
     abogados: [], 
     psicosociales: [] 
