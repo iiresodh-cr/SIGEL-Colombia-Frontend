@@ -23,16 +23,16 @@ const MainLayout = () => {
             Panel General
           </Button>
 
-          {/* Actualizado a roles en minúscula */}
           {isAdminApp && (role === 'superadmin' || role === 'admin') && (
             <Button color="inherit" onClick={() => navigate('/admin')}>
               Gestión de Usuarios
             </Button>
           )}
 
+          {/* Actualizado para apuntar a la nueva matriz de víctimas */}
           {!isAdminApp && (
-            <Button color="inherit" onClick={() => navigate('/expedientes')}>
-              Gestión de Casos (Víctimas)
+            <Button color="inherit" onClick={() => navigate('/victimas')}>
+              Matriz de Víctimas
             </Button>
           )}
         </Toolbar>
