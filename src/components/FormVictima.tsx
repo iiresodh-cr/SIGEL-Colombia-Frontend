@@ -6,7 +6,6 @@ import {
 import { Victima } from '../types/jep';
 
 interface FormVictimaProps {
-  // onSave emitirá un objeto que cumple con la estructura base de Victima
   onSave: (data: Omit<Victima, 'id' | 'fecha_registro'>) => void;
   onCancel: () => void;
 }
@@ -15,8 +14,19 @@ const CASOS_JEP = ['Caso 01', 'Caso 10'];
 const BLOQUES_JEP = ['BNOR', 'BSUR', 'BORI', 'BCAR', 'BCC', 'BMM'];
 const CALIDADES = ['Directa', 'Indirecta', 'Indirecta (Vocera)', 'Ambas'];
 
+// Listado de géneros para el selector
+const GENEROS = ['Mujer', 'Hombre', 'No binario', 'Otro', 'Prefiero no decirlo'];
+
+// Listado de departamentos de Colombia para el selector
+const DEPARTAMENTOS = [
+  'Amazonas', 'Antioquia', 'Arauca', 'Atlántico', 'Bolívar', 'Boyacá', 'Caldas', 
+  'Caquetá', 'Casanare', 'Cauca', 'Cesar', 'Chocó', 'Córdoba', 'Cundinamarca', 
+  'Guainía', 'Guaviare', 'Huila', 'La Guajira', 'Magdalena', 'Meta', 'Nariño', 
+  'Norte de Santander', 'Putumayo', 'Quindío', 'Risaralda', 'San Andrés y Providencia', 
+  'Santander', 'Sucre', 'Tolima', 'Valle del Cauca', 'Vaupés', 'Vichada', 'Bogotá D.C.'
+];
+
 export const FormVictima = ({ onSave, onCancel }: FormVictimaProps) => {
-  // Inicializamos el estado reflejando la nueva arquitectura anidada de Firestore
   const [formData, setFormData] = useState<Omit<Victima, 'id' | 'fecha_registro' | 'storage_folder_url'>>({
     nombre_completo: '',
     tipo_documento: 'CC',
@@ -38,8 +48,8 @@ export const FormVictima = ({ onSave, onCancel }: FormVictimaProps) => {
       caso: [],
       bloque: [],
       calidad_victima: '',
-      juridico_asignado_id: '', // Se llenará en el servicio o vista padre
-      psicosocial_asignado_id: '', // Se llenará en el servicio o vista padre
+      juridico_asignado_id: '',
+      psicosocial_asignado_id: '',
       fecha_asignacion: new Date().toISOString().split('T')[0],
       estado: 'Activo'
     },
@@ -51,7 +61,6 @@ export const FormVictima = ({ onSave, onCancel }: FormVictimaProps) => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Emitimos los datos al componente padre (Victimas.tsx o VictimaDetalle.tsx)
     onSave(formData as any);
   };
 
@@ -97,15 +106,20 @@ export const FormVictima = ({ onSave, onCancel }: FormVictimaProps) => {
             />
           </Grid>
 
+          {/* Campo de Género actualizado a Selector */}
           <Grid size={{ xs: 12, md: 6 }}>
             <TextField
-              fullWidth size="small" label="Género" placeholder="Ej: Mujer, Hombre"
+              select fullWidth size="small" label="Género" required
               value={formData.datos_demograficos.genero}
               onChange={(e) => setFormData({ 
                 ...formData, 
                 datos_demograficos: { ...formData.datos_demograficos, genero: e.target.value } 
               })}
-            />
+            >
+              {GENEROS.map((opcion) => (
+                <MenuItem key={opcion} value={opcion}>{opcion}</MenuItem>
+              ))}
+            </TextField>
           </Grid>
 
           {/* ================= SECCIÓN 2: DATOS DE CONTACTO ================= */}
@@ -135,21 +149,27 @@ export const FormVictima = ({ onSave, onCancel }: FormVictimaProps) => {
             />
           </Grid>
 
+          {/* Campo de Departamento actualizado a Selector */}
           <Grid size={{ xs: 12, md: 6 }}>
             <TextField
-              fullWidth size="small" label="Departamento" required
-              placeholder="Ej: Antioquia"
+              select fullWidth size="small" label="Departamento" required
               value={formData.datos_contacto.departamento}
               onChange={(e) => setFormData({ 
                 ...formData, 
                 datos_contacto: { ...formData.datos_contacto, departamento: e.target.value } 
               })}
-            />
+            >
+              {DEPARTAMENTOS.map((dep) => (
+                <MenuItem key={dep} value={dep}>{dep}</MenuItem>
+              ))}
+            </TextField>
           </Grid>
 
+          {/* Campo de Dirección actualizado a Multilínea */}
           <Grid size={{ xs: 12, md: 6 }}>
             <TextField
-              fullWidth size="small" label="Dirección / Vereda"
+              fullWidth multiline rows={3} label="Dirección / Vereda / Detalles de ubicación"
+              placeholder="Ingresa la dirección detallada, incluyendo vereda o indicaciones adicionales..."
               value={formData.datos_contacto.direccion}
               onChange={(e) => setFormData({ 
                 ...formData, 
