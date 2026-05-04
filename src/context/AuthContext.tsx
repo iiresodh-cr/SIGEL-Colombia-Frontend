@@ -43,14 +43,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           }
 
           if (user.email === SUPER_ADMIN_EMAIL) {
-            setRole('SuperAdmin');
+            setRole('superadmin');
             setCurrentUser(user);
           } else {
-            const userDocRef = doc(db, "users", user.email.toLowerCase());
+            // Cambiado a colección 'usuarios' para coincidir con Fase 1
+            const userDocRef = doc(db, "usuarios", user.email.toLowerCase());
             const userDoc = await getDoc(userDocRef);
 
             if (userDoc.exists()) {
-              setRole(userDoc.data().role as UserRole);
+              setRole(userDoc.data().rol as UserRole); // Traemos 'rol' en vez de 'role'
               setCurrentUser(user);
             } else {
               await signOut(auth);

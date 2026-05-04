@@ -25,7 +25,7 @@ const AppRouter = () => {
               
               {isAdminApp && (
                 <Route path="/admin" element={
-                  <RoleGuard allowedRoles={['SuperAdmin', 'Administrador']}>
+                  <RoleGuard allowedRoles={['superadmin', 'admin']}>
                     <AdminDashboard />
                   </RoleGuard>
                 } />

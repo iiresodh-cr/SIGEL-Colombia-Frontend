@@ -6,7 +6,7 @@ export interface DatosDemograficos {
   genero: string;
   orientacion_sexual: string;
   grupo_etnico: string;
-  etareo: string; // Ej: Adulto, Adulto mayor, etc.
+  etareo: string; 
   discapacidad: string;
   fecha_nacimiento?: string;
 }
@@ -20,15 +20,15 @@ export interface DatosContacto {
 }
 
 export interface Representacion {
-  caso: string[]; // Ej: ['Caso 01', 'Caso 10']
-  bloque: string[]; // Ej: ['BSUR', 'BORI', 'BNOR']
-  calidad_victima: string; // Ej: 'Directa', 'Indirecta (Vocera)', etc.
+  caso: string[]; 
+  bloque: string[]; 
+  calidad_victima: string; 
   delito?: string;
-  juridico_asignado_id: string; // UID del abogado
-  psicosocial_asignado_id: string; // UID del profesional psicosocial
+  juridico_asignado_id: string; 
+  psicosocial_asignado_id: string; 
   fecha_asignacion: string;
   estado: 'Activo' | 'Desasignado' | 'En Sustitución' | 'Fallecido';
-  referencia_llegada?: string; // Ej: 'Asignación SAAD', 'Llegó al IIRESODH'
+  referencia_llegada?: string; 
 }
 
 export interface EstadoSistemaVista {
@@ -52,7 +52,6 @@ export interface EstadoJEP {
 // COLECCIONES PRINCIPALES
 // ==========================================
 
-// 1. Colección: /victimas
 export interface Victima {
   id?: string;
   identificacion: string;
@@ -66,52 +65,48 @@ export interface Victima {
   fecha_registro: string;
 }
 
-// 2. Colección: /eventos (Talleres, Capacitaciones, Audiencias)
 export interface Evento {
   id?: string;
   tipo: 'Taller' | 'Audiencia' | 'Jornada Divulgación' | 'Capacitación' | 'Reunión' | 'Otro';
   titulo: string;
   fecha_inicio: string;
   fecha_fin?: string;
-  modalidad: string; // Ej: 'Presencial - Bogotá', 'Virtual'
+  modalidad: string; 
   casos: string[];
   bloques: string[];
-  funcionarios_juridicos: string[]; // Arreglo de nombres o IDs
-  funcionarios_psicosociales: string[]; // Arreglo de nombres o IDs
+  funcionarios_juridicos: string[]; 
+  funcionarios_psicosociales: string[]; 
   explicacion_conclusiones: string;
   numero_asistentes?: number;
-  asistencia_victimas?: string[]; // IDs de víctimas (opcional)
+  asistencia_victimas?: string[]; 
 }
 
-// 3. Colección: /radicados_institucionales (Documentos y Memoriales)
 export interface RadicadoInstitucional {
   id?: string;
   fecha_solicitud: string;
   fecha_radicado: string;
   numero_radicado: string;
   asunto: string;
-  entidad_destino: string; // Ej: info@jep.gov.co
-  victimas_involucradas?: string[]; // IDs de víctimas relacionadas
-  abogado_responsable_id: string; // UID del abogado
+  entidad_destino: string; 
+  victimas_involucradas?: string[]; 
+  abogado_responsable_id: string; 
 }
 
 // ==========================================
-// SUBCOLECCIONES (Dentro de /victimas/{id})
+// SUBCOLECCIONES
 // ==========================================
 
-// Subcolección: /victimas/{id}/interacciones
 export interface Interaccion {
   id?: string;
   fecha: string;
-  tipo: string; // Ej: 'Llamada de sentido del proceso', 'Asesoría jurídica'
-  responsable_id: string; // UID de quien hizo la interacción
+  tipo: string; 
+  responsable_id: string; 
   rol_responsable: 'Jurídico' | 'Psicosocial';
   estado_contacto: 'Contactado' | 'No contactado' | 'Contacto fallido';
   observaciones: string;
   compromisos?: string;
 }
 
-// Subcolección: /victimas/{id}/historial_asignaciones
 export interface HistorialAsignacion {
   id?: string;
   fecha_sustitucion: string;
@@ -119,6 +114,31 @@ export interface HistorialAsignacion {
   abogado_anterior_id: string;
   abogado_nuevo_id: string;
   motivo: string;
-  sustitucion_realizada_por_id: string; // UID del Admin que hizo el cambio
+  sustitucion_realizada_por_id: string; 
   radicado_sustitucion_jep?: string;
+}
+
+// ==========================================
+// TIPOS LEGACY / DEPRECADOS (Compatibilidad UI Fase 3)
+// ==========================================
+export interface ExpedienteJEP {
+  id?: string;
+  codigoExpediente: string;
+  macrocaso: 'Caso 01' | 'Caso 10';
+  estadoProcesal: string;
+  resumenHechos: string;
+  fechaRegistro: string;
+}
+
+export interface VictimaJEP {
+  id?: string;
+  expedienteId: string;
+  nombreCompleto: string;
+  documentoIdentidad: string;
+  telefono: string;
+  direccion: string;
+  municipio: string;
+  departamento: string;
+  estadoAcreditacion: 'Acreditada' | 'En proceso' | 'No acreditada';
+  observacionesContacto: string;
 }

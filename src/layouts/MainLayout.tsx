@@ -23,20 +23,16 @@ const MainLayout = () => {
             Panel General
           </Button>
 
-          {/* SEGURIDAD REFORZADA:
-              El botón de admin solo se renderiza si estamos en el DOMINIO de admin
-              Y además el usuario tiene el ROL adecuado.
-          */}
-          {isAdminApp && (role === 'SuperAdmin' || role === 'Administrador') && (
+          {/* Actualizado a roles en minúscula */}
+          {isAdminApp && (role === 'superadmin' || role === 'admin') && (
             <Button color="inherit" onClick={() => navigate('/admin')}>
               Gestión de Usuarios
             </Button>
           )}
 
-          {/* El acceso a expedientes solo es visible en la App Principal */}
           {!isAdminApp && (
             <Button color="inherit" onClick={() => navigate('/expedientes')}>
-              Expedientes
+              Gestión de Casos (Víctimas)
             </Button>
           )}
         </Toolbar>
