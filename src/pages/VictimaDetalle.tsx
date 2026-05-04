@@ -10,9 +10,12 @@ import AddCommentIcon from '@mui/icons-material/AddComment';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import DeleteIcon from '@mui/icons-material/Delete';
+import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import { jepService } from '../services/jepService';
 import { storageService, ArchivoJEP } from '../services/storageService';
+import { adminService } from '../services/adminService';
 import { Victima, Interaccion } from '../types/jep';
+import { Usuario } from '../types/user';
 import { useAuth } from '../context/AuthContext';
 import { useModal } from '../context/ModalContext';
 
@@ -33,29 +36,34 @@ const VictimaDetalle = () => {
   const [victima, setVictima] = useState<Victima | null>(null);
   const [interacciones, setInteracciones] = useState<Interaccion[]>([]);
   const [poderes, setPoderes] = useState<ArchivoJEP[]>([]);
+  const [listaProfesionales, setListaProfesionales] = useState<{ abogados: Usuario[], psicosociales: Usuario[] }>({ abogados: [], psicosociales: [] });
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
 
+  // Estados para notas
   const [openNoteModal, setOpenNoteModal] = useState(false);
   const [newNote, setNewNote] = useState<Partial<Interaccion>>({
-    tipo: 'Llamada de sentido del proceso',
-    estado_contacto: 'Contactado',
-    observaciones: '',
-    compromisos: ''
+    tipo: 'Llamada de sentido del proceso', estado_contacto: 'Contactado', observaciones: '', compromisos: ''
   });
+
+  // Estados para reasignación de caso (Solo Admins)
+  const [openReasignarModal, setOpenReasignarModal] = useState(false);
+  const [reasignarData, setReasignarData] = useState({ juridico_nuevo_id: '', psicosocial_nuevo_id: '', motivo: '' });
 
   const loadData = async () => {
     if (!id) return;
     try {
       setLoading(true);
-      const [victimaData, notasData, archivosData] = await Promise.all([
+      const [victimaData, notasData, archivosData, profsData] = await Promise.all([
         jepService.getVictimaById(id),
         jepService.getInteraccionesRecientes(id),
-        storageService.getFiles(id, 'poderes') // Cargamos los poderes
+        storageService.getFiles(id, 'poderes'),
+        adminService.getProfesionales() // Traemos los profesionales
       ]);
       setVictima(victimaData);
       setInteracciones(notasData);
       setPoderes(archivosData);
+      setListaProfesionales(profsData);
     } catch (error) {
       console.error("Error cargando perfil:", error);
       showModal('Error', 'No se pudo cargar la información de la víctima.', 'error');
@@ -90,17 +98,41 @@ const VictimaDetalle = () => {
     }
   };
 
+  const handleReasignar = async () => {
+    if (!id || !currentUser || !victima) return;
+    if (!reasignarData.motivo) {
+      showModal('Falta Información', 'Debe justificar el motivo de la reasignación.', 'error');
+      return;
+    }
+    try {
+      setLoading(true);
+      await adminService.reasignarVictimaIndividual(id, currentUser.uid, {
+        juridico_anterior_id: victima.representacion.juridico_asignado_id,
+        juridico_nuevo_id: reasignarData.juridico_nuevo_id,
+        psicosocial_anterior_id: victima.representacion.psicosocial_asignado_id,
+        psicosocial_nuevo_id: reasignarData.psicosocial_nuevo_id,
+        motivo: reasignarData.motivo
+      });
+      showModal('Reasignación Exitosa', 'El caso ha sido actualizado y el cambio quedó registrado.', 'success');
+      setOpenReasignarModal(false);
+      await loadData();
+    } catch (error) {
+      console.error(error);
+      showModal('Error', 'No se pudo reasignar el caso.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file || !id) return;
-
     try {
       setUploading(true);
       await storageService.uploadFile(id, file, 'poderes');
       showModal('Archivo Subido', 'El poder ha sido cargado con éxito.', 'success');
-      await loadData(); // Recarga la lista de archivos
+      await loadData();
     } catch (error) {
-      console.error("Error subiendo archivo:", error);
       showModal('Error', 'No se pudo subir el archivo. Intenta de nuevo.', 'error');
     } finally {
       setUploading(false);
@@ -119,8 +151,13 @@ const VictimaDetalle = () => {
     });
   };
 
+  const getNombreAbo = (uid: string) => listaProfesionales.abogados.find(u => u.uid === uid)?.nombre_completo || 'Sin asignar';
+  const getNombrePsi = (uid: string) => listaProfesionales.psicosociales.find(u => u.uid === uid)?.nombre_completo || 'Sin asignar';
+
   if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', mt: 10 }}><CircularProgress /></Box>;
   if (!victima) return <Box sx={{ p: 4 }}><Typography>Víctima no encontrada</Typography></Box>;
+
+  const isAdmin = role === 'admin' || role === 'superadmin';
 
   return (
     <Box sx={{ p: 4 }}>
@@ -154,7 +191,42 @@ const VictimaDetalle = () => {
 
             <Divider sx={{ my: 3 }} />
 
-            <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 2, color: '#003366' }}>Información de Representación (IIRESODH)</Typography>
+            {/* SECCIÓN DE REPRESENTACIÓN CON BOTÓN DE REASIGNAR */}
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+              <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#003366' }}>
+                Información de Representación (IIRESODH)
+              </Typography>
+              {isAdmin && (
+                <Button 
+                  size="small" 
+                  variant="outlined" 
+                  color="warning" 
+                  startIcon={<SwapHorizIcon />}
+                  onClick={() => {
+                    setReasignarData({
+                      juridico_nuevo_id: victima.representacion.juridico_asignado_id,
+                      psicosocial_nuevo_id: victima.representacion.psicosocial_asignado_id,
+                      motivo: ''
+                    });
+                    setOpenReasignarModal(true);
+                  }}
+                >
+                  Reasignar Caso
+                </Button>
+              )}
+            </Box>
+
+            <Grid container spacing={2} sx={{ mb: 2 }}>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <Typography variant="caption" color="text.secondary">Abogado/a Responsable</Typography>
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>{getNombreAbo(victima.representacion.juridico_asignado_id)}</Typography>
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <Typography variant="caption" color="text.secondary">Psicosocial Responsable</Typography>
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>{getNombrePsi(victima.representacion.psicosocial_asignado_id)}</Typography>
+              </Grid>
+            </Grid>
+
             <Grid container spacing={2}>
               <Grid size={{ xs: 12, sm: 6 }}>
                 <Typography variant="caption" color="text.secondary">Macrocasos Vinculados</Typography>
@@ -164,18 +236,10 @@ const VictimaDetalle = () => {
                 <Typography variant="caption" color="text.secondary">Bloques Asignados</Typography>
                 <Box sx={{ display: 'flex', gap: 0.5, mt: 0.5 }}>{victima.representacion.bloque.map(b => <Chip key={b} label={b} size="small" variant="outlined" />)}</Box>
               </Grid>
-              <Grid size={{ xs: 12, sm: 6 }}>
-                <Typography variant="caption" color="text.secondary">Calidad de Víctima</Typography>
-                <Typography variant="body2">{victima.representacion.calidad_victima}</Typography>
-              </Grid>
-              <Grid size={{ xs: 12, sm: 6 }}>
-                <Typography variant="caption" color="text.secondary">Estado de Representación</Typography>
-                <Typography variant="body2">{victima.representacion.estado}</Typography>
-              </Grid>
             </Grid>
           </Paper>
 
-          {/* NUEVA SECCIÓN DE ARCHIVOS (PODERES) */}
+          {/* SECCIÓN DE ARCHIVOS (PODERES) */}
           <Paper elevation={0} sx={{ p: 4, borderRadius: 3, border: '1px solid #e2e8f0' }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
               <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#003366' }}>Poderes y Documentos</Typography>
@@ -196,7 +260,7 @@ const VictimaDetalle = () => {
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                       <PictureAsPdfIcon color="error" />
                       <a href={archivo.url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', color: '#0369a1', fontWeight: 600 }}>
-                        {archivo.name.split('_').slice(1).join('_') || archivo.name} {/* Limpia el timestamp del nombre */}
+                        {archivo.name.split('_').slice(1).join('_') || archivo.name}
                       </a>
                     </Box>
                     <IconButton size="small" color="error" onClick={() => handleDeleteFile(archivo.fullPath)}>
@@ -282,6 +346,57 @@ const VictimaDetalle = () => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* MODAL: REASIGNAR CASO INDIVIDUAL */}
+      <Dialog open={openReasignarModal} onClose={() => setOpenReasignarModal(false)} fullWidth maxWidth="sm">
+        <DialogTitle sx={{ fontWeight: 'bold', color: '#92400e', display: 'flex', alignItems: 'center', gap: 1 }}>
+          <SwapHorizIcon /> Reasignar Responsables del Caso
+        </DialogTitle>
+        <DialogContent dividers>
+          <Typography variant="body2" sx={{ mb: 3, color: 'text.secondary' }}>
+            Selecciona a los nuevos profesionales a cargo. El cambio quedará registrado en el historial de asignaciones de la víctima.
+          </Typography>
+          <Grid container spacing={2}>
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <TextField 
+                select fullWidth size="small" 
+                label="Nuevo Abogado/a" 
+                value={reasignarData.juridico_nuevo_id} 
+                onChange={(e) => setReasignarData({ ...reasignarData, juridico_nuevo_id: e.target.value })}
+              >
+                {listaProfesionales.abogados.map(u => <MenuItem key={u.uid} value={u.uid}>{u.nombre_completo || u.correo}</MenuItem>)}
+              </TextField>
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <TextField 
+                select fullWidth size="small" 
+                label="Nuevo Psicosocial" 
+                value={reasignarData.psicosocial_nuevo_id} 
+                onChange={(e) => setReasignarData({ ...reasignarData, psicosocial_nuevo_id: e.target.value })}
+              >
+                {listaProfesionales.psicosociales.map(u => <MenuItem key={u.uid} value={u.uid}>{u.nombre_completo || u.correo}</MenuItem>)}
+              </TextField>
+            </Grid>
+            <Grid size={{ xs: 12 }}>
+              <TextField 
+                fullWidth multiline rows={3} 
+                label="Motivo de la Reasignación" 
+                required 
+                placeholder="Ej: Renuncia de la abogada anterior, nivelación de carga laboral, etc." 
+                value={reasignarData.motivo} 
+                onChange={(e) => setReasignarData({ ...reasignarData, motivo: e.target.value })} 
+              />
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setOpenReasignarModal(false)} color="inherit">Cancelar</Button>
+          <Button onClick={handleReasignar} variant="contained" color="warning" disabled={!reasignarData.motivo}>
+            Ejecutar Reasignación
+          </Button>
+        </DialogActions>
+      </Dialog>
+
     </Box>
   );
 };

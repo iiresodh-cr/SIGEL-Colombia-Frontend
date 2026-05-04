@@ -83,15 +83,13 @@ export const adminService = {
     snapshot.forEach((victimaDoc) => {
       const victimaRef = doc(db, 'victimas', victimaDoc.id);
       
-      // Actualizar asignación
       batch.update(victimaRef, {
         [campoFiltro]: profesionalNuevoId,
         'representacion.fecha_asignacion': new Date().toISOString().split('T')[0]
       });
 
-      // Registrar en historial de la víctima
       const historialRef = doc(collection(db, `victimas/${victimaDoc.id}/historial_asignaciones`));
-      const registroHistorial: Omit<HistorialAsignacion, 'id'> = {
+      batch.set(historialRef, {
         fecha_sustitucion: new Date().toISOString(),
         tipo_profesional: tipoProfesional,
         abogado_anterior_id: profesionalAnteriorId,
@@ -99,16 +97,13 @@ export const adminService = {
         motivo: motivo,
         sustitucion_realizada_por_id: adminResponsableId,
         radicado_sustitucion_jep: radicadoJep || ''
-      };
-      
-      batch.set(historialRef, registroHistorial);
+      });
       totalModificados++;
     });
 
     if (totalModificados > 0) {
       await batch.commit();
     }
-
     return totalModificados;
   },
 
@@ -121,5 +116,64 @@ export const adminService = {
       abogados: todos.filter(u => u.rol === 'abogado' || u.rol === 'admin' || u.rol === 'superadmin'),
       psicosociales: todos.filter(u => u.rol === 'psicosocial')
     };
+  },
+
+  // 8. REASIGNACIÓN INDIVIDUAL (Bisturí de casos)
+  reasignarVictimaIndividual: async (
+    victimaId: string,
+    adminResponsableId: string,
+    cambios: {
+      juridico_anterior_id: string;
+      juridico_nuevo_id: string;
+      psicosocial_anterior_id: string;
+      psicosocial_nuevo_id: string;
+      motivo: string;
+    }
+  ): Promise<void> => {
+    const batch = writeBatch(db);
+    const victimaRef = doc(db, 'victimas', victimaId);
+    const updates: any = {};
+    let huboCambios = false;
+
+    // Si cambió el abogado
+    if (cambios.juridico_nuevo_id !== cambios.juridico_anterior_id) {
+      updates['representacion.juridico_asignado_id'] = cambios.juridico_nuevo_id;
+      updates['representacion.fecha_asignacion'] = new Date().toISOString().split('T')[0];
+      huboCambios = true;
+      
+      const historialRef = doc(collection(db, `victimas/${victimaId}/historial_asignaciones`));
+      batch.set(historialRef, {
+        fecha_sustitucion: new Date().toISOString(),
+        tipo_profesional: 'Jurídico',
+        abogado_anterior_id: cambios.juridico_anterior_id || 'Sin asignar',
+        abogado_nuevo_id: cambios.juridico_nuevo_id,
+        motivo: cambios.motivo,
+        sustitucion_realizada_por_id: adminResponsableId,
+        radicado_sustitucion_jep: ''
+      });
+    }
+
+    // Si cambió el psicosocial
+    if (cambios.psicosocial_nuevo_id !== cambios.psicosocial_anterior_id) {
+      updates['representacion.psicosocial_asignado_id'] = cambios.psicosocial_nuevo_id;
+      updates['representacion.fecha_asignacion'] = new Date().toISOString().split('T')[0];
+      huboCambios = true;
+      
+      const historialRef2 = doc(collection(db, `victimas/${victimaId}/historial_asignaciones`));
+      batch.set(historialRef2, {
+        fecha_sustitucion: new Date().toISOString(),
+        tipo_profesional: 'Psicosocial',
+        abogado_anterior_id: cambios.psicosocial_anterior_id || 'Sin asignar',
+        abogado_nuevo_id: cambios.psicosocial_nuevo_id,
+        motivo: cambios.motivo,
+        sustitucion_realizada_por_id: adminResponsableId,
+        radicado_sustitucion_jep: ''
+      });
+    }
+
+    if (huboCambios) {
+      batch.update(victimaRef, updates);
+      await batch.commit();
+    }
   }
 };
