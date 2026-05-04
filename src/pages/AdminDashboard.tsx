@@ -5,6 +5,8 @@ import {
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import { useNavigate } from 'react-router-dom'; // Importamos el navegador
 import { adminService } from '../services/adminService';
 import { AdminStats } from '../components/AdminStats';
 import { UserManagement } from '../components/UserManagement';
@@ -21,6 +23,7 @@ const AdminDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [showSustitucion, setShowSustitucion] = useState(false);
   
+  const navigate = useNavigate(); // Hook para redirección
   const { showModal } = useModal();
   const { currentUser } = useAuth();
 
@@ -121,6 +124,7 @@ const AdminDashboard = () => {
                       <TableCell sx={{ fontWeight: 'bold' }}>Nombre</TableCell>
                       <TableCell sx={{ fontWeight: 'bold' }}>Casos</TableCell>
                       <TableCell sx={{ fontWeight: 'bold' }}>Acreditación</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 'bold' }}>Acción</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -134,6 +138,16 @@ const AdminDashboard = () => {
                         </TableCell>
                         <TableCell>
                           <Typography variant="caption">{v.estado_jep.estado_acreditacion}</Typography>
+                        </TableCell>
+                        <TableCell align="right">
+                          <IconButton 
+                            size="small" 
+                            color="primary" 
+                            onClick={() => navigate(`/victimas/${v.id}`)}
+                            title="Ver Perfil Completo"
+                          >
+                            <VisibilityIcon fontSize="small" />
+                          </IconButton>
                         </TableCell>
                       </TableRow>
                     ))}
