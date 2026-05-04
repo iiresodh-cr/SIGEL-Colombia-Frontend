@@ -1,6 +1,7 @@
 import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
+import { getStorage } from "firebase/storage"; // <-- Nueva importación
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -14,10 +15,11 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
+export const storage = getStorage(app); // <-- Exportamos el servicio de archivos
 export const googleProvider = new GoogleAuthProvider();
 
 // Forzar que el selector de cuentas de Google aparezca siempre
 googleProvider.setCustomParameters({
   prompt: 'select_account',
-  hd: 'iiresodh.org' // Sugiere el dominio institucional
+  hd: 'iiresodh.org' 
 });

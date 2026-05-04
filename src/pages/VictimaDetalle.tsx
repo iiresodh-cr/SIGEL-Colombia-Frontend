@@ -2,12 +2,16 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
   Box, Typography, Paper, Grid, Divider, Button, CircularProgress, 
-  Chip, List, ListItem, ListItemText, Dialog, DialogTitle, 
-  DialogContent, DialogActions, TextField, MenuItem 
+  Chip, List, ListItem, Dialog, DialogTitle, 
+  DialogContent, DialogActions, TextField, MenuItem, IconButton
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import AddCommentIcon from '@mui/icons-material/AddComment';
+import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
+import DeleteIcon from '@mui/icons-material/Delete';
 import { jepService } from '../services/jepService';
+import { storageService, ArchivoJEP } from '../services/storageService';
 import { Victima, Interaccion } from '../types/jep';
 import { useAuth } from '../context/AuthContext';
 import { useModal } from '../context/ModalContext';
@@ -28,9 +32,10 @@ const VictimaDetalle = () => {
   
   const [victima, setVictima] = useState<Victima | null>(null);
   const [interacciones, setInteracciones] = useState<Interaccion[]>([]);
+  const [poderes, setPoderes] = useState<ArchivoJEP[]>([]);
   const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
 
-  // Estado para el modal de nueva nota
   const [openNoteModal, setOpenNoteModal] = useState(false);
   const [newNote, setNewNote] = useState<Partial<Interaccion>>({
     tipo: 'Llamada de sentido del proceso',
@@ -43,12 +48,14 @@ const VictimaDetalle = () => {
     if (!id) return;
     try {
       setLoading(true);
-      const [victimaData, notasData] = await Promise.all([
+      const [victimaData, notasData, archivosData] = await Promise.all([
         jepService.getVictimaById(id),
-        jepService.getInteraccionesRecientes(id)
+        jepService.getInteraccionesRecientes(id),
+        storageService.getFiles(id, 'poderes') // Cargamos los poderes
       ]);
       setVictima(victimaData);
       setInteracciones(notasData);
+      setPoderes(archivosData);
     } catch (error) {
       console.error("Error cargando perfil:", error);
       showModal('Error', 'No se pudo cargar la información de la víctima.', 'error');
@@ -63,7 +70,6 @@ const VictimaDetalle = () => {
 
   const handleSaveNote = async () => {
     if (!id || !currentUser || !newNote.observaciones) return;
-    
     try {
       const interaccionToSave: Omit<Interaccion, 'id'> = {
         fecha: new Date().toISOString(),
@@ -74,16 +80,43 @@ const VictimaDetalle = () => {
         observaciones: newNote.observaciones,
         compromisos: newNote.compromisos || ''
       };
-
       await jepService.addInteraccion(id, interaccionToSave);
-      showModal('Éxito', 'Interacción guardada correctamente en el historial.', 'success');
+      showModal('Éxito', 'Interacción guardada correctamente.', 'success');
       setOpenNoteModal(false);
-      setNewNote({ ...newNote, observaciones: '', compromisos: '' }); // Reset
-      await loadData(); // Recargar notas
+      setNewNote({ ...newNote, observaciones: '', compromisos: '' });
+      await loadData();
     } catch (error) {
-      console.error("Error guardando nota:", error);
       showModal('Error', 'Hubo un problema al guardar la interacción.', 'error');
     }
+  };
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !id) return;
+
+    try {
+      setUploading(true);
+      await storageService.uploadFile(id, file, 'poderes');
+      showModal('Archivo Subido', 'El poder ha sido cargado con éxito.', 'success');
+      await loadData(); // Recarga la lista de archivos
+    } catch (error) {
+      console.error("Error subiendo archivo:", error);
+      showModal('Error', 'No se pudo subir el archivo. Intenta de nuevo.', 'error');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleDeleteFile = async (fullPath: string) => {
+    showModal('¿Eliminar Archivo?', 'Esta acción no se puede deshacer.', 'confirm', async () => {
+      try {
+        await storageService.deleteFile(fullPath);
+        showModal('Eliminado', 'El archivo fue borrado.', 'success');
+        await loadData();
+      } catch (error) {
+        showModal('Error', 'No se pudo borrar el archivo.', 'error');
+      }
+    });
   };
 
   if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', mt: 10 }}><CircularProgress /></Box>;
@@ -91,34 +124,21 @@ const VictimaDetalle = () => {
 
   return (
     <Box sx={{ p: 4 }}>
-      <Button 
-        startIcon={<ArrowBackIcon />} 
-        onClick={() => navigate('/victimas')}
-        sx={{ mb: 3 }}
-      >
+      <Button startIcon={<ArrowBackIcon />} onClick={() => navigate('/victimas')} sx={{ mb: 3 }}>
         Volver a la Matriz
       </Button>
 
       <Grid container spacing={4}>
         
-        {/* ================= COLUMNA IZQUIERDA: DATOS DE LA VÍCTIMA ================= */}
+        {/* COLUMNA IZQUIERDA: DATOS Y ARCHIVOS */}
         <Grid size={{ xs: 12, lg: 7 }}>
-          <Paper elevation={0} sx={{ p: 4, borderRadius: 3, border: '1px solid #e2e8f0' }}>
+          <Paper elevation={0} sx={{ p: 4, borderRadius: 3, border: '1px solid #e2e8f0', mb: 4 }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3, alignItems: 'flex-start' }}>
               <Box>
-                <Typography variant="h4" sx={{ fontWeight: 800, color: '#003366' }}>
-                  {victima.nombre_completo}
-                </Typography>
-                <Typography variant="body1" color="text.secondary" sx={{ mt: 0.5 }}>
-                  {victima.tipo_documento} {victima.identificacion}
-                </Typography>
+                <Typography variant="h4" sx={{ fontWeight: 800, color: '#003366' }}>{victima.nombre_completo}</Typography>
+                <Typography variant="body1" color="text.secondary" sx={{ mt: 0.5 }}>{victima.tipo_documento} {victima.identificacion}</Typography>
               </Box>
-              <Chip 
-                label={victima.estado_jep.estado_acreditacion} 
-                color={victima.estado_jep.estado_acreditacion === 'Acreditada' ? 'success' : 'warning'} 
-                variant="outlined" 
-                sx={{ fontWeight: 600 }} 
-              />
+              <Chip label={victima.estado_jep.estado_acreditacion} color={victima.estado_jep.estado_acreditacion === 'Acreditada' ? 'success' : 'warning'} variant="outlined" sx={{ fontWeight: 600 }} />
             </Box>
 
             <Grid container spacing={2} sx={{ mb: 3 }}>
@@ -128,30 +148,21 @@ const VictimaDetalle = () => {
               </Grid>
               <Grid size={{ xs: 12, sm: 6 }}>
                 <Typography variant="caption" color="text.secondary">Ubicación</Typography>
-                <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                  {victima.datos_contacto.departamento} {victima.datos_contacto.direccion && `- ${victima.datos_contacto.direccion}`}
-                </Typography>
+                <Typography variant="body1" sx={{ fontWeight: 500 }}>{victima.datos_contacto.departamento} {victima.datos_contacto.direccion && `- ${victima.datos_contacto.direccion}`}</Typography>
               </Grid>
             </Grid>
 
             <Divider sx={{ my: 3 }} />
 
-            <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 2, color: '#003366' }}>
-              Información de Representación (IIRESODH)
-            </Typography>
-            
+            <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 2, color: '#003366' }}>Información de Representación (IIRESODH)</Typography>
             <Grid container spacing={2}>
               <Grid size={{ xs: 12, sm: 6 }}>
                 <Typography variant="caption" color="text.secondary">Macrocasos Vinculados</Typography>
-                <Box sx={{ display: 'flex', gap: 0.5, mt: 0.5 }}>
-                  {victima.representacion.caso.map(c => <Chip key={c} label={c} size="small" sx={{ bgcolor: '#e0e7ff', color: '#3730a3' }} />)}
-                </Box>
+                <Box sx={{ display: 'flex', gap: 0.5, mt: 0.5 }}>{victima.representacion.caso.map(c => <Chip key={c} label={c} size="small" sx={{ bgcolor: '#e0e7ff', color: '#3730a3' }} />)}</Box>
               </Grid>
               <Grid size={{ xs: 12, sm: 6 }}>
                 <Typography variant="caption" color="text.secondary">Bloques Asignados</Typography>
-                <Box sx={{ display: 'flex', gap: 0.5, mt: 0.5 }}>
-                  {victima.representacion.bloque.map(b => <Chip key={b} label={b} size="small" variant="outlined" />)}
-                </Box>
+                <Box sx={{ display: 'flex', gap: 0.5, mt: 0.5 }}>{victima.representacion.bloque.map(b => <Chip key={b} label={b} size="small" variant="outlined" />)}</Box>
               </Grid>
               <Grid size={{ xs: 12, sm: 6 }}>
                 <Typography variant="caption" color="text.secondary">Calidad de Víctima</Typography>
@@ -163,20 +174,47 @@ const VictimaDetalle = () => {
               </Grid>
             </Grid>
           </Paper>
+
+          {/* NUEVA SECCIÓN DE ARCHIVOS (PODERES) */}
+          <Paper elevation={0} sx={{ p: 4, borderRadius: 3, border: '1px solid #e2e8f0' }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+              <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#003366' }}>Poderes y Documentos</Typography>
+              <Button component="label" variant="outlined" startIcon={uploading ? <CircularProgress size={20} /> : <CloudUploadIcon />} disabled={uploading}>
+                {uploading ? 'Subiendo...' : 'Subir Poder PDF'}
+                <input type="file" hidden accept=".pdf,image/*" onChange={handleFileUpload} />
+              </Button>
+            </Box>
+            
+            {poderes.length === 0 ? (
+              <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic', textAlign: 'center', py: 2 }}>
+                No hay poderes o documentos adjuntos.
+              </Typography>
+            ) : (
+              <List>
+                {poderes.map((archivo, index) => (
+                  <ListItem key={index} sx={{ border: '1px solid #e2e8f0', borderRadius: 2, mb: 1, display: 'flex', justifyContent: 'space-between' }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <PictureAsPdfIcon color="error" />
+                      <a href={archivo.url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', color: '#0369a1', fontWeight: 600 }}>
+                        {archivo.name.split('_').slice(1).join('_') || archivo.name} {/* Limpia el timestamp del nombre */}
+                      </a>
+                    </Box>
+                    <IconButton size="small" color="error" onClick={() => handleDeleteFile(archivo.fullPath)}>
+                      <DeleteIcon />
+                    </IconButton>
+                  </ListItem>
+                ))}
+              </List>
+            )}
+          </Paper>
         </Grid>
 
-        {/* ================= COLUMNA DERECHA: HISTORIAL E INTERACCIONES ================= */}
+        {/* COLUMNA DERECHA: HISTORIAL E INTERACCIONES */}
         <Grid size={{ xs: 12, lg: 5 }}>
           <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid #e2e8f0', bgcolor: '#f8fafc', height: '100%' }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
               <Typography variant="h6" sx={{ fontWeight: 700 }}>Historial de Seguimiento</Typography>
-              <Button 
-                startIcon={<AddCommentIcon />} 
-                variant="contained" 
-                size="small"
-                sx={{ bgcolor: '#003366' }}
-                onClick={() => setOpenNoteModal(true)}
-              >
+              <Button startIcon={<AddCommentIcon />} variant="contained" size="small" sx={{ bgcolor: '#003366' }} onClick={() => setOpenNoteModal(true)}>
                 Nueva Nota
               </Button>
             </Box>
@@ -193,13 +231,9 @@ const VictimaDetalle = () => {
                   <Paper key={nota.id} elevation={0} sx={{ p: 2, mb: 2, border: '1px solid #e2e8f0' }}>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                       <Chip label={nota.tipo} size="small" color={nota.rol_responsable === 'Psicosocial' ? 'secondary' : 'primary'} variant="outlined" />
-                      <Typography variant="caption" color="text.secondary">
-                        {new Date(nota.fecha).toLocaleDateString()}
-                      </Typography>
+                      <Typography variant="caption" color="text.secondary">{new Date(nota.fecha).toLocaleDateString()}</Typography>
                     </Box>
-                    <Typography variant="body2" sx={{ mb: 1, whiteSpace: 'pre-line' }}>
-                      {nota.observaciones}
-                    </Typography>
+                    <Typography variant="body2" sx={{ mb: 1, whiteSpace: 'pre-line' }}>{nota.observaciones}</Typography>
                     {nota.compromisos && (
                       <Typography variant="caption" sx={{ display: 'block', mt: 1, p: 1, bgcolor: '#f1f5f9', borderRadius: 1 }}>
                         <strong>Compromisos:</strong> {nota.compromisos}
@@ -216,46 +250,28 @@ const VictimaDetalle = () => {
         </Grid>
       </Grid>
 
-      {/* ================= MODAL: AGREGAR NUEVA INTERACCIÓN ================= */}
+      {/* MODAL: AGREGAR NUEVA INTERACCIÓN */}
       <Dialog open={openNoteModal} onClose={() => setOpenNoteModal(false)} fullWidth maxWidth="sm">
         <DialogTitle sx={{ fontWeight: 'bold', color: '#003366' }}>Registrar Interacción / Nota</DialogTitle>
         <DialogContent dividers>
           <Grid container spacing={2} sx={{ mt: 0.5 }}>
             <Grid size={{ xs: 12, sm: 6 }}>
-              <TextField
-                select fullWidth size="small" label="Tipo de Actividad"
-                value={newNote.tipo}
-                onChange={(e) => setNewNote({ ...newNote, tipo: e.target.value })}
-              >
+              <TextField select fullWidth size="small" label="Tipo de Actividad" value={newNote.tipo} onChange={(e) => setNewNote({ ...newNote, tipo: e.target.value })}>
                 {TIPOS_INTERACCION.map(tipo => <MenuItem key={tipo} value={tipo}>{tipo}</MenuItem>)}
               </TextField>
             </Grid>
             <Grid size={{ xs: 12, sm: 6 }}>
-              <TextField
-                select fullWidth size="small" label="Estado del Contacto"
-                value={newNote.estado_contacto}
-                onChange={(e) => setNewNote({ ...newNote, estado_contacto: e.target.value as any })}
-              >
+              <TextField select fullWidth size="small" label="Estado del Contacto" value={newNote.estado_contacto} onChange={(e) => setNewNote({ ...newNote, estado_contacto: e.target.value as any })}>
                 <MenuItem value="Contactado">Contactado con éxito</MenuItem>
                 <MenuItem value="Contacto fallido">Contacto fallido / Número equivocado</MenuItem>
                 <MenuItem value="No contactado">No contesta</MenuItem>
               </TextField>
             </Grid>
             <Grid size={{ xs: 12 }}>
-              <TextField
-                fullWidth multiline rows={4} label="Observaciones / Sentido del proceso" required
-                placeholder="Escribe el resumen de la llamada o asesoría..."
-                value={newNote.observaciones}
-                onChange={(e) => setNewNote({ ...newNote, observaciones: e.target.value })}
-              />
+              <TextField fullWidth multiline rows={4} label="Observaciones / Sentido del proceso" required placeholder="Escribe el resumen de la llamada..." value={newNote.observaciones} onChange={(e) => setNewNote({ ...newNote, observaciones: e.target.value })} />
             </Grid>
             <Grid size={{ xs: 12 }}>
-              <TextField
-                fullWidth size="small" label="Compromisos / Tareas pendientes (Opcional)"
-                placeholder="Ej: Llamar en 15 días para confirmar recepción de poder"
-                value={newNote.compromisos}
-                onChange={(e) => setNewNote({ ...newNote, compromisos: e.target.value })}
-              />
+              <TextField fullWidth size="small" label="Compromisos / Tareas pendientes (Opcional)" value={newNote.compromisos} onChange={(e) => setNewNote({ ...newNote, compromisos: e.target.value })} />
             </Grid>
           </Grid>
         </DialogContent>
