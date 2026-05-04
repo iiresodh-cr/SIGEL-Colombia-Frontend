@@ -234,7 +234,7 @@ const VictimaDetalle = () => {
               <TextField
                 select fullWidth size="small" label="Estado del Contacto"
                 value={newNote.estado_contacto}
-                onChange={(e) => setNewNote({ ...newNote, estado_contacto: e.target.value })}
+                onChange={(e) => setNewNote({ ...newNote, estado_contacto: e.target.value as any })}
               >
                 <MenuItem value="Contactado">Contactado con éxito</MenuItem>
                 <MenuItem value="Contacto fallido">Contacto fallido / Número equivocado</MenuItem>
