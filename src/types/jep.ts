@@ -30,6 +30,9 @@ export interface Representacion {
   fecha_asignacion: string;
   estado: 'Activo' | 'Desasignado' | 'En Sustitución' | 'Fallecido';
   referencia_llegada?: string; 
+  // NUEVO: Campos para registrar el historial de la pestaña DESASIGNADAS
+  motivo_desasignacion?: string;
+  fecha_desasignacion?: string;
 }
 
 export interface SeguimientoVista {
@@ -56,6 +59,12 @@ export interface EstadoJEP {
   estado_sistema_vista?: EstadoSistemaVista;
 }
 
+// NUEVO: Estructura para la pestaña DESAPARICIÓN
+export interface FamiliarDesaparecido {
+  nombre_completo: string;
+  parentesco: string;
+}
+
 // ==========================================
 // COLECCIONES PRINCIPALES
 // ==========================================
@@ -72,6 +81,8 @@ export interface Victima {
   seguimiento_vista?: SeguimientoVista; // Checklist de Actuaciones añadido
   storage_folder_url?: string;
   fecha_registro: string;
+  // NUEVO: Campo opcional para vincular al familiar en casos de desaparición
+  familiar_desaparecido?: FamiliarDesaparecido;
 }
 
 export interface Evento {
