@@ -23,7 +23,7 @@ const Dashboard = () => {
   const navigate = useNavigate();
   
   const [stats, setStats] = useState({ total: 0, caso01: 0, caso10: 0, acreditadas: 0 });
-  const [victimasGlobales, setVictimasGlobales] = useState<Victima[]>([]);
+  const [victimasList, setVictimasList] = useState<Victima[]>([]);
   const [profesionales, setProfesionales] = useState<Usuario[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -31,13 +31,11 @@ const Dashboard = () => {
   const isAdmin = role === 'admin' || role === 'superadmin';
 
   const loadData = async () => {
-    // IMPORTANTE: El administrador y los usuarios usan el Email como llave de asignación
     if (!currentUser?.email) return;
     try {
       setLoading(true);
       
       if (isAdmin) {
-        // Carga global para Administración
         const [globalStats, snapVictimas, snapUsers] = await Promise.all([
           adminService.getGlobalStats(),
           getDocs(query(collection(db, 'victimas'))),
@@ -51,21 +49,20 @@ const Dashboard = () => {
           acreditadas: 0 
         });
 
-        setVictimasGlobales(snapVictimas.docs.map(doc => ({ id: doc.id, ...doc.data() } as Victima)));
+        setVictimasList(snapVictimas.docs.map(doc => ({ id: doc.id, ...doc.data() } as Victima)));
         setProfesionales(snapUsers);
 
       } else {
-        // Carga individual para Usuarios (Consulta por Email)
         const rolBusqueda = role === 'psicosocial' ? 'psicosocial' : 'abogado';
-        const victimas = await jepService.getVictimasAsignadas(currentUser.email, rolBusqueda);
+        const data = await jepService.getVictimasAsignadas(currentUser.email, rolBusqueda);
         
         setStats({
-          total: victimas.length,
-          caso01: victimas.filter(v => v.representacion.caso.includes('Caso 01')).length,
-          caso10: victimas.filter(v => v.representacion.caso.includes('Caso 10')).length,
-          acreditadas: victimas.filter(v => v.estado_jep.estado_acreditacion === 'Acreditada').length
+          total: data.length,
+          caso01: data.filter(v => v.representacion.caso.includes('Caso 01')).length,
+          caso10: data.filter(v => v.representacion.caso.includes('Caso 10')).length,
+          acreditadas: data.filter(v => v.estado_jep.estado_acreditacion === 'Acreditada').length
         });
-        setVictimasGlobales(victimas);
+        setVictimasList(data);
       }
     } catch (error) {
       console.error("Error Dashboard:", error);
@@ -84,7 +81,7 @@ const Dashboard = () => {
     return prof ? (prof.nombre_completo || prof.correo) : id;
   };
 
-  const victimasFiltradas = victimasGlobales.filter(v => 
+  const filtered = victimasList.filter(v => 
     v.nombre_completo.toLowerCase().includes(search.toLowerCase()) ||
     v.identificacion.includes(search)
   ).slice(0, 15);
@@ -98,11 +95,13 @@ const Dashboard = () => {
           {isAdmin ? "Control Maestro de Casos" : "Mi Panel de Trabajo"}
         </Typography>
         <Typography variant="body1" color="text.secondary">
-          {isAdmin ? "Gestión global de asignaciones IIRESODH." : "Estado de tus procesos asignados."}
+          {isAdmin 
+            ? "Gestión global de la representación IIRESODH." 
+            : `Bienvenido/a. Tienes ${stats.total} víctimas asignadas.`}
         </Typography>
       </Box>
 
-      {/* ESTADÍSTICAS */}
+      {/* TARJETAS DE ESTADÍSTICAS (MUI V6 Syntax) */}
       <Grid container spacing={3} sx={{ mb: 6 }}>
         <Grid size={{ xs: 12, md: 4 }}>
           <Paper elevation={0} sx={{ p: 3, display: 'flex', alignItems: 'center', borderRadius: 3, bgcolor: '#f0f9ff', border: '1px solid #e0f2fe' }}>
@@ -121,7 +120,7 @@ const Dashboard = () => {
                 <Typography variant="h6" sx={{ fontWeight: 800, color: '#be185d' }}>{stats.caso01} <Typography component="span" variant="caption">C01</Typography></Typography>
                 <Typography variant="h6" sx={{ fontWeight: 800, color: '#be185d' }}>{stats.caso10} <Typography component="span" variant="caption">C10</Typography></Typography>
               </Box>
-              <Typography variant="body2" color="text.secondary">POR MACROCASO</Typography>
+              <Typography variant="body2" color="text.secondary">DISTRIBUCIÓN JEP</Typography>
             </Box>
           </Paper>
         </Grid>
@@ -130,7 +129,7 @@ const Dashboard = () => {
             <AssignmentTurnedInIcon sx={{ fontSize: 40, color: '#15803d', mr: 2 }} />
             <Box>
               <Typography variant="h4" sx={{ fontWeight: 800 }}>{stats.acreditadas}</Typography>
-              <Typography variant="body2" color="text.secondary">ACREDITADAS JEP</Typography>
+              <Typography variant="body2" color="text.secondary">ACREDITADAS EN JEP</Typography>
             </Box>
           </Paper>
         </Grid>
@@ -139,7 +138,7 @@ const Dashboard = () => {
       <Box>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
           <Typography variant="h5" sx={{ fontWeight: 800, color: '#003366' }}>
-            {isAdmin ? "Buscador para Reasignación" : "Mis Víctimas Asignadas"}
+            {isAdmin ? "Buscador para Reasignación" : "Listado de mis Víctimas"}
           </Typography>
           <TextField 
             size="small"
@@ -147,7 +146,15 @@ const Dashboard = () => {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             sx={{ width: 350, bgcolor: 'white' }}
-            slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchIcon /></InputAdornment> } }}
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon />
+                  </InputAdornment>
+                ),
+              },
+            }}
           />
         </Box>
 
@@ -156,37 +163,41 @@ const Dashboard = () => {
             <TableHead sx={{ bgcolor: '#f8fafc' }}>
               <TableRow>
                 <TableCell sx={{ fontWeight: 'bold' }}>Víctima</TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>{isAdmin ? "Abogado/a Actual" : "Estado JEP"}</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>{isAdmin ? "Abogado/a Actual" : "Estado Acreditación"}</TableCell>
                 <TableCell align="right" sx={{ fontWeight: 'bold' }}>Acción</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {victimasFiltradas.map((v) => (
-                <TableRow key={v.id} hover>
-                  <TableCell>
-                    <Typography variant="body2" sx={{ fontWeight: 700 }}>{v.nombre_completo}</Typography>
-                    <Typography variant="caption" color="text.secondary">CC: {v.identificacion}</Typography>
-                  </TableCell>
-                  <TableCell>
-                    {isAdmin ? (
-                      <Chip label={getNombreProfesional(v.representacion.juridico_asignado_id)} size="small" variant="outlined" />
-                    ) : (
-                      <Chip label={v.estado_jep.estado_acreditacion} size="small" variant="outlined" color="primary" />
-                    )}
-                  </TableCell>
-                  <TableCell align="right">
-                    <Button 
-                      variant="contained" 
-                      size="small" 
-                      color={isAdmin ? "warning" : "primary"}
-                      startIcon={<VisibilityIcon />}
-                      onClick={() => navigate(`/victimas/${v.id}`)}
-                    >
-                      {isAdmin ? "Reasignar" : "Ver Ficha"}
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {filtered.length === 0 ? (
+                <TableRow><TableCell colSpan={3} align="center" sx={{ py: 3 }}>No hay registros.</TableCell></TableRow>
+              ) : (
+                filtered.map((v) => (
+                  <TableRow key={v.id} hover>
+                    <TableCell>
+                      <Typography variant="body2" sx={{ fontWeight: 700 }}>{v.nombre_completo}</Typography>
+                      <Typography variant="caption" color="text.secondary">ID: {v.identificacion}</Typography>
+                    </TableCell>
+                    <TableCell>
+                      {isAdmin ? (
+                        <Chip label={getNombreProfesional(v.representacion.juridico_asignado_id)} size="small" variant="outlined" />
+                      ) : (
+                        <Chip label={v.estado_jep.estado_acreditacion} size="small" color="primary" variant="outlined" />
+                      )}
+                    </TableCell>
+                    <TableCell align="right">
+                      <Button 
+                        variant="contained" 
+                        size="small" 
+                        color={isAdmin ? "warning" : "primary"}
+                        startIcon={<VisibilityIcon />}
+                        onClick={() => navigate(`/victimas/${v.id}`)}
+                      >
+                        {isAdmin ? "Reasignar" : "Ver Perfil"}
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </Paper>

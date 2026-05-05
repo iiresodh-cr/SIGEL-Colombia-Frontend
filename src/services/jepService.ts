@@ -28,7 +28,7 @@ export const jepService = {
     return docRef.id;
   },
 
-  // 2. Obtener víctimas asignadas (Filtro por Email/ID para abogados y psicosociales)
+  // 2. Obtener víctimas asignadas (Consulta por Email)
   getVictimasAsignadas: async (profesionalId: string, tipo: 'abogado' | 'psicosocial') => {
     const campo = tipo === 'abogado' ? 'representacion.juridico_asignado_id' : 'representacion.psicosocial_asignado_id';
     const q = query(
@@ -50,7 +50,7 @@ export const jepService = {
     throw new Error("Víctima no encontrada");
   },
 
-  // 4. Obtener todas las víctimas (con o sin filtro de expediente)
+  // 4. Obtener todas las víctimas
   getVictimas: async (expedienteId?: string) => {
     let q;
     if (expedienteId) {
@@ -62,7 +62,7 @@ export const jepService = {
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Victima));
   },
 
-  // 5. Vincular víctima a un expediente específico
+  // 5. Vincular víctima a un expediente
   addVictima: async (expedienteId: string, data: any) => {
     const victimasRef = collection(db, 'victimas');
     await addDoc(victimasRef, {
@@ -75,13 +75,13 @@ export const jepService = {
 
   // --- SECCIÓN INTERACCIONES Y NOTAS ---
 
-  // 6. Registrar interacción/nota de seguimiento
+  // 6. Registrar interacción/nota
   addInteraccion: async (victimaId: string, data: Omit<Interaccion, 'id'>) => {
     const interaccionesRef = collection(db, `victimas/${victimaId}/interacciones`);
     await addDoc(interaccionesRef, data);
   },
 
-  // 7. Obtener historial de interacciones recientes
+  // 7. Obtener interacciones recientes
   getInteraccionesRecientes: async (victimaId: string) => {
     const interaccionesRef = collection(db, `victimas/${victimaId}/interacciones`);
     const q = query(interaccionesRef, orderBy('fecha', 'desc'), limit(10));
@@ -92,7 +92,7 @@ export const jepService = {
 
   // --- SECCIÓN EVENTOS Y TALLERES ---
 
-  // 8. Obtener cronograma de eventos próximos
+  // 8. Obtener eventos próximos
   getEventosProximos: async () => {
     const eventosRef = collection(db, 'eventos');
     const q = query(eventosRef, orderBy('fecha', 'asc'));
@@ -100,7 +100,7 @@ export const jepService = {
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Evento));
   },
 
-  // 9. Crear un nuevo evento institucional
+  // 9. Crear un nuevo evento
   createEvento: async (data: Omit<Evento, 'id'>) => {
     const eventosRef = collection(db, 'eventos');
     const docRef = await addDoc(eventosRef, data);
@@ -108,16 +108,15 @@ export const jepService = {
   },
 
 
-  // --- SECCIÓN EXPEDIENTES (RESTAURADA PARA COMPILACIÓN) ---
+  // --- SECCIÓN EXPEDIENTES ---
 
-  // 10. Obtener listado de todos los expedientes (Requerido por Expedientes.tsx)
+  // 10. Obtener listado de expedientes
   getExpedientes: async () => {
-    const expedientesRef = collection(db, 'expedientes');
-    const snapshot = await getDocs(expedientesRef);
+    const snapshot = await getDocs(collection(db, 'expedientes'));
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
   },
 
-  // 11. Obtener un expediente único por su ID
+  // 11. Obtener expediente por ID
   getExpedienteById: async (id: string) => {
     const docRef = doc(db, 'expedientes', id);
     const docSnap = await getDoc(docRef);
