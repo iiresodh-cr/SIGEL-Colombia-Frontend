@@ -50,114 +50,6 @@ const ImportadorMasivo = () => {
     return name.trim(); 
   };
 
-  const processSheet = (sheet: XLSX.WorkSheet, sheetName: string): Victima[] => {
-    const rows = XLSX.utils.sheet_to_json<any[]>(sheet, { header: 1 });
-    let headerRowIndex = -1;
-    let headers: string[] = [];
-
-    // Busca automáticamente en qué fila están los títulos (cualquiera que diga 'NOMBRE')
-    for (let i = 0; i < rows.length; i++) {
-      const row = rows[i];
-      if (row && row.some(cell => typeof cell === 'string' && cell.toUpperCase().includes('NOMBRE'))) {
-        headerRowIndex = i;
-        headers = row.map(h => h ? String(h).trim().toUpperCase() : '');
-        break;
-      }
-    }
-
-    if (headerRowIndex === -1) return [];
-
-    const parsedVictimas: Victima[] = [];
-    
-    for (let i = headerRowIndex + 1; i < rows.length; i++) {
-      const rowData = rows[i];
-      if (!rowData || rowData.length === 0) continue;
-
-      const row: Record<string, any> = {};
-      headers.forEach((h, idx) => {
-        if (h) row[h] = rowData[idx];
-      });
-
-      // Diccionario inteligente de búsqueda de columnas (Sinónimos)
-      const getVal = (aliases: string[]) => {
-        for (let alias of aliases) {
-          const foundKey = Object.keys(row).find(k => k.includes(alias));
-          if (foundKey && row[foundKey] !== undefined) return row[foundKey];
-        }
-        return '';
-      };
-
-      const nombre = getVal(['NOMBRE']);
-      if (!nombre || String(nombre).trim() === '' || String(nombre).includes('Solicitar al despacho')) continue;
-
-      let estadoAcreditacion: any = 'No está acreditada';
-      const rowAcred = String(getVal(['ESTADO ACRED', 'ACREDITACIÓN'])).toLowerCase();
-      if (rowAcred.includes('acreditad')) estadoAcreditacion = 'Acreditada';
-      else if (rowAcred.includes('trámite') || rowAcred.includes('tramite')) estadoAcreditacion = 'En trámite (despacho no ha resuelto)';
-
-      let estadoPJ = 'Sin PJ (no se ha recibido poder)';
-      if (String(getVal(['ESTADO REC', 'PJ'])).toLowerCase().includes('con pj')) {
-        estadoPJ = 'Con PJ';
-      }
-
-      // Infiere el caso según la hoja, de lo contrario lo deja por definir
-      let casoMacro = 'Por definir';
-      if (sheetName.includes('10')) casoMacro = 'Caso 10';
-      else if (sheetName.includes('01')) casoMacro = 'Caso 01';
-
-      let primerContactoStr = String(getVal(['SENTIDO', 'PRIMER CONTACTO', 'LLAMADA'])).toLowerCase();
-      const primerContacto = primerContactoStr.includes('realizada') || primerContactoStr.includes('contactado') || primerContactoStr.includes('si');
-      
-      let poderStr = String(getVal(['PODER'])).toLowerCase();
-      const firmaPoder = poderStr.includes('si') || poderStr.includes('enviado') || poderStr.includes('recibido');
-
-      const victima: Omit<Victima, 'id'> = {
-        nombre_completo: String(nombre).trim(),
-        tipo_documento: getVal(['TIPO DOC']) || 'CC',
-        identificacion: String(getVal(['NUMERO DOC', 'NÚMERO DOC', 'IDENTIFICACIÓN', 'IDENTIFICACION'])).replace(/\./g, '') || `ID-${Math.floor(Math.random()*100000)}`,
-        fecha_registro: new Date().toISOString(),
-        datos_demograficos: {
-          genero: getVal(['GÉNERO', 'GENERO']) || 'No registra',
-          orientacion_sexual: getVal(['ORIENTACIÓN', 'ORIENTACION']) || 'No registra',
-          grupo_etnico: getVal(['ETNI', 'ÉTNICO']) || 'Ninguno',
-          etareo: getVal(['ETÁREO', 'ETAREO']) || 'Adulto',
-          discapacidad: getVal(['DISCAPACIDAD']) || 'Ninguna',
-        },
-        datos_contacto: {
-          telefono: String(getVal(['TELÉFONO', 'TELEFONO'])),
-          correo: String(getVal(['CORREO'])),
-          direccion: String(getVal(['DIRECCIÓN', 'DIRECCION'])),
-          departamento: getVal(['DEPARTAMENTO', 'RESIDENCIA']) || 'No registra'
-        },
-        representacion: {
-          caso: [casoMacro],
-          bloque: getVal(['BLOQUE']) ? [String(getVal(['BLOQUE'])).trim()] : [],
-          calidad_victima: getVal(['DIRECTA', 'CALIDAD']) || 'No definida',
-          hechos_victimizantes: getVal(['DELITO', 'HECHO']) ? String(getVal(['DELITO', 'HECHO'])).split('/').map(s => s.trim()) : [],
-          juridico_asignado_id: findEmail(String(getVal(['JURÍDICO', 'JURIDICO']))),
-          psicosocial_asignado_id: findEmail(String(getVal(['PSICOSOCIAL']))),
-          fecha_asignacion: getVal(['FECHA ASIG', 'ASIGNACIÓN']) || new Date().toISOString().split('T')[0],
-          estado: String(getVal(['ESTADO'])).toLowerCase().includes('desasignado') ? 'Desasignado' : 'Activo',
-          referencia_llegada: getVal(['REFERENCIA']) || ''
-        },
-        estado_jep: {
-          estado_acreditacion: estadoAcreditacion,
-          auto_acreditacion: String(getVal(['AUTO DE ACRED', 'AUTO ACRED'])),
-          estado_reconocimiento_pj: estadoPJ,
-          auto_reconocimiento: String(getVal(['AUTO REC']))
-        },
-        seguimiento_vista: {
-          primer_contacto: primerContacto,
-          firma_poder: firmaPoder,
-          demandas_verdad: false,
-          sol_desasignacion: String(getVal(['DESASIG'])).toLowerCase().includes('si')
-        }
-      };
-      parsedVictimas.push(victima as Victima);
-    }
-    return parsedVictimas;
-  };
-
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -168,21 +60,175 @@ const ImportadorMasivo = () => {
         const bstr = evt.target?.result;
         const workbook = XLSX.read(bstr, { type: 'binary' });
 
-        let todasLasVictimas: Victima[] = [];
+        const globalVictimas = new Map<string, Victima>();
 
-        // Ahora procesa TODAS las pestañas que encuentre dentro del Excel
         workbook.SheetNames.forEach(sheetName => {
           const sheet = workbook.Sheets[sheetName];
-          const victimas = processSheet(sheet, sheetName);
-          if (victimas.length > 0) {
-            todasLasVictimas = [...todasLasVictimas, ...victimas];
+          // Usamos raw: false para leer tal cual el texto en Excel y defval para no saltar celdas vacías
+          const rows = XLSX.utils.sheet_to_json<any[]>(sheet, { header: 1, raw: false, defval: '' });
+          
+          let headerRowIndex = -1;
+          let nameColIndex = -1;
+          let idColIndex = -1;
+
+          // 1. UBICACIÓN EXACTA Y ESTRICTA DE LA CABECERA
+          for (let i = 0; i < rows.length; i++) {
+            const rowArr = rows[i];
+            if (!Array.isArray(rowArr)) continue;
+            
+            let tempNameIdx = -1;
+            let tempIdIdx = -1;
+
+            rowArr.forEach((cell, idx) => {
+                const c = String(cell).trim().toUpperCase();
+                if (['NOMBRE VÍCTIMA', 'NOMBRE DE LA VÍCTIMA', 'NOMBRES', 'NOMBRE COMPLETO', 'NOMBRE'].includes(c)) {
+                    tempNameIdx = idx;
+                }
+                if (['NUMERO DOC', 'NÚMERO DOC', 'IDENTIFICACIÓN', 'IDENTIFICACION', 'DOCUMENTO', 'C.C.', 'CC'].includes(c)) {
+                    tempIdIdx = idx;
+                }
+            });
+
+            // Para que sea una tabla válida, DEBE tener una columna de Nombre reconocida
+            if (tempNameIdx !== -1) {
+                headerRowIndex = i;
+                nameColIndex = tempNameIdx;
+                idColIndex = tempIdIdx;
+                break;
+            }
+          }
+
+          if (headerRowIndex === -1) return;
+
+          const headers = rows[headerRowIndex].map(h => String(h).trim().toUpperCase());
+
+          // 2. EXTRACCIÓN PROTEGIDA Y A PRUEBA DE BALAS
+          for (let i = headerRowIndex + 1; i < rows.length; i++) {
+            const rowArr = rows[i];
+            if (!Array.isArray(rowArr) || rowArr.length === 0) continue;
+
+            const nombreStr = String(rowArr[nameColIndex] || '').trim();
+            
+            // --- INICIA FILTRO DE BASURA ---
+            if (!nombreStr || nombreStr.length < 4) continue; // Ignorar vacíos o muy cortos
+            if (['NOMBRE VÍCTIMA', 'NOMBRE DE LA VÍCTIMA', 'NOMBRES', 'NOMBRE COMPLETO', 'NOMBRE', 'NO.'].includes(nombreStr.toUpperCase())) continue; // Ignorar encabezados repetidos
+            if (/\d/.test(nombreStr)) continue; // REGLA DE ORO: Ningún nombre real tiene números. Bloquea Oficios y Fechas infiltradas.
+            if (nombreStr.toLowerCase().includes('total') || nombreStr.toLowerCase().includes('solicitar')) continue; // Ignorar filas de sumatorias
+            
+            // Bloquear si el nombre en realidad es el de un abogado/psicosocial (Ej. Dalila Henao)
+            let isProf = false;
+            for (let [key] of profMap.entries()) {
+                if (nombreStr.toLowerCase().includes(key)) {
+                    isProf = true; break;
+                }
+            }
+            if (isProf) continue;
+            // --- FIN FILTRO DE BASURA ---
+
+            const getVal = (aliases: string[]) => {
+                for (let alias of aliases) {
+                    const idx = headers.findIndex(h => h.includes(alias));
+                    if (idx !== -1 && rowArr[idx] !== undefined) return String(rowArr[idx]).trim();
+                }
+                return '';
+            };
+
+            let idStr = idColIndex !== -1 ? String(rowArr[idColIndex]).replace(/\./g, '').trim() : '';
+            if (!idStr || idStr.toLowerCase() === 'na' || idStr.toLowerCase() === 'undefined') idStr = '';
+
+            const dedupeKey = idStr ? idStr : nombreStr.toLowerCase().replace(/\s+/g, '');
+
+            let casoMacro = 'Por definir';
+            if (sheetName.includes('10')) casoMacro = 'Caso 10';
+            else if (sheetName.includes('01')) casoMacro = 'Caso 01';
+
+            let primerContactoStr = String(getVal(['SENTIDO', 'PRIMER CONTACTO', 'LLAMADA'])).toLowerCase();
+            const primerContacto = primerContactoStr.includes('realizada') || primerContactoStr.includes('contactado') || primerContactoStr.includes('si');
+            
+            let poderStr = String(getVal(['PODER'])).toLowerCase();
+            const firmaPoder = poderStr.includes('si') || poderStr.includes('enviado') || poderStr.includes('recibido');
+            const solDesasig = String(getVal(['DESASIG'])).toLowerCase().includes('si');
+
+            let estadoAcreditacion: any = 'No está acreditada';
+            const rowAcred = String(getVal(['ESTADO ACRED', 'ACREDITACIÓN'])).toLowerCase();
+            if (rowAcred.includes('acreditad')) estadoAcreditacion = 'Acreditada';
+            else if (rowAcred.includes('trámite') || rowAcred.includes('tramite')) estadoAcreditacion = 'En trámite (despacho no ha resuelto)';
+
+            let estadoPJ = 'Sin PJ (no se ha recibido poder)';
+            if (String(getVal(['ESTADO REC', 'PJ'])).toLowerCase().includes('con pj')) estadoPJ = 'Con PJ';
+
+            const juridico = findEmail(String(getVal(['JURÍDICO', 'JURIDICO'])));
+            const psicosocial = findEmail(String(getVal(['PSICOSOCIAL'])));
+            const bloqueVal = getVal(['BLOQUE']);
+
+            // 3. FUSIÓN DE DATOS (DEDUPLICADOR)
+            const existing = globalVictimas.get(dedupeKey);
+
+            if (existing) {
+                if (!existing.identificacion || existing.identificacion.startsWith('ID-')) existing.identificacion = idStr || existing.identificacion;
+                if (casoMacro !== 'Por definir' && !existing.representacion.caso.includes(casoMacro)) existing.representacion.caso.push(casoMacro);
+                if (bloqueVal && !existing.representacion.bloque.includes(bloqueVal)) existing.representacion.bloque.push(bloqueVal);
+                if (juridico) existing.representacion.juridico_asignado_id = juridico;
+                if (psicosocial) existing.representacion.psicosocial_asignado_id = psicosocial;
+                if (primerContacto) existing.seguimiento_vista!.primer_contacto = true;
+                if (firmaPoder) existing.seguimiento_vista!.firma_poder = true;
+                if (solDesasig) existing.seguimiento_vista!.sol_desasignacion = true;
+                if (estadoAcreditacion !== 'No está acreditada') existing.estado_jep.estado_acreditacion = estadoAcreditacion;
+                
+                globalVictimas.set(dedupeKey, existing);
+            } else {
+                const victima: Omit<Victima, 'id'> = {
+                    nombre_completo: nombreStr,
+                    tipo_documento: getVal(['TIPO DOC']) || 'CC',
+                    identificacion: idStr || `ID-${Math.floor(Math.random()*100000)}`,
+                    fecha_registro: new Date().toISOString(),
+                    datos_demograficos: {
+                      genero: getVal(['GÉNERO', 'GENERO']) || 'No registra',
+                      orientacion_sexual: getVal(['ORIENTACIÓN', 'ORIENTACION']) || 'No registra',
+                      grupo_etnico: getVal(['ETNI', 'ÉTNICO']) || 'Ninguno',
+                      etareo: getVal(['ETÁREO', 'ETAREO']) || 'Adulto',
+                      discapacidad: getVal(['DISCAPACIDAD']) || 'Ninguna',
+                    },
+                    datos_contacto: {
+                      telefono: String(getVal(['TELÉFONO', 'TELEFONO'])),
+                      correo: String(getVal(['CORREO'])),
+                      direccion: String(getVal(['DIRECCIÓN', 'DIRECCION'])),
+                      departamento: getVal(['DEPARTAMENTO', 'RESIDENCIA']) || 'No registra'
+                    },
+                    representacion: {
+                      caso: casoMacro !== 'Por definir' ? [casoMacro] : [],
+                      bloque: bloqueVal ? [bloqueVal] : [],
+                      calidad_victima: getVal(['DIRECTA', 'CALIDAD']) || 'No definida',
+                      hechos_victimizantes: getVal(['DELITO', 'HECHO']) ? String(getVal(['DELITO', 'HECHO'])).split('/').map(s => s.trim()) : [],
+                      juridico_asignado_id: juridico,
+                      psicosocial_asignado_id: psicosocial,
+                      fecha_asignacion: getVal(['FECHA ASIG', 'ASIGNACIÓN']) || new Date().toISOString().split('T')[0],
+                      estado: String(getVal(['ESTADO'])).toLowerCase().includes('desasignado') ? 'Desasignado' : 'Activo',
+                      referencia_llegada: getVal(['REFERENCIA']) || ''
+                    },
+                    estado_jep: {
+                      estado_acreditacion: estadoAcreditacion,
+                      auto_acreditacion: String(getVal(['AUTO DE ACRED', 'AUTO ACRED'])),
+                      estado_reconocimiento_pj: estadoPJ,
+                      auto_reconocimiento: String(getVal(['AUTO REC']))
+                    },
+                    seguimiento_vista: {
+                      primer_contacto: primerContacto,
+                      firma_poder: firmaPoder,
+                      demandas_verdad: false,
+                      sol_desasignacion: solDesasig
+                    }
+                };
+                globalVictimas.set(dedupeKey, victima as Victima);
+            }
           }
         });
 
-        if (todasLasVictimas.length === 0) {
-          alert("No se encontraron víctimas válidas en este archivo. Asegúrate de que el Excel contenga columnas con nombres de víctimas.");
+        const arrVictimas = Array.from(globalVictimas.values());
+        if (arrVictimas.length === 0) {
+          alert("No se encontraron víctimas válidas. Asegúrate de que el Excel no esté vacío.");
         } else {
-          setPreviewData(todasLasVictimas);
+          setPreviewData(arrVictimas);
           setSuccess(false);
         }
       } catch (error) {
@@ -228,10 +274,10 @@ const ImportadorMasivo = () => {
   return (
     <Box sx={{ p: 4 }}>
       <Typography variant="h4" sx={{ fontWeight: 800, color: 'primary.main', mb: 1 }}>
-        Migración Masiva Inteligente
+        Migración Masiva Inteligente (Ultra-Estricta)
       </Typography>
       <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
-        Sube cualquier archivo Excel (.xlsx). El sistema escaneará automáticamente TODAS las pestañas buscando tablas de víctimas y mapeará los datos a los correos de los profesionales.
+        Sube el archivo Excel (.xlsx). Los filtros anti-basura bloquearán oficios, fechas, nombres de profesionales y encabezados repetidos, extrayendo únicamente víctimas reales.
       </Typography>
 
       <Grid container spacing={3} sx={{ mb: 4 }}>
@@ -241,21 +287,21 @@ const ImportadorMasivo = () => {
               Cargar Archivo Excel (.xlsx)
               <input type="file" hidden accept=".xlsx, .xls" onChange={handleFileUpload} />
             </Button>
-            <Typography variant="body2" color="text.secondary">Sube "INSUMOS CONSOLIDADOS" o "MATRIZ DE SEGUIMIENTO". El sistema leerá todas las pestañas posibles.</Typography>
+            <Typography variant="body2" color="text.secondary">Filtro de integridad de datos activado.</Typography>
           </Paper>
         </Grid>
       </Grid>
 
       {success && (
         <Alert severity="success" sx={{ mb: 3 }}>
-          ¡Los datos fueron migrados exitosamente a Firestore! Ya puedes verlos en el Dashboard.
+          ¡Los datos fueron migrados exitosamente a Firestore!
         </Alert>
       )}
 
       {previewData.length > 0 && (
         <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-            <Typography variant="h6">Vista Previa ({previewData.length} registros extraídos)</Typography>
+            <Typography variant="h6">Vista Previa ({previewData.length} víctimas reales validadas)</Typography>
             <Button 
               variant="contained" 
               color="success" 
@@ -270,11 +316,11 @@ const ImportadorMasivo = () => {
           <Table size="small">
             <TableHead sx={{ bgcolor: 'background.default' }}>
               <TableRow>
-                <TableCell sx={{ fontWeight: 'bold' }}>Nombre</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>Nombre Validad</TableCell>
                 <TableCell sx={{ fontWeight: 'bold' }}>CC</TableCell>
                 <TableCell sx={{ fontWeight: 'bold' }}>Macrocaso</TableCell>
                 <TableCell sx={{ fontWeight: 'bold' }}>Bloque</TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>Abogado (Email/ID)</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>Abogado</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -282,7 +328,9 @@ const ImportadorMasivo = () => {
                 <TableRow key={i}>
                   <TableCell>{v.nombre_completo}</TableCell>
                   <TableCell>{v.identificacion}</TableCell>
-                  <TableCell><Chip label={v.representacion.caso[0]} size="small" color="primary" variant="outlined" /></TableCell>
+                  <TableCell>
+                    {v.representacion.caso.map(c => <Chip key={c} label={c} size="small" color="primary" variant="outlined" sx={{ mr: 0.5 }} />)}
+                  </TableCell>
                   <TableCell>{v.representacion.bloque.join(', ')}</TableCell>
                   <TableCell>
                     <Chip 
@@ -296,7 +344,7 @@ const ImportadorMasivo = () => {
             </TableBody>
           </Table>
           <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 2, textAlign: 'center' }}>
-            Mostrando solo los primeros 10 registros. Al hacer clic en Migrar se subirán los {previewData.length} a tu base de datos.
+            Mostrando solo los primeros 10 registros.
           </Typography>
         </Paper>
       )}

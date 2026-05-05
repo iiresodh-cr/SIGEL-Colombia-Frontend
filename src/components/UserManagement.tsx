@@ -9,20 +9,27 @@ interface UserManagementProps {
 
 export const UserManagement = ({ onUserAdded }: UserManagementProps) => {
   const [email, setEmail] = useState('');
-  const [role, setRole] = useState('Abogado');
+  const [role, setRole] = useState('abogado'); // Definido en minúscula según tipado estricto
   const { showModal } = useModal();
 
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!email.toLowerCase().endsWith('@iiresodh.org')) {
+    const cleanEmail = email.toLowerCase().trim();
+
+    if (!cleanEmail.endsWith('@iiresodh.org')) {
       showModal('Dominio Inválido', 'Solo se permiten correos del dominio institucional @iiresodh.org', 'error');
       return;
     }
 
+    if (cleanEmail === 'webmaster@iiresodh.org') {
+      showModal('Acción Protegida', 'El usuario webmaster es el Superadministrador del sistema y no puede ser manipulado desde este panel.', 'error');
+      return;
+    }
+
     try {
-      await adminService.invitarUsuario(email, role);
-      showModal('Autorización Exitosa', `El usuario ${email} ha sido pre-autorizado correctamente.`, 'success');
+      await adminService.invitarUsuario(cleanEmail, role);
+      showModal('Autorización Exitosa', `El usuario ${cleanEmail} ha sido pre-autorizado correctamente.`, 'success');
       setEmail('');
       onUserAdded();
     } catch (error) {
@@ -56,9 +63,10 @@ export const UserManagement = ({ onUserAdded }: UserManagementProps) => {
               value={role} 
               onChange={(e) => setRole(e.target.value)}
             >
-              <MenuItem value="Abogado">Abogado/a</MenuItem>
-              <MenuItem value="Administrador">Administrador/a</MenuItem>
-              <MenuItem value="Invitado">Invitado (Solo Lectura)</MenuItem>
+              <MenuItem value="admin">Administrador/a</MenuItem>
+              <MenuItem value="abogado">Abogado/a</MenuItem>
+              <MenuItem value="psicosocial">Psicosocial</MenuItem>
+              <MenuItem value="lector">Lector (Solo Lectura)</MenuItem>
             </TextField>
           </Grid>
           <Grid size={{ xs: 12 }}>

@@ -42,7 +42,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             return;
           }
 
-          if (user.email === SUPER_ADMIN_EMAIL) {
+          // REGLA ESTRICTA: El Superadministrador siempre tiene acceso supremo
+          if (user.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) {
             setRole('superadmin');
             setCurrentUser(user);
           } else {
