@@ -58,7 +58,7 @@ export const adminService = {
     };
   },
 
-  // 6. SUSTITUCIÓN MASIVA DE CASOS (Fase 3: Sustituciones por renuncia)
+  // 6. SUSTITUCIÓN MASIVA DE CASOS
   reasignarCasosMasivamente: async (
     profesionalAnteriorId: string,
     profesionalNuevoId: string,
@@ -108,18 +108,18 @@ export const adminService = {
     return totalModificados;
   },
 
-  // 7. Listar profesionales para selectores
+  // 7. Listar profesionales operativos
   getProfesionales: async () => {
     const q = query(collection(db, 'usuarios'));
     const snapshot = await getDocs(q);
     const todos = snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as Usuario));
     return {
-      abogados: todos.filter(u => u.rol === 'abogado'),
+      abogados: todos.filter(u => u.rol === 'abogado' || u.rol === 'admin' || u.rol === 'superadmin'),
       psicosociales: todos.filter(u => u.rol === 'psicosocial')
     };
   },
 
-  // 8. REASIGNACIÓN INDIVIDUAL (Bisturí de casos - Corregido para persistencia)
+  // 8. REASIGNACIÓN INDIVIDUAL (USO OBLIGATORIO DE NOTACIÓN DE PUNTOS)
   reasignarVictimaIndividual: async (
     victimaId: string,
     adminResponsableId: string,
@@ -131,19 +131,16 @@ export const adminService = {
   ): Promise<void> => {
     const victimaRef = doc(db, 'victimas', victimaId);
     const fechaCompleta = new Date().toISOString();
-    const fechaCorta = fechaCompleta.split('T')[0];
+    
+    // Objeto de actualización parcial. IMPORTANTE: Usar strings como llaves para no borrar el resto de 'representacion'
+    const updates: any = {};
+    updates['representacion.juridico_asignado_id'] = cambios.juridico_nuevo_id;
+    updates['representacion.psicosocial_asignado_id'] = cambios.psicosocial_nuevo_id;
+    updates['representacion.fecha_asignacion'] = fechaCompleta.split('T')[0];
 
-    // IMPORTANTE: Se usa notación de puntos para actualizar campos anidados en Firestore
-    const updates = {
-      'representacion.juridico_asignado_id': cambios.juridico_nuevo_id,
-      'representacion.psicosocial_asignado_id': cambios.psicosocial_nuevo_id,
-      'representacion.fecha_asignacion': fechaCorta
-    };
-
-    // Actualizamos el documento principal
     await updateDoc(victimaRef, updates);
 
-    // Registramos en el sub-historial de la víctima
+    // Guardamos historial del cambio
     const historialRef = doc(collection(db, `victimas/${victimaId}/historial_asignaciones`));
     await setDoc(historialRef, {
       fecha_sustitucion: fechaCompleta,

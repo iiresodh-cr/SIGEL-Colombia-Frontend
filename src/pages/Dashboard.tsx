@@ -36,7 +36,7 @@ const Dashboard = () => {
       setLoading(true);
       
       if (isAdmin) {
-        // Carga para el ADMINISTRADOR (Estadísticas globales + Lista total)
+        // Carga global para dominio de Administración
         const [globalStats, snapVictimas, snapUsers] = await Promise.all([
           adminService.getGlobalStats(),
           getDocs(query(collection(db, 'victimas'))),
@@ -54,7 +54,7 @@ const Dashboard = () => {
         setProfesionales(snapUsers);
 
       } else {
-        // Carga para ABOGADO/PSICOSOCIAL (Carga Individual)
+        // Carga individual para dominio de Usuarios
         const rolBusqueda = role === 'psicosocial' ? 'psicosocial' : 'abogado';
         const victimas = await jepService.getVictimasAsignadas(currentUser.uid, rolBusqueda);
         
@@ -66,7 +66,7 @@ const Dashboard = () => {
         });
       }
     } catch (error) {
-      console.error("Error al cargar datos del Dashboard:", error);
+      console.error("Error al cargar datos:", error);
     } finally {
       setLoading(false);
     }
@@ -102,18 +102,17 @@ const Dashboard = () => {
         </Typography>
       </Box>
 
-      {/* TARJETAS DE ESTADÍSTICAS */}
+      {/* ESTADÍSTICAS */}
       <Grid container spacing={3} sx={{ mb: 6 }}>
         <Grid size={{ xs: 12, md: 4 }}>
           <Paper elevation={0} sx={{ p: 3, display: 'flex', alignItems: 'center', borderRadius: 3, bgcolor: '#f0f9ff', border: '1px solid #e0f2fe' }}>
             <PeopleIcon sx={{ fontSize: 40, color: '#0369a1', mr: 2 }} />
             <Box>
               <Typography variant="h4" sx={{ fontWeight: 800 }}>{stats.total}</Typography>
-              <Typography variant="body2" color="text.secondary">VÍCTIMAS EN EL SISTEMA</Typography>
+              <Typography variant="body2" color="text.secondary">VÍCTIMAS TOTALES</Typography>
             </Box>
           </Paper>
         </Grid>
-
         <Grid size={{ xs: 12, md: 4 }}>
           <Paper elevation={0} sx={{ p: 3, display: 'flex', alignItems: 'center', borderRadius: 3, bgcolor: '#fdf2f8', border: '1px solid #fce7f3' }}>
             <FolderIcon sx={{ fontSize: 40, color: '#be185d', mr: 2 }} />
@@ -122,38 +121,33 @@ const Dashboard = () => {
                 <Typography variant="h6" sx={{ fontWeight: 800, color: '#be185d' }}>{stats.caso01} <Typography component="span" variant="caption">C01</Typography></Typography>
                 <Typography variant="h6" sx={{ fontWeight: 800, color: '#be185d' }}>{stats.caso10} <Typography component="span" variant="caption">C10</Typography></Typography>
               </Box>
-              <Typography variant="body2" color="text.secondary">DISTRIBUCIÓN POR MACROCASO</Typography>
+              <Typography variant="body2" color="text.secondary">DISTRIBUCIÓN MACROCASO</Typography>
             </Box>
           </Paper>
         </Grid>
-
         <Grid size={{ xs: 12, md: 4 }}>
           <Paper elevation={0} sx={{ p: 3, display: 'flex', alignItems: 'center', borderRadius: 3, bgcolor: '#f0fdf4', border: '1px solid #dcfce7' }}>
             <AssignmentTurnedInIcon sx={{ fontSize: 40, color: '#15803d', mr: 2 }} />
             <Box>
               <Typography variant="h4" sx={{ fontWeight: 800 }}>{stats.acreditadas}</Typography>
-              <Typography variant="body2" color="text.secondary">ACREDITADAS EN LA JEP</Typography>
+              <Typography variant="body2" color="text.secondary">ACREDITADAS EN JEP</Typography>
             </Box>
           </Paper>
         </Grid>
       </Grid>
 
-      {/* SECCIÓN PARA ADMINISTRADORES: BUSCADOR MAESTRO */}
+      {/* BUSCADOR MAESTRO (SOLO ADMIN) */}
       {isAdmin && (
         <Box>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-            <Typography variant="h5" sx={{ fontWeight: 800, color: '#003366' }}>
-              Buscador para Reasignación
-            </Typography>
+            <Typography variant="h5" sx={{ fontWeight: 800, color: '#003366' }}>Buscador para Reasignación</Typography>
             <TextField 
               size="small"
               placeholder="Buscar por nombre o cédula..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               sx={{ width: 350, bgcolor: 'white' }}
-              slotProps={{
-                input: { startAdornment: <InputAdornment position="start"><SearchIcon /></InputAdornment> }
-              }}
+              slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchIcon /></InputAdornment> } }}
             />
           </Box>
 
@@ -167,47 +161,32 @@ const Dashboard = () => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {victimasFiltradas.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={3} align="center" sx={{ py: 3 }}>No se encontraron víctimas con ese criterio.</TableCell>
+                {victimasFiltradas.map((v) => (
+                  <TableRow key={v.id} hover>
+                    <TableCell>
+                      <Typography variant="body2" sx={{ fontWeight: 700 }}>{v.nombre_completo}</Typography>
+                      <Typography variant="caption" color="text.secondary">ID: {v.identificacion}</Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Chip label={getNombreProfesional(v.representacion.juridico_asignado_id)} size="small" variant="outlined" />
+                    </TableCell>
+                    <TableCell align="right">
+                      <Button 
+                        variant="contained" 
+                        size="small" 
+                        color="warning"
+                        startIcon={<VisibilityIcon />}
+                        onClick={() => navigate(`/victimas/${v.id}`)}
+                      >
+                        Reasignar
+                      </Button>
+                    </TableCell>
                   </TableRow>
-                ) : (
-                  victimasFiltradas.map((v) => (
-                    <TableRow key={v.id} hover>
-                      <TableCell>
-                        <Typography variant="body2" sx={{ fontWeight: 700 }}>{v.nombre_completo}</Typography>
-                        <Typography variant="caption" color="text.secondary">CC: {v.identificacion}</Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Chip label={getNombreProfesional(v.representacion.juridico_asignado_id)} size="small" variant="outlined" />
-                      </TableCell>
-                      <TableCell align="right">
-                        <Button 
-                          variant="contained" 
-                          size="small" 
-                          color="warning"
-                          startIcon={<VisibilityIcon />}
-                          onClick={() => navigate(`/victimas/${v.id}`)}
-                          sx={{ fontWeight: 'bold', textTransform: 'none' }}
-                        >
-                          Reasignar
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
+                ))}
               </TableBody>
             </Table>
           </Paper>
         </Box>
-      )}
-
-      {!isAdmin && (
-        <Paper elevation={0} sx={{ p: 4, borderRadius: 3, border: '1px solid #e2e8f0', textAlign: 'center' }}>
-          <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
-            En próximas actualizaciones aquí verás tu agenda institucional.
-          </Typography>
-        </Paper>
       )}
     </Box>
   );
