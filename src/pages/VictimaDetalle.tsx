@@ -3,7 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { 
   Box, Typography, Paper, Grid, Divider, Button, CircularProgress, 
   Chip, List, ListItem, Dialog, DialogTitle, FormGroup, FormControlLabel, Checkbox,
-  DialogContent, DialogActions, TextField, MenuItem, IconButton, ListItemText
+  DialogContent, DialogActions, TextField, MenuItem, IconButton, ListItemText,
+  Tabs, Tab, Table, TableHead, TableRow, TableCell, TableBody, Alert
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import AddCommentIcon from '@mui/icons-material/AddComment';
@@ -11,17 +12,42 @@ import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import DeleteIcon from '@mui/icons-material/Delete';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
+import TimelineIcon from '@mui/icons-material/Timeline';
+import GavelIcon from '@mui/icons-material/Gavel';
+import FolderSpecialIcon from '@mui/icons-material/FolderSpecial';
+import InfoIcon from '@mui/icons-material/Info';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+
 import { jepService } from '../services/jepService';
 import { storageService, ArchivoJEP } from '../services/storageService';
 import { adminService } from '../services/adminService';
+import { audienciaService } from '../services/audienciaService';
+import { radicadoService } from '../services/radicadoService';
 import { Victima, Interaccion } from '../types/jep';
 import { Usuario } from '../types/user';
+import { Audiencia } from '../types/audiencia';
+import { Radicado } from '../types/radicado';
 import { useAuth } from '../context/AuthContext';
 import { useModal } from '../context/ModalContext';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 
 const TIPOS_INTERACCION = ['Llamada de sentido del proceso', 'Asesoría jurídica', 'Acompañamiento psicosocial', 'Gestión de acreditación', 'Otra'];
+
+interface TabPanelProps {
+  children?: React.ReactNode;
+  index: number;
+  value: number;
+}
+
+const TabPanel = (props: TabPanelProps) => {
+  const { children, value, index, ...other } = props;
+  return (
+    <div role="tabpanel" hidden={value !== index} {...other}>
+      {value === index && <Box sx={{ pt: 3 }}>{children}</Box>}
+    </div>
+  );
+};
 
 const VictimaDetalle = () => {
   const { id } = useParams<{ id: string }>();
@@ -33,6 +59,12 @@ const VictimaDetalle = () => {
   const [interacciones, setInteracciones] = useState<Interaccion[]>([]);
   const [poderes, setPoderes] = useState<ArchivoJEP[]>([]);
   const [listaProfesionales, setListaProfesionales] = useState<{ abogados: Usuario[], psicosociales: Usuario[] }>({ abogados: [], psicosociales: [] });
+  
+  // NUEVOS ESTADOS PARA INTEGRACIÓN 360
+  const [audiencias, setAudiencias] = useState<Audiencia[]>([]);
+  const [radicados, setRadicados] = useState<Radicado[]>([]);
+  const [tabIndex, setTabIndex] = useState(0);
+
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
 
@@ -52,16 +84,35 @@ const VictimaDetalle = () => {
     if (!id) return;
     try {
       setLoading(true);
-      const [victimaData, notasData, archivosData, profsData] = await Promise.all([
+      const [victimaData, notasData, archivosData, profsData, allAudiencias, allRadicados] = await Promise.all([
         jepService.getVictimaById(id),
         jepService.getInteraccionesRecientes(id),
         storageService.getFiles(id, 'poderes'),
-        adminService.getProfesionales()
+        adminService.getProfesionales(),
+        audienciaService.getAudiencias(),
+        radicadoService.getRadicados()
       ]);
       setVictima(victimaData);
       setInteracciones(notasData);
       setPoderes(archivosData);
       setListaProfesionales(profsData);
+
+      // CRUCE DE INFORMACIÓN 360
+      if (victimaData) {
+        const audienciasFiltradas = allAudiencias.filter(a => 
+          a.observaciones.toLowerCase().includes(victimaData.nombre_completo.toLowerCase()) || 
+          a.titulo_diligencia.toLowerCase().includes(victimaData.nombre_completo.toLowerCase()) ||
+          a.observaciones.includes(victimaData.identificacion)
+        );
+        setAudiencias(audienciasFiltradas);
+
+        const radicadosFiltrados = allRadicados.filter(r => 
+          r.observaciones.toLowerCase().includes(victimaData.nombre_completo.toLowerCase()) || 
+          r.asunto.toLowerCase().includes(victimaData.nombre_completo.toLowerCase()) ||
+          r.observaciones.includes(victimaData.identificacion)
+        );
+        setRadicados(radicadosFiltrados);
+      }
     } catch (error) {
       console.error(error);
       showModal('Error', 'No se pudo cargar la información.', 'error');
@@ -179,157 +230,251 @@ const VictimaDetalle = () => {
     sol_desasignacion: false 
   };
 
+  const isDesasignado = victima.representacion.estado === 'Desasignado';
+
   return (
     <Box sx={{ p: 4 }}>
       <Button startIcon={<ArrowBackIcon />} onClick={() => navigate(-1)} sx={{ mb: 3 }}>Volver</Button>
 
-      <Grid container spacing={4}>
-        <Grid size={{ xs: 12, lg: 7 }}>
-          <Paper elevation={0} sx={{ p: 4, borderRadius: 3, border: '1px solid #e2e8f0', mb: 4 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3, alignItems: 'flex-start' }}>
-              <Box>
-                <Typography variant="h4" sx={{ fontWeight: 800, color: 'primary.main' }}>{victima.nombre_completo}</Typography>
-                <Typography variant="body1" color="text.secondary" sx={{ mt: 0.5 }}>{victima.tipo_documento}: {victima.identificacion}</Typography>
+      {/* Alerta de Desasignación */}
+      {isDesasignado && (
+        <Alert severity="warning" icon={<WarningAmberIcon />} sx={{ mb: 3, borderRadius: 2 }}>
+          <strong>Esta víctima se encuentra inactiva.</strong> <br/>
+          Motivo registrado: {victima.representacion.motivo_desasignacion || 'No especificado'}. <br/>
+          Fecha de desasignación: {victima.representacion.fecha_desasignacion || 'No registrada'}.
+        </Alert>
+      )}
+
+      {/* Pestañas de Integración */}
+      <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 1 }}>
+        <Tabs value={tabIndex} onChange={(e, val) => setTabIndex(val)} variant="scrollable" scrollButtons="auto">
+          <Tab icon={<InfoIcon />} label="Vista General" iconPosition="start" />
+          <Tab icon={<GavelIcon />} label={`Actuaciones Judiciales (${audiencias.length})`} iconPosition="start" />
+          <Tab icon={<FolderSpecialIcon />} label={`Expediente Documental (${radicados.length})`} iconPosition="start" />
+        </Tabs>
+      </Box>
+
+      {/* ==========================================
+          TAB 0: TU INTERFAZ ORIGINAL INTACTA
+      ========================================== */}
+      <TabPanel value={tabIndex} index={0}>
+        <Grid container spacing={4}>
+          <Grid size={{ xs: 12, lg: 7 }}>
+            <Paper elevation={0} sx={{ p: 4, borderRadius: 3, border: '1px solid #e2e8f0', mb: 4 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3, alignItems: 'flex-start' }}>
+                <Box>
+                  <Typography variant="h4" sx={{ fontWeight: 800, color: 'primary.main' }}>{victima.nombre_completo}</Typography>
+                  <Typography variant="body1" color="text.secondary" sx={{ mt: 0.5 }}>{victima.tipo_documento}: {victima.identificacion}</Typography>
+                </Box>
+                <Chip label={victima.estado_jep?.estado_acreditacion || 'No está acreditada'} color="primary" variant="outlined" sx={{ fontWeight: 600 }} />
               </Box>
-              <Chip label={victima.estado_jep?.estado_acreditacion || 'No está acreditada'} color="primary" variant="outlined" sx={{ fontWeight: 600 }} />
-            </Box>
 
-            <Divider sx={{ my: 3 }} />
+              <Divider sx={{ my: 3 }} />
 
-            <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 2, fontWeight: 700 }}>Información Demográfica</Typography>
-            <Grid container spacing={2} sx={{ mb: 3 }}>
-              <Grid size={{ xs: 6, md: 4 }}><Typography variant="caption">Género</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{victima.datos_demograficos?.genero}</Typography></Grid>
-              <Grid size={{ xs: 6, md: 4 }}><Typography variant="caption">Orientación</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{victima.datos_demograficos?.orientacion_sexual || 'No registra'}</Typography></Grid>
-              <Grid size={{ xs: 6, md: 4 }}><Typography variant="caption">Etnia</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{victima.datos_demograficos?.grupo_etnico}</Typography></Grid>
-              <Grid size={{ xs: 6, md: 4 }}><Typography variant="caption">Ciclo Vital</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{victima.datos_demograficos?.etareo}</Typography></Grid>
-              <Grid size={{ xs: 6, md: 4 }}><Typography variant="caption">Discapacidad</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{victima.datos_demograficos?.discapacidad}</Typography></Grid>
-            </Grid>
+              <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 2, fontWeight: 700 }}>Información Demográfica</Typography>
+              <Grid container spacing={2} sx={{ mb: 3 }}>
+                <Grid size={{ xs: 6, md: 4 }}><Typography variant="caption">Género</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{victima.datos_demograficos?.genero}</Typography></Grid>
+                <Grid size={{ xs: 6, md: 4 }}><Typography variant="caption">Orientación</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{victima.datos_demograficos?.orientacion_sexual || 'No registra'}</Typography></Grid>
+                <Grid size={{ xs: 6, md: 4 }}><Typography variant="caption">Etnia</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{victima.datos_demograficos?.grupo_etnico}</Typography></Grid>
+                <Grid size={{ xs: 6, md: 4 }}><Typography variant="caption">Ciclo Vital</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{victima.datos_demograficos?.etareo}</Typography></Grid>
+                <Grid size={{ xs: 6, md: 4 }}><Typography variant="caption">Discapacidad</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{victima.datos_demograficos?.discapacidad}</Typography></Grid>
+              </Grid>
 
-            <Divider sx={{ my: 3 }} />
-
-            <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 2, fontWeight: 700 }}>Datos de Contacto</Typography>
-            <Grid container spacing={2} sx={{ mb: 3 }}>
-              <Grid size={{ xs: 6 }}><Typography variant="caption">Teléfono</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{victima.datos_contacto?.telefono || 'No registra'}</Typography></Grid>
-              <Grid size={{ xs: 6 }}><Typography variant="caption">Correo</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{victima.datos_contacto?.correo || 'No registra'}</Typography></Grid>
-              <Grid size={{ xs: 12 }}><Typography variant="caption">Ubicación</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{victima.datos_contacto?.departamento} - {victima.datos_contacto?.direccion}</Typography></Grid>
-            </Grid>
-
-            <Divider sx={{ my: 3 }} />
-
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-              <Typography variant="subtitle1" sx={{ fontWeight: 700, color: 'primary.main' }}>Asignación IIRESODH</Typography>
-              {isAdmin && (
-                <Button size="small" variant="contained" color="secondary" startIcon={<SwapHorizIcon />} onClick={() => {
-                  setReasignarData({ 
-                    juridico_nuevo_id: victima.representacion.juridico_asignado_id || '', 
-                    psicosocial_nuevo_id: victima.representacion.psicosocial_asignado_id || '', 
-                    motivo: '' 
-                  });
-                  setOpenReasignarModal(true);
-                }}>Reasignar Caso</Button>
+              {/* DATO FAMILIAR DESAPARECIDO SI EXISTE */}
+              {victima.familiar_desaparecido && (
+                <Alert severity="info" sx={{ mb: 3, borderRadius: 2 }}>
+                  <strong>Familiar Desaparecido:</strong> {victima.familiar_desaparecido.nombre_completo}
+                </Alert>
               )}
-            </Box>
 
-            <Grid container spacing={2} sx={{ mb: 3 }}>
-              <Grid size={{ xs: 12, sm: 6 }}><Typography variant="caption">Abogado/a Responsable</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{getNombreAbo(victima.representacion?.juridico_asignado_id)}</Typography></Grid>
-              <Grid size={{ xs: 12, sm: 6 }}><Typography variant="caption">Psicosocial Responsable</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{getNombrePsi(victima.representacion?.psicosocial_asignado_id)}</Typography></Grid>
-            </Grid>
+              <Divider sx={{ my: 3 }} />
 
-            <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 2, fontWeight: 700 }}>Información Jurídica (JEP)</Typography>
-            <Grid container spacing={2} sx={{ mb: 2 }}>
-              <Grid size={{ xs: 12, sm: 6 }}>
-                <Typography variant="caption" color="text.secondary">Macrocasos</Typography>
-                <Box sx={{ display: 'flex', gap: 0.5, mt: 0.5 }}>{(victima.representacion?.caso || []).map((c: string) => <Chip key={c} label={c} size="small" sx={{ bgcolor: '#e0e7ff', color: '#3730a3' }} />)}</Box>
+              <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 2, fontWeight: 700 }}>Datos de Contacto</Typography>
+              <Grid container spacing={2} sx={{ mb: 3 }}>
+                <Grid size={{ xs: 6 }}><Typography variant="caption">Teléfono</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{victima.datos_contacto?.telefono || 'No registra'}</Typography></Grid>
+                <Grid size={{ xs: 6 }}><Typography variant="caption">Correo</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{victima.datos_contacto?.correo || 'No registra'}</Typography></Grid>
+                <Grid size={{ xs: 12 }}><Typography variant="caption">Ubicación</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{victima.datos_contacto?.departamento} - {victima.datos_contacto?.direccion}</Typography></Grid>
               </Grid>
-              <Grid size={{ xs: 12, sm: 6 }}>
-                <Typography variant="caption" color="text.secondary">Bloques</Typography>
-                <Box sx={{ display: 'flex', gap: 0.5, mt: 0.5 }}>{(victima.representacion?.bloque || []).map((b: string) => <Chip key={b} label={b} size="small" variant="outlined" />)}</Box>
-              </Grid>
-              <Grid size={{ xs: 12 }}>
-                <Typography variant="caption" color="text.secondary">Hechos Victimizantes (Delitos)</Typography>
-                <Box sx={{ display: 'flex', gap: 0.5, mt: 0.5, flexWrap: 'wrap' }}>{(victima.representacion?.hechos_victimizantes || []).map((h: string) => <Chip key={h} label={h} size="small" color="default" />)}</Box>
-              </Grid>
-            </Grid>
-          </Paper>
 
-          <Paper elevation={0} sx={{ p: 4, borderRadius: 3, border: '1px solid #e2e8f0' }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-              <Typography variant="subtitle1" sx={{ fontWeight: 700, color: 'primary.main' }}>Documentación y Poderes</Typography>
-              {canEdit && (
-                <Button component="label" variant="outlined" startIcon={<CloudUploadIcon />}>
-                  Subir PDF
-                  <input type="file" hidden accept=".pdf" onChange={handleFileUpload} />
-                </Button>
-              )}
-            </Box>
-            <List>
-              {poderes.map((archivo, index) => (
-                <ListItem key={index} sx={{ border: '1px solid #e2e8f0', borderRadius: 2, mb: 1 }}>
-                  <PictureAsPdfIcon color="error" sx={{ mr: 2 }} />
-                  <ListItemText primary={archivo.name} />
-                  {/* REGLA: Solo Coordinación puede borrar archivos */}
-                  {canDelete && (
-                    <IconButton color="error" onClick={() => handleDeleteFile(archivo.fullPath)}>
-                      <DeleteIcon />
-                    </IconButton>
-                  )}
-                </ListItem>
-              ))}
-            </List>
-          </Paper>
+              <Divider sx={{ my: 3 }} />
+
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 700, color: 'primary.main' }}>Asignación IIRESODH</Typography>
+                {isAdmin && (
+                  <Button size="small" variant="contained" color="secondary" startIcon={<SwapHorizIcon />} onClick={() => {
+                    setReasignarData({ 
+                      juridico_nuevo_id: victima.representacion.juridico_asignado_id || '', 
+                      psicosocial_nuevo_id: victima.representacion.psicosocial_asignado_id || '', 
+                      motivo: '' 
+                    });
+                    setOpenReasignarModal(true);
+                  }}>Reasignar Caso</Button>
+                )}
+              </Box>
+
+              <Grid container spacing={2} sx={{ mb: 3 }}>
+                <Grid size={{ xs: 12, sm: 6 }}><Typography variant="caption">Abogado/a Responsable</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{getNombreAbo(victima.representacion?.juridico_asignado_id)}</Typography></Grid>
+                <Grid size={{ xs: 12, sm: 6 }}><Typography variant="caption">Psicosocial Responsable</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{getNombrePsi(victima.representacion?.psicosocial_asignado_id)}</Typography></Grid>
+              </Grid>
+
+              <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 2, fontWeight: 700 }}>Información Jurídica (JEP)</Typography>
+              <Grid container spacing={2} sx={{ mb: 2 }}>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <Typography variant="caption" color="text.secondary">Macrocasos</Typography>
+                  <Box sx={{ display: 'flex', gap: 0.5, mt: 0.5 }}>{(victima.representacion?.caso || []).map((c: string) => <Chip key={c} label={c} size="small" sx={{ bgcolor: '#e0e7ff', color: '#3730a3' }} />)}</Box>
+                </Grid>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <Typography variant="caption" color="text.secondary">Bloques</Typography>
+                  <Box sx={{ display: 'flex', gap: 0.5, mt: 0.5 }}>{(victima.representacion?.bloque || []).map((b: string) => <Chip key={b} label={b} size="small" variant="outlined" />)}</Box>
+                </Grid>
+                <Grid size={{ xs: 12 }}>
+                  <Typography variant="caption" color="text.secondary">Hechos Victimizantes (Delitos)</Typography>
+                  <Box sx={{ display: 'flex', gap: 0.5, mt: 0.5, flexWrap: 'wrap' }}>{(victima.representacion?.hechos_victimizantes || []).map((h: string) => <Chip key={h} label={h} size="small" color="default" />)}</Box>
+                </Grid>
+              </Grid>
+            </Paper>
+
+            <Paper elevation={0} sx={{ p: 4, borderRadius: 3, border: '1px solid #e2e8f0' }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 700, color: 'primary.main' }}>Documentación y Poderes</Typography>
+                {canEdit && (
+                  <Button component="label" variant="outlined" startIcon={<CloudUploadIcon />}>
+                    Subir PDF
+                    <input type="file" hidden accept=".pdf" onChange={handleFileUpload} />
+                  </Button>
+                )}
+              </Box>
+              <List>
+                {poderes.map((archivo, index) => (
+                  <ListItem key={index} sx={{ border: '1px solid #e2e8f0', borderRadius: 2, mb: 1 }}>
+                    <PictureAsPdfIcon color="error" sx={{ mr: 2 }} />
+                    <ListItemText primary={archivo.name} />
+                    {/* REGLA: Solo Coordinación puede borrar archivos */}
+                    {canDelete && (
+                      <IconButton color="error" onClick={() => handleDeleteFile(archivo.fullPath)}>
+                        <DeleteIcon />
+                      </IconButton>
+                    )}
+                  </ListItem>
+                ))}
+              </List>
+            </Paper>
+          </Grid>
+
+          <Grid size={{ xs: 12, lg: 5 }}>
+            <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid', borderColor: 'primary.light', bgcolor: '#f0f4f8', mb: 4 }}>
+              <Typography variant="h6" sx={{ fontWeight: 700, mb: 2, color: 'primary.main' }}>Actuaciones Vista (Checklist)</Typography>
+              <FormGroup>
+                <FormControlLabel 
+                  control={<Checkbox checked={sv.primer_contacto} disabled={!canEdit} onChange={(e) => handleToggleChecklist('primer_contacto', e.target.checked)} color="primary" />} 
+                  label="Primer Contacto Realizado" 
+                />
+                <FormControlLabel 
+                  control={<Checkbox checked={sv.firma_poder} disabled={!canEdit} onChange={(e) => handleToggleChecklist('firma_poder', e.target.checked)} color="primary" />} 
+                  label="Firma de Poder Recibida" 
+                />
+                <FormControlLabel 
+                  control={<Checkbox checked={sv.demandas_verdad} disabled={!canEdit} onChange={(e) => handleToggleChecklist('demandas_verdad', e.target.checked)} color="primary" />} 
+                  label="Demandas de Verdad Presentadas" 
+                />
+                <FormControlLabel 
+                  control={<Checkbox checked={sv.sol_desasignacion} disabled={!canEdit} onChange={(e) => handleToggleChecklist('sol_desasignacion', e.target.checked)} color="error" />} 
+                  label="Solicitud de Desasignación" 
+                />
+              </FormGroup>
+            </Paper>
+
+            <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid #e2e8f0', bgcolor: 'background.paper', height: '100%' }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                <Typography variant="h6" sx={{ fontWeight: 700 }}>Historial de Notas</Typography>
+                {canEdit && (
+                  <Button startIcon={<AddCommentIcon />} variant="contained" size="small" color="primary" onClick={() => setOpenNoteModal(true)}>
+                    Nueva Nota
+                  </Button>
+                )}
+              </Box>
+              <List>
+                {interacciones.map((nota) => (
+                  <Paper key={nota.id} elevation={0} sx={{ p: 2, mb: 2, border: '1px solid #e2e8f0' }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                      <Chip label={nota.tipo} size="small" variant="outlined" color="primary" />
+                      <Typography variant="caption">{new Date(nota.fecha).toLocaleDateString()}</Typography>
+                    </Box>
+                    <Typography variant="body2" sx={{ mt: 1 }}>{nota.observaciones}</Typography>
+                    {nota.compromisos && (
+                      <Typography variant="caption" sx={{ display: 'block', mt: 1, color: 'secondary.main', fontWeight: 600 }}>
+                        Compromiso: {nota.compromisos}
+                      </Typography>
+                    )}
+                  </Paper>
+                ))}
+              </List>
+            </Paper>
+          </Grid>
         </Grid>
+      </TabPanel>
 
-        <Grid size={{ xs: 12, lg: 5 }}>
-          <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid', borderColor: 'primary.light', bgcolor: '#f0f4f8', mb: 4 }}>
-            <Typography variant="h6" sx={{ fontWeight: 700, mb: 2, color: 'primary.main' }}>Actuaciones Vista (Checklist)</Typography>
-            <FormGroup>
-              <FormControlLabel 
-                control={<Checkbox checked={sv.primer_contacto} disabled={!canEdit} onChange={(e) => handleToggleChecklist('primer_contacto', e.target.checked)} color="primary" />} 
-                label="Primer Contacto Realizado" 
-              />
-              <FormControlLabel 
-                control={<Checkbox checked={sv.firma_poder} disabled={!canEdit} onChange={(e) => handleToggleChecklist('firma_poder', e.target.checked)} color="primary" />} 
-                label="Firma de Poder Recibida" 
-              />
-              <FormControlLabel 
-                control={<Checkbox checked={sv.demandas_verdad} disabled={!canEdit} onChange={(e) => handleToggleChecklist('demandas_verdad', e.target.checked)} color="primary" />} 
-                label="Demandas de Verdad Presentadas" 
-              />
-              <FormControlLabel 
-                control={<Checkbox checked={sv.sol_desasignacion} disabled={!canEdit} onChange={(e) => handleToggleChecklist('sol_desasignacion', e.target.checked)} color="error" />} 
-                label="Solicitud de Desasignación" 
-              />
-            </FormGroup>
-          </Paper>
-
-          <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid #e2e8f0', bgcolor: 'background.paper', height: '100%' }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-              <Typography variant="h6" sx={{ fontWeight: 700 }}>Historial de Notas</Typography>
-              {canEdit && (
-                <Button startIcon={<AddCommentIcon />} variant="contained" size="small" color="primary" onClick={() => setOpenNoteModal(true)}>
-                  Nueva Nota
-                </Button>
+      {/* ==========================================
+          TAB 1: ACTUACIONES JUDICIALES
+      ========================================== */}
+      <TabPanel value={tabIndex} index={1}>
+        <Paper elevation={0} sx={{ p: 3, border: '1px solid #e2e8f0', borderRadius: 3 }}>
+          <Table size="small">
+            <TableHead sx={{ bgcolor: '#f8fafc' }}>
+              <TableRow>
+                <TableCell>Fecha</TableCell>
+                <TableCell>Tipo / Despacho</TableCell>
+                <TableCell>Diligencia</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {audiencias.length === 0 ? (
+                <TableRow><TableCell colSpan={3} align="center" sx={{ py: 3 }}>No se encontraron actuaciones judiciales relacionadas.</TableCell></TableRow>
+              ) : (
+                audiencias.map((aud, idx) => (
+                  <TableRow key={idx} hover>
+                    <TableCell>{new Date(aud.fecha).toLocaleDateString()}</TableCell>
+                    <TableCell>{aud.tipo} <br/><Typography variant="caption" color="text.secondary">{aud.despacho}</Typography></TableCell>
+                    <TableCell sx={{ fontWeight: 500 }}>{aud.titulo_diligencia}</TableCell>
+                  </TableRow>
+                ))
               )}
-            </Box>
-            <List>
-              {interacciones.map((nota) => (
-                <Paper key={nota.id} elevation={0} sx={{ p: 2, mb: 2, border: '1px solid #e2e8f0' }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                    <Chip label={nota.tipo} size="small" variant="outlined" color="primary" />
-                    <Typography variant="caption">{new Date(nota.fecha).toLocaleDateString()}</Typography>
-                  </Box>
-                  <Typography variant="body2" sx={{ mt: 1 }}>{nota.observaciones}</Typography>
-                  {nota.compromisos && (
-                    <Typography variant="caption" sx={{ display: 'block', mt: 1, color: 'secondary.main', fontWeight: 600 }}>
-                      Compromiso: {nota.compromisos}
-                    </Typography>
-                  )}
-                </Paper>
-              ))}
-            </List>
-          </Paper>
-        </Grid>
-      </Grid>
+            </TableBody>
+          </Table>
+        </Paper>
+      </TabPanel>
+
+      {/* ==========================================
+          TAB 2: EXPEDIENTE DOCUMENTAL
+      ========================================== */}
+      <TabPanel value={tabIndex} index={2}>
+        <Paper elevation={0} sx={{ p: 3, border: '1px solid #e2e8f0', borderRadius: 3 }}>
+          <Table size="small">
+            <TableHead sx={{ bgcolor: '#f8fafc' }}>
+              <TableRow>
+                <TableCell>Fecha</TableCell>
+                <TableCell>Radicado / Auto</TableCell>
+                <TableCell>Asunto</TableCell>
+                <TableCell>Emisor</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {radicados.length === 0 ? (
+                <TableRow><TableCell colSpan={4} align="center" sx={{ py: 3 }}>No se encontraron documentos relacionados.</TableCell></TableRow>
+              ) : (
+                radicados.map((rad, idx) => (
+                  <TableRow key={idx} hover>
+                    <TableCell>{new Date(rad.fecha_radicado).toLocaleDateString()}</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold', color: '#003366' }}>{rad.numero_radicado}</TableCell>
+                    <TableCell>{rad.asunto}</TableCell>
+                    <TableCell>{rad.emisor}</TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </Paper>
+      </TabPanel>
 
       {/* MODAL PARA NOTAS */}
       <Dialog open={openNoteModal} onClose={() => setOpenNoteModal(false)} fullWidth maxWidth="sm">
