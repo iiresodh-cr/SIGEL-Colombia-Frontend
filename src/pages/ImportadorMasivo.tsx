@@ -37,27 +37,52 @@ const ImportadorMasivo = () => {
     }
   };
 
-  // FUNCIÓN AUXILIAR 1: Conversión matemática infalible de fechas Excel a JS
+  // FUNCIÓN AUXILIAR 1: Traductor robusto de fechas (Evita el error 1969)
   const formatFecha = (val: any) => {
-    if (!val) return '';
+    // Si viene vacío, asigna la fecha de hoy para no quebrar el sistema
+    if (!val) return new Date().toISOString().split('T')[0];
     
-    const serial = Number(val);
-    // Si es un número de Excel (ej. 45417)
-    if (!isNaN(serial) && serial > 20000) {
-      // 25569 = Días entre 1/1/1900 (Excel) y 1/1/1970 (JS)
+    // 1. Si es un número serial nativo de Excel
+    if (typeof val === 'number' || (!isNaN(Number(val)) && Number(val) > 20000)) {
+      const serial = Number(val);
       const date = new Date((serial - 25569) * 86400 * 1000);
-      // Corrección de zona horaria para evitar el desfase al 31 de diciembre
-      const adjustedDate = new Date(date.getTime() + Math.abs(date.getTimezoneOffset() * 60000));
-      return adjustedDate.toISOString().split('T')[0];
+      const localDate = new Date(date.getTime() + date.getTimezoneOffset() * 60000);
+      return localDate.toISOString().split('T')[0];
     }
 
-    // Si ya viene como texto ("2024-05-10")
-    const textDate = new Date(val);
-    if (!isNaN(textDate.getTime())) {
-      return textDate.toISOString().split('T')[0];
+    // 2. Si es un texto con barras o guiones (ej. "15/08/2024" o "15-08-24")
+    const strVal = String(val).trim();
+    if (strVal.includes('/') || strVal.includes('-')) {
+      const separator = strVal.includes('/') ? '/' : '-';
+      const partes = strVal.split(separator);
+      
+      // Formato YYYY-MM-DD
+      if (partes[0].length === 4) {
+         const d = new Date(strVal);
+         if(!isNaN(d.getTime())) return d.toISOString().split('T')[0];
+      } 
+      // Formato DD/MM/YYYY (El más común en LatAm)
+      else if (partes.length === 3) {
+        let dia = parseInt(partes[0], 10);
+        let mes = parseInt(partes[1], 10) - 1; // JS cuenta los meses del 0 al 11
+        let anio = parseInt(partes[2], 10);
+        
+        // Si el año es corto (ej. "24"), lo vuelve "2024"
+        if (anio < 100) anio += 2000;
+        
+        const d = new Date(anio, mes, dia);
+        if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
+      }
     }
 
-    return String(val); // Si es un texto raro, retornarlo crudo
+    // 3. Intento final usando el lector estándar de JS
+    const fallbackDate = new Date(strVal);
+    if (!isNaN(fallbackDate.getTime())) {
+      return fallbackDate.toISOString().split('T')[0];
+    }
+
+    // Si todo falla, no retornamos null. Retornamos hoy para evitar el 1969.
+    return new Date().toISOString().split('T')[0];
   };
 
   // FUNCIÓN AUXILIAR 2: Búsqueda parcial ultra flexible
@@ -246,7 +271,7 @@ const ImportadorMasivo = () => {
           await eventoService.addEvento({
             tipo: tipoEvento,
             tema_titulo: String(temaVal),
-            fecha: formatFecha(fechaVal) || new Date().toISOString().split('T')[0],
+            fecha: formatFecha(fechaVal),
             lugar: String(getVal(row, 'VIRTUAL / PRESENCIAL', 'LUGAR') || 'No especificado'),
             asistentes_total: Number(getVal(row, 'NÚMERO ASISTENTES', 'VÍCTIMAS ASISTENTES') || 0),
             observaciones: String(getVal(row, 'EXPLICACIÓN', 'CONCLUSIONES', 'RESULTADOS') || ''),
@@ -284,7 +309,7 @@ const ImportadorMasivo = () => {
       try {
         await audienciaService.addAudiencia({
           macrocaso: [String(getVal(row, 'CASO', 'Caso') || 'Institucional')],
-          fecha: formatFecha(fechaVal) || new Date().toISOString().split('T')[0],
+          fecha: formatFecha(fechaVal),
           despacho: String(getVal(row, 'SALA', 'SECCIÓN', 'Despacho') || 'SRVR') as DespachoJEP,
           tipo: String(tipoVal) as TipoAudiencia,
           titulo_diligencia: String(getVal(row, 'EXPLICACIÓN', 'Explicacion') || 'Diligencia Judicial'),
@@ -324,7 +349,7 @@ const ImportadorMasivo = () => {
         try {
           await radicadoService.addRadicado({
             numero_radicado: String(getVal(row, 'Radicado', 'TIPO DE DOCUMENTO') || 'Sin Radicado'),
-            fecha_radicado: formatFecha(fechaVal) || new Date().toISOString().split('T')[0],
+            fecha_radicado: formatFecha(fechaVal),
             asunto: String(getVal(row, 'Asunto', 'EXPLICACIÓN CORTA') || 'Sin asunto'),
             emisor: String(getVal(row, 'ENTIDAD', 'Entidad') || 'IIRESODH') as EmisorRadicado,
             receptor: String(getVal(row, 'Destinatario', 'QUIEN RADICA') || 'JEP / Otra Entidad'),
@@ -352,7 +377,6 @@ const ImportadorMasivo = () => {
 
     try {
       const data = await file.arrayBuffer();
-      // NO usamos cellDates: true, procesamos el raw date directamente en formatFecha
       const workbook = XLSX.read(data, { type: 'array' });
 
       await procesarVictimas(workbook);
