@@ -47,14 +47,10 @@ const AppRouter = () => {
                 </>
               )}
               
-              {/* RUTAS DE VÍCTIMAS: Visibles para AMBOS dominios */}
+              {/* RUTAS COMUNES: Visibles para AMBOS dominios (Admin y Usuarios) */}
               <Route path="/victimas" element={<Victimas />} />
               <Route path="/victimas/:id" element={<VictimaDetalle />} />
-              
-              {/* Rutas exclusivas del dominio USUARIOS (Abogados/Psicosociales) */}
-              {!isAdminApp && (
-                <Route path="/eventos" element={<Eventos />} />
-              )}
+              <Route path="/eventos" element={<Eventos />} />
 
             </Route>
 
