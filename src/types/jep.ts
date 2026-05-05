@@ -22,6 +22,7 @@ export interface DatosContacto {
 export interface Representacion {
   caso: string[]; 
   bloque: string[]; 
+  hechos_victimizantes?: string[]; // Propiedad agregada para el manejo de delitos
   calidad_victima: string; 
   delito?: string;
   juridico_asignado_id: string; 
@@ -29,6 +30,13 @@ export interface Representacion {
   fecha_asignacion: string;
   estado: 'Activo' | 'Desasignado' | 'En Sustitución' | 'Fallecido';
   referencia_llegada?: string; 
+}
+
+export interface SeguimientoVista {
+  primer_contacto: boolean;
+  firma_poder: boolean;
+  demandas_verdad: boolean;
+  sol_desasignacion: boolean;
 }
 
 export interface EstadoSistemaVista {
@@ -61,6 +69,7 @@ export interface Victima {
   datos_contacto: DatosContacto;
   representacion: Representacion;
   estado_jep: EstadoJEP;
+  seguimiento_vista?: SeguimientoVista; // Checklist de Actuaciones añadido
   storage_folder_url?: string;
   fecha_registro: string;
 }

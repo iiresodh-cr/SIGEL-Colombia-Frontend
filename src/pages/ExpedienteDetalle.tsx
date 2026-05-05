@@ -147,7 +147,7 @@ const ExpedienteDetalle = () => {
                   onCancel={() => setShowVictimaForm(false)} 
                   profesionales={listaProfesionales}
                   currentUserRole={role || ''}
-                  currentUserId={currentUser?.uid || ''}
+                  currentUserEmail={currentUser?.email || ''}
                 />
               </Box>
             )}

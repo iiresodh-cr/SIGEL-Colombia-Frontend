@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
   Box, Typography, Paper, Grid, Divider, Button, CircularProgress, 
-  Chip, List, ListItem, Dialog, DialogTitle, 
+  Chip, List, ListItem, Dialog, DialogTitle, FormGroup, FormControlLabel, Checkbox,
   DialogContent, DialogActions, TextField, MenuItem, IconButton, ListItemText
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
@@ -18,6 +18,8 @@ import { Victima, Interaccion } from '../types/jep';
 import { Usuario } from '../types/user';
 import { useAuth } from '../context/AuthContext';
 import { useModal } from '../context/ModalContext';
+import { doc, updateDoc } from 'firebase/firestore';
+import { db } from '../config/firebase';
 
 const TIPOS_INTERACCION = ['Llamada de sentido del proceso', 'Asesoría jurídica', 'Acompañamiento psicosocial', 'Gestión de acreditación', 'Otra'];
 
@@ -132,19 +134,46 @@ const VictimaDetalle = () => {
     });
   };
 
-  const getNombreAbo = (uid: string) => {
-    if (!uid) return 'Sin asignar';
-    return listaProfesionales.abogados.find(u => u.uid.toLowerCase() === uid.toLowerCase())?.nombre_completo || uid;
+  const handleToggleChecklist = async (campo: string, valor: boolean) => {
+    if (!id || !victima) return;
+    try {
+      const docRef = doc(db, 'victimas', id);
+      await updateDoc(docRef, {
+        [`seguimiento_vista.${campo}`]: valor
+      });
+      setVictima({
+        ...victima,
+        seguimiento_vista: {
+          ...(victima.seguimiento_vista || { primer_contacto: false, firma_poder: false, demandas_verdad: false, sol_desasignacion: false }),
+          [campo]: valor
+        }
+      });
+    } catch (error) {
+      showModal('Error', 'No se pudo actualizar el estado de la actuación.', 'error');
+    }
   };
-  const getNombrePsi = (uid: string) => {
-    if (!uid) return 'Sin asignar';
-    return listaProfesionales.psicosociales.find(u => u.uid.toLowerCase() === uid.toLowerCase())?.nombre_completo || uid;
+
+  const getNombreAbo = (correoId: string) => {
+    if (!correoId) return 'Sin asignar';
+    return listaProfesionales.abogados.find(u => u.correo.toLowerCase() === correoId.toLowerCase())?.nombre_completo || correoId;
+  };
+  const getNombrePsi = (correoId: string) => {
+    if (!correoId) return 'Sin asignar';
+    return listaProfesionales.psicosociales.find(u => u.correo.toLowerCase() === correoId.toLowerCase())?.nombre_completo || correoId;
   };
 
   if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', mt: 10 }}><CircularProgress /></Box>;
   if (!victima) return <Box sx={{ p: 4 }}><Typography>Víctima no encontrada</Typography></Box>;
 
   const isAdmin = role === 'admin' || role === 'superadmin';
+  
+  // SOLUCIÓN ESTRICTA TS: Objeto por defecto con todas las propiedades definidas.
+  const sv = victima.seguimiento_vista || { 
+    primer_contacto: false, 
+    firma_poder: false, 
+    demandas_verdad: false, 
+    sol_desasignacion: false 
+  };
 
   return (
     <Box sx={{ p: 4 }}>
@@ -155,41 +184,38 @@ const VictimaDetalle = () => {
           <Paper elevation={0} sx={{ p: 4, borderRadius: 3, border: '1px solid #e2e8f0', mb: 4 }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3, alignItems: 'flex-start' }}>
               <Box>
-                <Typography variant="h4" sx={{ fontWeight: 800, color: '#003366' }}>{victima.nombre_completo}</Typography>
-                <Typography variant="body1" color="text.secondary" sx={{ mt: 0.5 }}>CC: {victima.identificacion}</Typography>
+                <Typography variant="h4" sx={{ fontWeight: 800, color: 'primary.main' }}>{victima.nombre_completo}</Typography>
+                <Typography variant="body1" color="text.secondary" sx={{ mt: 0.5 }}>{victima.tipo_documento}: {victima.identificacion}</Typography>
               </Box>
-              <Chip label={victima.estado_jep.estado_acreditacion} color="primary" variant="outlined" sx={{ fontWeight: 600 }} />
+              <Chip label={victima.estado_jep?.estado_acreditacion || 'No está acreditada'} color="primary" variant="outlined" sx={{ fontWeight: 600 }} />
             </Box>
 
             <Divider sx={{ my: 3 }} />
 
-            {/* SECCIÓN DATOS DEMOGRÁFICOS (RESTAURADO) */}
             <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 2, fontWeight: 700 }}>Información Demográfica</Typography>
             <Grid container spacing={2} sx={{ mb: 3 }}>
-              <Grid size={{ xs: 6, md: 4 }}><Typography variant="caption">Género</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{victima.datos_demograficos.genero}</Typography></Grid>
-              <Grid size={{ xs: 6, md: 4 }}><Typography variant="caption">Orientación</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{victima.datos_demograficos.orientacion_sexual || 'N/A'}</Typography></Grid>
-              <Grid size={{ xs: 6, md: 4 }}><Typography variant="caption">Etnia</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{victima.datos_demograficos.grupo_etnico}</Typography></Grid>
-              <Grid size={{ xs: 6, md: 4 }}><Typography variant="caption">Ciclo Vital</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{victima.datos_demograficos.etareo}</Typography></Grid>
-              <Grid size={{ xs: 6, md: 4 }}><Typography variant="caption">Discapacidad</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{victima.datos_demograficos.discapacidad}</Typography></Grid>
+              <Grid size={{ xs: 6, md: 4 }}><Typography variant="caption">Género</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{victima.datos_demograficos?.genero}</Typography></Grid>
+              <Grid size={{ xs: 6, md: 4 }}><Typography variant="caption">Orientación</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{victima.datos_demograficos?.orientacion_sexual || 'N/A'}</Typography></Grid>
+              <Grid size={{ xs: 6, md: 4 }}><Typography variant="caption">Etnia</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{victima.datos_demograficos?.grupo_etnico}</Typography></Grid>
+              <Grid size={{ xs: 6, md: 4 }}><Typography variant="caption">Ciclo Vital</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{victima.datos_demograficos?.etareo}</Typography></Grid>
+              <Grid size={{ xs: 6, md: 4 }}><Typography variant="caption">Discapacidad</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{victima.datos_demograficos?.discapacidad}</Typography></Grid>
             </Grid>
 
             <Divider sx={{ my: 3 }} />
 
-            {/* SECCIÓN CONTACTO (RESTAURADO) */}
             <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 2, fontWeight: 700 }}>Datos de Contacto</Typography>
             <Grid container spacing={2} sx={{ mb: 3 }}>
-              <Grid size={{ xs: 6 }}><Typography variant="caption">Teléfono</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{victima.datos_contacto.telefono}</Typography></Grid>
-              <Grid size={{ xs: 6 }}><Typography variant="caption">Correo</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{victima.datos_contacto.correo || 'No registra'}</Typography></Grid>
-              <Grid size={{ xs: 12 }}><Typography variant="caption">Ubicación</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{victima.datos_contacto.departamento} - {victima.datos_contacto.direccion}</Typography></Grid>
+              <Grid size={{ xs: 6 }}><Typography variant="caption">Teléfono</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{victima.datos_contacto?.telefono || 'No registra'}</Typography></Grid>
+              <Grid size={{ xs: 6 }}><Typography variant="caption">Correo</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{victima.datos_contacto?.correo || 'No registra'}</Typography></Grid>
+              <Grid size={{ xs: 12 }}><Typography variant="caption">Ubicación</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{victima.datos_contacto?.departamento} - {victima.datos_contacto?.direccion}</Typography></Grid>
             </Grid>
 
             <Divider sx={{ my: 3 }} />
 
-            {/* SECCIÓN ASIGNACIÓN */}
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-              <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#003366' }}>Asignación IIRESODH</Typography>
+              <Typography variant="subtitle1" sx={{ fontWeight: 700, color: 'primary.main' }}>Asignación IIRESODH</Typography>
               {isAdmin && (
-                <Button size="small" variant="contained" color="warning" startIcon={<SwapHorizIcon />} onClick={() => {
+                <Button size="small" variant="contained" color="secondary" startIcon={<SwapHorizIcon />} onClick={() => {
                   setReasignarData({ 
                     juridico_nuevo_id: victima.representacion.juridico_asignado_id || '', 
                     psicosocial_nuevo_id: victima.representacion.psicosocial_asignado_id || '', 
@@ -201,26 +227,42 @@ const VictimaDetalle = () => {
             </Box>
 
             <Grid container spacing={2} sx={{ mb: 3 }}>
-              <Grid size={{ xs: 12, sm: 6 }}><Typography variant="caption">Abogado/a Responsable</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{getNombreAbo(victima.representacion.juridico_asignado_id)}</Typography></Grid>
-              <Grid size={{ xs: 12, sm: 6 }}><Typography variant="caption">Psicosocial Responsable</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{getNombrePsi(victima.representacion.psicosocial_asignado_id)}</Typography></Grid>
+              <Grid size={{ xs: 12, sm: 6 }}><Typography variant="caption">Abogado/a Responsable</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{getNombreAbo(victima.representacion?.juridico_asignado_id)}</Typography></Grid>
+              <Grid size={{ xs: 12, sm: 6 }}><Typography variant="caption">Psicosocial Responsable</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{getNombrePsi(victima.representacion?.psicosocial_asignado_id)}</Typography></Grid>
             </Grid>
 
-            <Grid container spacing={2}>
+            <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 2, fontWeight: 700 }}>Información Jurídica (JEP)</Typography>
+            <Grid container spacing={2} sx={{ mb: 2 }}>
               <Grid size={{ xs: 12, sm: 6 }}>
                 <Typography variant="caption" color="text.secondary">Macrocasos</Typography>
-                <Box sx={{ display: 'flex', gap: 0.5, mt: 0.5 }}>{victima.representacion.caso.map(c => <Chip key={c} label={c} size="small" sx={{ bgcolor: '#e0e7ff', color: '#3730a3' }} />)}</Box>
+                <Box sx={{ display: 'flex', gap: 0.5, mt: 0.5 }}>{(victima.representacion?.caso || []).map((c: string) => <Chip key={c} label={c} size="small" sx={{ bgcolor: '#e0e7ff', color: '#3730a3' }} />)}</Box>
               </Grid>
               <Grid size={{ xs: 12, sm: 6 }}>
                 <Typography variant="caption" color="text.secondary">Bloques</Typography>
-                <Box sx={{ display: 'flex', gap: 0.5, mt: 0.5 }}>{victima.representacion.bloque.map(b => <Chip key={b} label={b} size="small" variant="outlined" />)}</Box>
+                <Box sx={{ display: 'flex', gap: 0.5, mt: 0.5 }}>{(victima.representacion?.bloque || []).map((b: string) => <Chip key={b} label={b} size="small" variant="outlined" />)}</Box>
+              </Grid>
+              <Grid size={{ xs: 12 }}>
+                <Typography variant="caption" color="text.secondary">Hechos Victimizantes (Delitos)</Typography>
+                <Box sx={{ display: 'flex', gap: 0.5, mt: 0.5, flexWrap: 'wrap' }}>{(victima.representacion?.hechos_victimizantes || []).map((h: string) => <Chip key={h} label={h} size="small" color="default" />)}</Box>
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <Typography variant="caption">Calidad de Víctima</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{victima.representacion?.calidad_victima || 'No definida'}</Typography>
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <Typography variant="caption">Reconocimiento PJ</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{victima.estado_jep?.estado_reconocimiento_pj || 'Sin PJ'}</Typography>
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <Typography variant="caption">Auto de Acreditación</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{victima.estado_jep?.auto_acreditacion || 'No registra'}</Typography>
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <Typography variant="caption">Auto de Reconocimiento</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{victima.estado_jep?.auto_reconocimiento || 'No registra'}</Typography>
               </Grid>
             </Grid>
           </Paper>
 
-          {/* DOCUMENTOS */}
           <Paper elevation={0} sx={{ p: 4, borderRadius: 3, border: '1px solid #e2e8f0' }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-              <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#003366' }}>Documentación</Typography>
+              <Typography variant="subtitle1" sx={{ fontWeight: 700, color: 'primary.main' }}>Documentación y Poderes</Typography>
               <Button component="label" variant="outlined" startIcon={<CloudUploadIcon />}>Subir PDF<input type="file" hidden accept=".pdf" onChange={handleFileUpload} /></Button>
             </Box>
             <List>{poderes.map((archivo, index) => (<ListItem key={index} sx={{ border: '1px solid #e2e8f0', borderRadius: 2, mb: 1 }}><PictureAsPdfIcon color="error" sx={{ mr: 2 }} /><ListItemText primary={archivo.name} /><IconButton color="error" onClick={() => handleDeleteFile(archivo.fullPath)}><DeleteIcon /></IconButton></ListItem>))}</List>
@@ -228,30 +270,50 @@ const VictimaDetalle = () => {
         </Grid>
 
         <Grid size={{ xs: 12, lg: 5 }}>
-          <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid #e2e8f0', bgcolor: '#f8fafc', height: '100%' }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}><Typography variant="h6" sx={{ fontWeight: 700 }}>Historial de Notas</Typography><Button startIcon={<AddCommentIcon />} variant="contained" size="small" sx={{ bgcolor: '#003366' }} onClick={() => setOpenNoteModal(true)}>Nota</Button></Box>
+          <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid', borderColor: 'primary.light', bgcolor: '#f0f4f8', mb: 4 }}>
+            <Typography variant="h6" sx={{ fontWeight: 700, mb: 2, color: 'primary.main' }}>Actuaciones Vista (Checklist)</Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Marque las actuaciones que ya se han completado para esta víctima en el sistema.
+            </Typography>
+            <FormGroup>
+              <FormControlLabel control={<Checkbox checked={sv.primer_contacto} onChange={(e) => handleToggleChecklist('primer_contacto', e.target.checked)} color="primary" />} label="Primer Contacto (Llamada Sentido del Proceso)" />
+              <FormControlLabel control={<Checkbox checked={sv.firma_poder} onChange={(e) => handleToggleChecklist('firma_poder', e.target.checked)} color="primary" />} label="Firma de Poder Recibida" />
+              <FormControlLabel control={<Checkbox checked={sv.demandas_verdad} onChange={(e) => handleToggleChecklist('demandas_verdad', e.target.checked)} color="primary" />} label="Demandas de Verdad Presentadas" />
+              <FormControlLabel control={<Checkbox checked={sv.sol_desasignacion} onChange={(e) => handleToggleChecklist('sol_desasignacion', e.target.checked)} color="error" />} label="Solicitud de Desasignación" />
+            </FormGroup>
+          </Paper>
+
+          <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid #e2e8f0', bgcolor: 'background.paper', height: '100%' }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+              <Typography variant="h6" sx={{ fontWeight: 700 }}>Historial de Notas</Typography>
+              <Button startIcon={<AddCommentIcon />} variant="contained" size="small" color="primary" onClick={() => setOpenNoteModal(true)}>Nota</Button>
+            </Box>
             <List>{interacciones.map((nota) => (<Paper key={nota.id} elevation={0} sx={{ p: 2, mb: 2, border: '1px solid #e2e8f0' }}><Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}><Chip label={nota.tipo} size="small" variant="outlined" color="primary" /><Typography variant="caption">{new Date(nota.fecha).toLocaleDateString()}</Typography></Box><Typography variant="body2" sx={{ mt: 1 }}>{nota.observaciones}</Typography></Paper>))}</List>
           </Paper>
         </Grid>
       </Grid>
 
-      {/* MODALES */}
       <Dialog open={openNoteModal} onClose={() => setOpenNoteModal(false)} fullWidth maxWidth="sm">
         <DialogTitle sx={{ fontWeight: 'bold' }}>Registrar Interacción</DialogTitle>
-        <DialogContent dividers><TextField fullWidth multiline rows={4} label="Observaciones" value={newNote.observaciones} onChange={(e) => setNewNote({ ...newNote, observaciones: e.target.value })} /></DialogContent>
-        <DialogActions sx={{ p: 2 }}><Button onClick={() => setOpenNoteModal(false)}>Cancelar</Button><Button onClick={handleSaveNote} variant="contained" sx={{ bgcolor: '#003366' }}>Guardar</Button></DialogActions>
+        <DialogContent dividers>
+          <TextField select fullWidth size="small" label="Tipo de Interacción" sx={{ mb: 2, mt: 1 }} value={newNote.tipo} onChange={(e) => setNewNote({ ...newNote, tipo: e.target.value })}>
+            {TIPOS_INTERACCION.map(t => <MenuItem key={t} value={t}>{t}</MenuItem>)}
+          </TextField>
+          <TextField fullWidth multiline rows={4} label="Observaciones" value={newNote.observaciones} onChange={(e) => setNewNote({ ...newNote, observaciones: e.target.value })} />
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}><Button onClick={() => setOpenNoteModal(false)} color="secondary">Cancelar</Button><Button onClick={handleSaveNote} variant="contained" color="primary">Guardar</Button></DialogActions>
       </Dialog>
 
       <Dialog open={openReasignarModal} onClose={() => setOpenReasignarModal(false)} fullWidth maxWidth="sm">
         <DialogTitle sx={{ fontWeight: 'bold' }}>Reasignar Responsables</DialogTitle>
         <DialogContent dividers>
           <Grid container spacing={2} sx={{ mt: 1 }}>
-            <Grid size={{ xs: 12, sm: 6 }}><TextField select fullWidth label="Abogado" value={reasignarData.juridico_nuevo_id} onChange={(e) => setReasignarData({ ...reasignarData, juridico_nuevo_id: e.target.value })}>{listaProfesionales.abogados.map(u => <MenuItem key={u.uid} value={u.uid}>{u.nombre_completo || u.correo}</MenuItem>)}</TextField></Grid>
-            <Grid size={{ xs: 12, sm: 6 }}><TextField select fullWidth label="Psicosocial" value={reasignarData.psicosocial_nuevo_id} onChange={(e) => setReasignarData({ ...reasignarData, psicosocial_nuevo_id: e.target.value })}>{listaProfesionales.psicosociales.map(u => <MenuItem key={u.uid} value={u.uid}>{u.nombre_completo || u.correo}</MenuItem>)}</TextField></Grid>
+            <Grid size={{ xs: 12, sm: 6 }}><TextField select fullWidth label="Abogado" value={reasignarData.juridico_nuevo_id} onChange={(e) => setReasignarData({ ...reasignarData, juridico_nuevo_id: e.target.value })}>{listaProfesionales.abogados.map(u => <MenuItem key={u.uid} value={u.correo}>{u.nombre_completo || u.correo}</MenuItem>)}</TextField></Grid>
+            <Grid size={{ xs: 12, sm: 6 }}><TextField select fullWidth label="Psicosocial" value={reasignarData.psicosocial_nuevo_id} onChange={(e) => setReasignarData({ ...reasignarData, psicosocial_nuevo_id: e.target.value })}>{listaProfesionales.psicosociales.map(u => <MenuItem key={u.uid} value={u.correo}>{u.nombre_completo || u.correo}</MenuItem>)}</TextField></Grid>
             <Grid size={{ xs: 12 }}><TextField fullWidth multiline rows={3} label="Motivo" required value={reasignarData.motivo} onChange={(e) => setReasignarData({ ...reasignarData, motivo: e.target.value })} /></Grid>
           </Grid>
         </DialogContent>
-        <DialogActions sx={{ p: 2 }}><Button onClick={() => setOpenReasignarModal(false)}>Cancelar</Button><Button onClick={handleReasignar} variant="contained" color="warning">Confirmar</Button></DialogActions>
+        <DialogActions sx={{ p: 2 }}><Button onClick={() => setOpenReasignarModal(false)} color="secondary">Cancelar</Button><Button onClick={handleReasignar} variant="contained" color="primary">Confirmar</Button></DialogActions>
       </Dialog>
     </Box>
   );

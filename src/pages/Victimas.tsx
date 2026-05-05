@@ -76,13 +76,13 @@ const Victimas = () => {
     <Box sx={{ p: 4 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
         <Box>
-          <Typography variant="h4" sx={{ fontWeight: 800, color: '#003366' }}>Matriz de Víctimas</Typography>
+          <Typography variant="h4" sx={{ fontWeight: 800, color: 'primary.main' }}>Matriz de Víctimas</Typography>
           <Typography variant="body1" color="text.secondary">Base de datos de representación institucional.</Typography>
         </Box>
         <Button 
           variant="contained" 
           startIcon={<AddIcon />} 
-          sx={{ bgcolor: '#003366' }}
+          color="primary"
           onClick={() => setShowForm(true)}
         >
           Nuevo Registro
@@ -96,12 +96,12 @@ const Victimas = () => {
             onCancel={() => setShowForm(false)} 
             profesionales={profesionales}
             currentUserRole={role || ''}
-            currentUserId={currentUser?.email || ''} 
+            currentUserEmail={currentUser?.email || ''} 
           />
         </Box>
       ) : (
         <>
-          <Paper elevation={0} sx={{ p: 2, mb: 3, borderRadius: 3, border: '1px solid #e2e8f0' }}>
+          <Paper elevation={0} sx={{ p: 2, mb: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
             <TextField 
               fullWidth 
               placeholder="Buscar por nombre o identificación..." 
@@ -111,7 +111,7 @@ const Victimas = () => {
                 input: {
                   startAdornment: (
                     <InputAdornment position="start">
-                      <SearchIcon />
+                      <SearchIcon color="action" />
                     </InputAdornment>
                   ),
                 },
@@ -119,15 +119,15 @@ const Victimas = () => {
             />
           </Paper>
 
-          <Paper elevation={0} sx={{ borderRadius: 3, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+          <Paper elevation={0} sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider', overflow: 'hidden' }}>
             <Table>
-              <TableHead sx={{ bgcolor: '#f8fafc' }}>
+              <TableHead sx={{ bgcolor: 'background.default' }}>
                 <TableRow>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Víctima</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Identificación</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Macrocaso</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Estado JEP</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 'bold' }}>Acciones</TableCell>
+                  <TableCell sx={{ fontWeight: 600, color: 'text.secondary' }}>Víctima</TableCell>
+                  <TableCell sx={{ fontWeight: 600, color: 'text.secondary' }}>Identificación</TableCell>
+                  <TableCell sx={{ fontWeight: 600, color: 'text.secondary' }}>Macrocaso</TableCell>
+                  <TableCell sx={{ fontWeight: 600, color: 'text.secondary' }}>Estado JEP</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 600, color: 'text.secondary' }}>Acciones</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -136,7 +136,7 @@ const Victimas = () => {
                     <TableCell sx={{ fontWeight: 600 }}>{v.nombre_completo}</TableCell>
                     <TableCell>{v.identificacion}</TableCell>
                     <TableCell>
-                      {v.representacion.caso.map(c => <Chip key={c} label={c} size="small" sx={{ mr: 0.5 }} />)}
+                      {v.representacion.caso.map((c: string) => <Chip key={c} label={c} size="small" sx={{ mr: 0.5 }} />)}
                     </TableCell>
                     <TableCell>
                       <Chip label={v.estado_jep.estado_acreditacion} size="small" variant="outlined" color="primary" />
