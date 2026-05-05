@@ -16,7 +16,7 @@ const MainLayout = () => {
 
       <AppBar position="static" color="primary" elevation={0}>
         <Toolbar>
-          <Typography variant="h6" sx={{ fontWeight: 700, letterSpacing: '1px', flexGrow: 1 }}>
+          <Typography variant="h6" color="inherit" sx={{ fontWeight: 700, letterSpacing: '1px', flexGrow: 1 }}>
             SIGEL {isAdminApp ? 'ADMIN' : ''}
           </Typography>
           
@@ -42,7 +42,7 @@ const MainLayout = () => {
           )}
 
           <Box sx={{ display: 'flex', alignItems: 'center', ml: 2, pl: 2, borderLeft: '1px solid rgba(255,255,255,0.3)' }}>
-            <Typography variant="body2" sx={{ mr: 2, fontWeight: 500 }}>
+            <Typography variant="body2" color="inherit" sx={{ mr: 2, fontWeight: 500 }}>
               {currentUser?.email}
             </Typography>
             <Tooltip title="Cerrar Sesión">

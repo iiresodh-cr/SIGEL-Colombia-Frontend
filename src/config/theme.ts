@@ -6,10 +6,12 @@ const theme = createTheme({
       main: '#003087', // Azul institucional serio (acorde a la franja de la bandera)
       dark: '#002266', // Tono más oscuro para hovers
       light: '#335aa0',
+      contrastText: '#FFFFFF', // Contraste explícito para elementos sobre azul
     },
     secondary: {
       main: '#6C757D', // Gris sobrio para acciones secundarias o botones de cancelar
       dark: '#495057',
+      contrastText: '#FFFFFF',
     },
     error: {
       main: '#E63946', // Rojo alerta/destructivo
@@ -32,11 +34,12 @@ const theme = createTheme({
     h1: { fontWeight: 700, color: '#003087', fontSize: '2.5rem' },
     h2: { fontWeight: 600, color: '#003087', fontSize: '2rem' },
     h3: { fontWeight: 600, color: '#003087', fontSize: '1.75rem' },
-    h4: { fontWeight: 600, color: '#212529', fontSize: '1.5rem' },
-    h5: { fontWeight: 500, color: '#212529', fontSize: '1.25rem' },
-    h6: { fontWeight: 500, color: '#212529', fontSize: '1rem' },
-    body1: { fontSize: '1rem', color: '#212529', lineHeight: 1.6 },
-    body2: { fontSize: '0.875rem', color: '#495057', lineHeight: 1.5 },
+    // A partir del h4 y body, evitamos forzar el color para no romper fondos coloreados (como AppBars)
+    h4: { fontWeight: 600, fontSize: '1.5rem' },
+    h5: { fontWeight: 500, fontSize: '1.25rem' },
+    h6: { fontWeight: 500, fontSize: '1rem' },
+    body1: { fontSize: '1rem', lineHeight: 1.6 },
+    body2: { fontSize: '0.875rem', lineHeight: 1.5 },
   },
   components: {
     MuiButton: {
