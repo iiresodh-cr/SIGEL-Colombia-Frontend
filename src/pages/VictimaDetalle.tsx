@@ -42,6 +42,12 @@ const VictimaDetalle = () => {
   const [openReasignarModal, setOpenReasignarModal] = useState(false);
   const [reasignarData, setReasignarData] = useState({ juridico_nuevo_id: '', psicosocial_nuevo_id: '', motivo: '' });
 
+  // DEFINICIÓN DE PERMISOS SEGÚN LA MINUTA
+  const isAdmin = role === 'admin' || role === 'superadmin';
+  const isLector = role === 'lector';
+  const canDelete = isAdmin; // Solo coordinación borra
+  const canEdit = !isLector; // Abogados, Psicosociales y Admins editan. Lectores NO.
+
   const loadData = async () => {
     if (!id) return;
     try {
@@ -67,7 +73,7 @@ const VictimaDetalle = () => {
   useEffect(() => { loadData(); }, [id]);
 
   const handleSaveNote = async () => {
-    if (!id || !currentUser || !newNote.observaciones) return;
+    if (!id || !currentUser || !newNote.observaciones || !canEdit) return;
     try {
       const interaccionToSave: Omit<Interaccion, 'id'> = {
         fecha: new Date().toISOString(),
@@ -89,7 +95,7 @@ const VictimaDetalle = () => {
   };
 
   const handleReasignar = async () => {
-    if (!id || !currentUser || !victima) return;
+    if (!id || !currentUser || !victima || !isAdmin) return;
     if (!reasignarData.motivo) {
       showModal('Falta Información', 'Debe justificar el motivo del cambio.', 'error');
       return;
@@ -109,7 +115,7 @@ const VictimaDetalle = () => {
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file || !id) return;
+    if (!file || !id || !canEdit) return;
     try {
       setUploading(true);
       await storageService.uploadFile(id, file, 'poderes');
@@ -123,19 +129,20 @@ const VictimaDetalle = () => {
   };
 
   const handleDeleteFile = async (fullPath: string) => {
-    showModal('¿Eliminar?', 'Esta acción no se puede deshacer.', 'confirm', async () => {
+    if (!canDelete) return;
+    showModal('¿Eliminar?', 'Esta acción no se puede deshacer y solo puede ser realizada por coordinación.', 'confirm', async () => {
       try {
         await storageService.deleteFile(fullPath);
-        showModal('Eliminado', 'Archivo borrado.', 'success');
+        showModal('Eliminado', 'Archivo borrado del servidor.', 'success');
         await loadData();
       } catch (error) {
-        showModal('Error', 'No se pudo borrar.', 'error');
+        showModal('Error', 'No se pudo borrar el archivo.', 'error');
       }
     });
   };
 
   const handleToggleChecklist = async (campo: string, valor: boolean) => {
-    if (!id || !victima) return;
+    if (!id || !victima || !canEdit) return;
     try {
       const docRef = doc(db, 'victimas', id);
       await updateDoc(docRef, {
@@ -149,7 +156,7 @@ const VictimaDetalle = () => {
         }
       });
     } catch (error) {
-      showModal('Error', 'No se pudo actualizar el estado de la actuación.', 'error');
+      showModal('Error', 'No se pudo actualizar el checklist.', 'error');
     }
   };
 
@@ -165,9 +172,6 @@ const VictimaDetalle = () => {
   if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', mt: 10 }}><CircularProgress /></Box>;
   if (!victima) return <Box sx={{ p: 4 }}><Typography>Víctima no encontrada</Typography></Box>;
 
-  const isAdmin = role === 'admin' || role === 'superadmin';
-  
-  // SOLUCIÓN ESTRICTA TS: Objeto por defecto con todas las propiedades definidas.
   const sv = victima.seguimiento_vista || { 
     primer_contacto: false, 
     firma_poder: false, 
@@ -195,7 +199,7 @@ const VictimaDetalle = () => {
             <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 2, fontWeight: 700 }}>Información Demográfica</Typography>
             <Grid container spacing={2} sx={{ mb: 3 }}>
               <Grid size={{ xs: 6, md: 4 }}><Typography variant="caption">Género</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{victima.datos_demograficos?.genero}</Typography></Grid>
-              <Grid size={{ xs: 6, md: 4 }}><Typography variant="caption">Orientación</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{victima.datos_demograficos?.orientacion_sexual || 'N/A'}</Typography></Grid>
+              <Grid size={{ xs: 6, md: 4 }}><Typography variant="caption">Orientación</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{victima.datos_demograficos?.orientacion_sexual || 'No registra'}</Typography></Grid>
               <Grid size={{ xs: 6, md: 4 }}><Typography variant="caption">Etnia</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{victima.datos_demograficos?.grupo_etnico}</Typography></Grid>
               <Grid size={{ xs: 6, md: 4 }}><Typography variant="caption">Ciclo Vital</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{victima.datos_demograficos?.etareo}</Typography></Grid>
               <Grid size={{ xs: 6, md: 4 }}><Typography variant="caption">Discapacidad</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{victima.datos_demograficos?.discapacidad}</Typography></Grid>
@@ -245,54 +249,89 @@ const VictimaDetalle = () => {
                 <Typography variant="caption" color="text.secondary">Hechos Victimizantes (Delitos)</Typography>
                 <Box sx={{ display: 'flex', gap: 0.5, mt: 0.5, flexWrap: 'wrap' }}>{(victima.representacion?.hechos_victimizantes || []).map((h: string) => <Chip key={h} label={h} size="small" color="default" />)}</Box>
               </Grid>
-              <Grid size={{ xs: 12, sm: 6 }}>
-                <Typography variant="caption">Calidad de Víctima</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{victima.representacion?.calidad_victima || 'No definida'}</Typography>
-              </Grid>
-              <Grid size={{ xs: 12, sm: 6 }}>
-                <Typography variant="caption">Reconocimiento PJ</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{victima.estado_jep?.estado_reconocimiento_pj || 'Sin PJ'}</Typography>
-              </Grid>
-              <Grid size={{ xs: 12, sm: 6 }}>
-                <Typography variant="caption">Auto de Acreditación</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{victima.estado_jep?.auto_acreditacion || 'No registra'}</Typography>
-              </Grid>
-              <Grid size={{ xs: 12, sm: 6 }}>
-                <Typography variant="caption">Auto de Reconocimiento</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{victima.estado_jep?.auto_reconocimiento || 'No registra'}</Typography>
-              </Grid>
             </Grid>
           </Paper>
 
           <Paper elevation={0} sx={{ p: 4, borderRadius: 3, border: '1px solid #e2e8f0' }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
               <Typography variant="subtitle1" sx={{ fontWeight: 700, color: 'primary.main' }}>Documentación y Poderes</Typography>
-              <Button component="label" variant="outlined" startIcon={<CloudUploadIcon />}>Subir PDF<input type="file" hidden accept=".pdf" onChange={handleFileUpload} /></Button>
+              {canEdit && (
+                <Button component="label" variant="outlined" startIcon={<CloudUploadIcon />}>
+                  Subir PDF
+                  <input type="file" hidden accept=".pdf" onChange={handleFileUpload} />
+                </Button>
+              )}
             </Box>
-            <List>{poderes.map((archivo, index) => (<ListItem key={index} sx={{ border: '1px solid #e2e8f0', borderRadius: 2, mb: 1 }}><PictureAsPdfIcon color="error" sx={{ mr: 2 }} /><ListItemText primary={archivo.name} /><IconButton color="error" onClick={() => handleDeleteFile(archivo.fullPath)}><DeleteIcon /></IconButton></ListItem>))}</List>
+            <List>
+              {poderes.map((archivo, index) => (
+                <ListItem key={index} sx={{ border: '1px solid #e2e8f0', borderRadius: 2, mb: 1 }}>
+                  <PictureAsPdfIcon color="error" sx={{ mr: 2 }} />
+                  <ListItemText primary={archivo.name} />
+                  {/* REGLA: Solo Coordinación puede borrar archivos */}
+                  {canDelete && (
+                    <IconButton color="error" onClick={() => handleDeleteFile(archivo.fullPath)}>
+                      <DeleteIcon />
+                    </IconButton>
+                  )}
+                </ListItem>
+              ))}
+            </List>
           </Paper>
         </Grid>
 
         <Grid size={{ xs: 12, lg: 5 }}>
           <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid', borderColor: 'primary.light', bgcolor: '#f0f4f8', mb: 4 }}>
             <Typography variant="h6" sx={{ fontWeight: 700, mb: 2, color: 'primary.main' }}>Actuaciones Vista (Checklist)</Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              Marque las actuaciones que ya se han completado para esta víctima en el sistema.
-            </Typography>
             <FormGroup>
-              <FormControlLabel control={<Checkbox checked={sv.primer_contacto} onChange={(e) => handleToggleChecklist('primer_contacto', e.target.checked)} color="primary" />} label="Primer Contacto (Llamada Sentido del Proceso)" />
-              <FormControlLabel control={<Checkbox checked={sv.firma_poder} onChange={(e) => handleToggleChecklist('firma_poder', e.target.checked)} color="primary" />} label="Firma de Poder Recibida" />
-              <FormControlLabel control={<Checkbox checked={sv.demandas_verdad} onChange={(e) => handleToggleChecklist('demandas_verdad', e.target.checked)} color="primary" />} label="Demandas de Verdad Presentadas" />
-              <FormControlLabel control={<Checkbox checked={sv.sol_desasignacion} onChange={(e) => handleToggleChecklist('sol_desasignacion', e.target.checked)} color="error" />} label="Solicitud de Desasignación" />
+              <FormControlLabel 
+                control={<Checkbox checked={sv.primer_contacto} disabled={!canEdit} onChange={(e) => handleToggleChecklist('primer_contacto', e.target.checked)} color="primary" />} 
+                label="Primer Contacto Realizado" 
+              />
+              <FormControlLabel 
+                control={<Checkbox checked={sv.firma_poder} disabled={!canEdit} onChange={(e) => handleToggleChecklist('firma_poder', e.target.checked)} color="primary" />} 
+                label="Firma de Poder Recibida" 
+              />
+              <FormControlLabel 
+                control={<Checkbox checked={sv.demandas_verdad} disabled={!canEdit} onChange={(e) => handleToggleChecklist('demandas_verdad', e.target.checked)} color="primary" />} 
+                label="Demandas de Verdad Presentadas" 
+              />
+              <FormControlLabel 
+                control={<Checkbox checked={sv.sol_desasignacion} disabled={!canEdit} onChange={(e) => handleToggleChecklist('sol_desasignacion', e.target.checked)} color="error" />} 
+                label="Solicitud de Desasignación" 
+              />
             </FormGroup>
           </Paper>
 
           <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid #e2e8f0', bgcolor: 'background.paper', height: '100%' }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
               <Typography variant="h6" sx={{ fontWeight: 700 }}>Historial de Notas</Typography>
-              <Button startIcon={<AddCommentIcon />} variant="contained" size="small" color="primary" onClick={() => setOpenNoteModal(true)}>Nota</Button>
+              {canEdit && (
+                <Button startIcon={<AddCommentIcon />} variant="contained" size="small" color="primary" onClick={() => setOpenNoteModal(true)}>
+                  Nueva Nota
+                </Button>
+              )}
             </Box>
-            <List>{interacciones.map((nota) => (<Paper key={nota.id} elevation={0} sx={{ p: 2, mb: 2, border: '1px solid #e2e8f0' }}><Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}><Chip label={nota.tipo} size="small" variant="outlined" color="primary" /><Typography variant="caption">{new Date(nota.fecha).toLocaleDateString()}</Typography></Box><Typography variant="body2" sx={{ mt: 1 }}>{nota.observaciones}</Typography></Paper>))}</List>
+            <List>
+              {interacciones.map((nota) => (
+                <Paper key={nota.id} elevation={0} sx={{ p: 2, mb: 2, border: '1px solid #e2e8f0' }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                    <Chip label={nota.tipo} size="small" variant="outlined" color="primary" />
+                    <Typography variant="caption">{new Date(nota.fecha).toLocaleDateString()}</Typography>
+                  </Box>
+                  <Typography variant="body2" sx={{ mt: 1 }}>{nota.observaciones}</Typography>
+                  {nota.compromisos && (
+                    <Typography variant="caption" sx={{ display: 'block', mt: 1, color: 'secondary.main', fontWeight: 600 }}>
+                      Compromiso: {nota.compromisos}
+                    </Typography>
+                  )}
+                </Paper>
+              ))}
+            </List>
           </Paper>
         </Grid>
       </Grid>
 
+      {/* MODAL PARA NOTAS */}
       <Dialog open={openNoteModal} onClose={() => setOpenNoteModal(false)} fullWidth maxWidth="sm">
         <DialogTitle sx={{ fontWeight: 'bold' }}>Registrar Interacción</DialogTitle>
         <DialogContent dividers>
@@ -301,19 +340,36 @@ const VictimaDetalle = () => {
           </TextField>
           <TextField fullWidth multiline rows={4} label="Observaciones" value={newNote.observaciones} onChange={(e) => setNewNote({ ...newNote, observaciones: e.target.value })} />
         </DialogContent>
-        <DialogActions sx={{ p: 2 }}><Button onClick={() => setOpenNoteModal(false)} color="secondary">Cancelar</Button><Button onClick={handleSaveNote} variant="contained" color="primary">Guardar</Button></DialogActions>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setOpenNoteModal(false)} color="secondary">Cancelar</Button>
+          <Button onClick={handleSaveNote} variant="contained" color="primary">Guardar Nota</Button>
+        </DialogActions>
       </Dialog>
 
+      {/* MODAL REASIGNACIÓN (SOLO ADMIN) */}
       <Dialog open={openReasignarModal} onClose={() => setOpenReasignarModal(false)} fullWidth maxWidth="sm">
-        <DialogTitle sx={{ fontWeight: 'bold' }}>Reasignar Responsables</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 'bold' }}>Reasignar Responsables del Caso</DialogTitle>
         <DialogContent dividers>
           <Grid container spacing={2} sx={{ mt: 1 }}>
-            <Grid size={{ xs: 12, sm: 6 }}><TextField select fullWidth label="Abogado" value={reasignarData.juridico_nuevo_id} onChange={(e) => setReasignarData({ ...reasignarData, juridico_nuevo_id: e.target.value })}>{listaProfesionales.abogados.map(u => <MenuItem key={u.uid} value={u.correo}>{u.nombre_completo || u.correo}</MenuItem>)}</TextField></Grid>
-            <Grid size={{ xs: 12, sm: 6 }}><TextField select fullWidth label="Psicosocial" value={reasignarData.psicosocial_nuevo_id} onChange={(e) => setReasignarData({ ...reasignarData, psicosocial_nuevo_id: e.target.value })}>{listaProfesionales.psicosociales.map(u => <MenuItem key={u.uid} value={u.correo}>{u.nombre_completo || u.correo}</MenuItem>)}</TextField></Grid>
-            <Grid size={{ xs: 12 }}><TextField fullWidth multiline rows={3} label="Motivo" required value={reasignarData.motivo} onChange={(e) => setReasignarData({ ...reasignarData, motivo: e.target.value })} /></Grid>
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <TextField select fullWidth label="Nuevo Abogado" value={reasignarData.juridico_nuevo_id} onChange={(e) => setReasignarData({ ...reasignarData, juridico_nuevo_id: e.target.value })}>
+                {listaProfesionales.abogados.map(u => <MenuItem key={u.uid} value={u.correo}>{u.nombre_completo || u.correo}</MenuItem>)}
+              </TextField>
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <TextField select fullWidth label="Nuevo Psicosocial" value={reasignarData.psicosocial_nuevo_id} onChange={(e) => setReasignarData({ ...reasignarData, psicosocial_nuevo_id: e.target.value })}>
+                {listaProfesionales.psicosociales.map(u => <MenuItem key={u.uid} value={u.correo}>{u.nombre_completo || u.correo}</MenuItem>)}
+              </TextField>
+            </Grid>
+            <Grid size={{ xs: 12 }}>
+              <TextField fullWidth multiline rows={3} label="Motivo de la reasignación" required value={reasignarData.motivo} onChange={(e) => setReasignarData({ ...reasignarData, motivo: e.target.value })} />
+            </Grid>
           </Grid>
         </DialogContent>
-        <DialogActions sx={{ p: 2 }}><Button onClick={() => setOpenReasignarModal(false)} color="secondary">Cancelar</Button><Button onClick={handleReasignar} variant="contained" color="primary">Confirmar</Button></DialogActions>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setOpenReasignarModal(false)} color="secondary">Cancelar</Button>
+          <Button onClick={handleReasignar} variant="contained" color="primary">Confirmar Cambio</Button>
+        </DialogActions>
       </Dialog>
     </Box>
   );
