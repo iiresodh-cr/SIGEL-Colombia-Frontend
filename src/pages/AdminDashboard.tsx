@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { 
   Box, Typography, Divider, Paper, Table, TableBody, TableCell, TableHead, 
-  TableRow, Select, MenuItem, Button, CircularProgress, IconButton, Chip, Grid 
+  TableRow, Select, MenuItem, Button, CircularProgress, IconButton, Chip, Grid,
+  Dialog, DialogTitle, DialogContent, DialogActions, List, ListItem, ListItemText
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import VisibilityIcon from '@mui/icons-material/Visibility';
+import FolderSharedIcon from '@mui/icons-material/FolderShared';
 import { useNavigate } from 'react-router-dom';
 import { adminService } from '../services/adminService';
 import { AdminStats } from '../components/AdminStats';
@@ -23,6 +25,12 @@ const AdminDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [showSustitucion, setShowSustitucion] = useState(false);
   
+  // Estados para la supervisión de carga
+  const [openCargaModal, setOpenReasignarModal] = useState(false);
+  const [victimasCarga, setVictimasCarga] = useState<Victima[]>([]);
+  const [loadingCarga, setLoadingCarga] = useState(false);
+  const [usuarioSupervisado, setUsuarioSupervisado] = useState('');
+
   const navigate = useNavigate();
   const { showModal } = useModal();
   const { currentUser } = useAuth();
@@ -63,18 +71,32 @@ const AdminDashboard = () => {
     }
   };
 
+  const handleVerCarga = async (email: string) => {
+    try {
+      setUsuarioSupervisado(email);
+      setLoadingCarga(true);
+      setOpenReasignarModal(true);
+      const data = await adminService.getVictimasPorProfesional(email);
+      setVictimasCarga(data);
+    } catch (error) {
+      showModal('Error', 'No se pudo obtener la carga de trabajo.', 'error');
+    } finally {
+      setLoadingCarga(false);
+    }
+  };
+
   const handleDeleteUser = (email: string) => {
     if (email.toLowerCase() === currentUser?.email?.toLowerCase()) {
       showModal('Acción no permitida', 'No puedes borrarte a ti mismo.', 'error');
       return;
     }
-    showModal('¿Revocar Acceso?', `¿Eliminar a ${email}? Esta persona ya no podrá entrar al SIGEL.`, 'confirm', async () => {
+    showModal('¿Revocar Acceso?', `¿Eliminar a ${email}?`, 'confirm', async () => {
       try {
         await adminService.deleteUser(email);
         await loadDashboardData();
-        showModal('Acceso Revocado', 'Usuario eliminado de la base de datos.', 'success');
+        showModal('Acceso Revocado', 'Usuario eliminado.', 'success');
       } catch (error) {
-        showModal('Error', 'No se pudo eliminar.', 'error');
+        showModal('Error', 'No se pudo eliminar.');
       }
     });
   };
@@ -122,7 +144,6 @@ const AdminDashboard = () => {
                   <TableHead sx={{ bgcolor: '#f8fafc' }}>
                     <TableRow>
                       <TableCell sx={{ fontWeight: 'bold' }}>Nombre</TableCell>
-                      <TableCell sx={{ fontWeight: 'bold' }}>Casos</TableCell>
                       <TableCell sx={{ fontWeight: 'bold' }}>Acreditación</TableCell>
                       <TableCell align="right" sx={{ fontWeight: 'bold' }}>Acción</TableCell>
                     </TableRow>
@@ -132,19 +153,13 @@ const AdminDashboard = () => {
                       <TableRow key={v.id}>
                         <TableCell sx={{ fontWeight: 600 }}>{v.nombre_completo}</TableCell>
                         <TableCell>
-                          {v.representacion.caso.map(c => (
-                            <Chip key={c} label={c} size="small" sx={{ mr: 0.5, fontSize: '0.65rem' }} />
-                          ))}
-                        </TableCell>
-                        <TableCell>
-                          <Typography variant="caption">{v.estado_jep.estado_acreditacion}</Typography>
+                          <Chip label={v.estado_jep.estado_acreditacion} size="small" variant="outlined" />
                         </TableCell>
                         <TableCell align="right">
                           <IconButton 
                             size="small" 
                             color="primary" 
                             onClick={() => navigate(`/victimas/${v.id}`)}
-                            title="Ver Perfil Completo"
                           >
                             <VisibilityIcon fontSize="small" />
                           </IconButton>
@@ -159,7 +174,7 @@ const AdminDashboard = () => {
         </>
       )}
 
-      <Divider sx={{ my: 6 }}><Typography variant="overline" sx={{ px: 2 }}>Personal Autorizado y Control de Roles</Typography></Divider>
+      <Divider sx={{ my: 6 }}><Typography variant="overline" sx={{ px: 2 }}>Personal Autorizado y Control de Cargas</Typography></Divider>
       
       <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid #e2e8f0' }}>
         <Table>
@@ -174,37 +189,78 @@ const AdminDashboard = () => {
             {users.map((u) => (
               <TableRow key={u.uid} hover>
                 <TableCell>{u.correo}</TableCell>
-                <TableCell>
-                  <Chip 
-                    label={u.rol} 
-                    size="small" 
-                    color={u.rol === 'superadmin' ? 'secondary' : 'default'} 
-                  />
-                </TableCell>
+                <TableCell><Chip label={u.rol} size="small" /></TableCell>
                 <TableCell align="right">
-                  {u.correo !== 'webmaster@iiresodh.org' && (
-                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
-                      <Select 
-                        size="small" 
-                        value={u.rol} 
-                        onChange={(e) => handleRoleChange(u.correo, e.target.value)} 
-                        sx={{ minWidth: 150 }}
-                      >
-                        <MenuItem value="abogado">Abogado/a</MenuItem>
-                        <MenuItem value="psicosocial">Psicosocial</MenuItem>
-                        <MenuItem value="admin">Administrador/a</MenuItem>
-                      </Select>
-                      <IconButton color="error" onClick={() => handleDeleteUser(u.correo)}>
-                        <DeleteIcon />
-                      </IconButton>
-                    </Box>
-                  )}
+                  <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
+                    <IconButton 
+                      color="info" 
+                      title="Ver víctimas asignadas"
+                      onClick={() => handleVerCarga(u.correo)}
+                    >
+                      <FolderSharedIcon />
+                    </IconButton>
+
+                    {u.correo !== 'webmaster@iiresodh.org' && (
+                      <>
+                        <Select 
+                          size="small" 
+                          value={u.rol} 
+                          onChange={(e) => handleRoleChange(u.correo, e.target.value)} 
+                        >
+                          <MenuItem value="abogado">Abogado/a</MenuItem>
+                          <MenuItem value="psicosocial">Psicosocial</MenuItem>
+                          <MenuItem value="admin">Administrador/a</MenuItem>
+                        </Select>
+                        <IconButton color="error" onClick={() => handleDeleteUser(u.correo)}>
+                          <DeleteIcon />
+                        </IconButton>
+                      </>
+                    )}
+                  </Box>
                 </TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
       </Paper>
+
+      {/* MODAL PARA SUPERVISIÓN DE CARGA */}
+      <Dialog open={openCargaModal} onClose={() => setOpenReasignarModal(false)} fullWidth maxWidth="sm">
+        <DialogTitle sx={{ fontWeight: 'bold', color: '#003366' }}>
+          Víctimas Asignadas a: {usuarioSupervisado}
+        </DialogTitle>
+        <DialogContent dividers>
+          {loadingCarga ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}><CircularProgress /></Box>
+          ) : victimasCarga.length === 0 ? (
+            <Typography variant="body2" color="text.secondary" sx={{ py: 2, textAlign: 'center' }}>
+              Este profesional no tiene víctimas asignadas actualmente.
+            </Typography>
+          ) : (
+            <List>
+              {victimasCarga.map((v) => (
+                <ListItem 
+                  key={v.id} 
+                  divider
+                  secondaryAction={
+                    <IconButton edge="end" onClick={() => navigate(`/victimas/${v.id}`)}>
+                      <VisibilityIcon color="primary" />
+                    </IconButton>
+                  }
+                >
+                  <ListItemText 
+                    primary={v.nombre_completo} 
+                    secondary={`ID: ${v.identificacion} | Caso: ${v.representacion.caso.join(', ')}`}
+                  />
+                </ListItem>
+              ))}
+            </List>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenReasignarModal(false)}>Cerrar</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

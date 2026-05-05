@@ -7,7 +7,8 @@ import {
   writeBatch, 
   setDoc, 
   deleteDoc,
-  updateDoc
+  updateDoc,
+  or
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { Victima } from '../types/jep';
@@ -18,7 +19,6 @@ export const adminService = {
   getAllUsers: async (): Promise<Usuario[]> => {
     const q = query(collection(db, 'usuarios'));
     const snapshot = await getDocs(q);
-    // IMPORTANTE: En tu DB el ID del documento es el correo
     return snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as Usuario));
   },
 
@@ -59,7 +59,7 @@ export const adminService = {
     };
   },
 
-  // 6. SUSTITUCIÓN MASIVA DE CASOS (Por renuncia o cambio de personal)
+  // 6. SUSTITUCIÓN MASIVA DE CASOS
   reasignarCasosMasivamente: async (
     profesionalAnteriorId: string,
     profesionalNuevoId: string,
@@ -84,7 +84,6 @@ export const adminService = {
 
     snapshot.forEach((victimaDoc) => {
       const victimaRef = doc(db, 'victimas', victimaDoc.id);
-      
       batch.update(victimaRef, {
         [campoFiltro]: profesionalNuevoId,
         'representacion.fecha_asignacion': new Date().toISOString().split('T')[0]
@@ -109,7 +108,7 @@ export const adminService = {
     return totalModificados;
   },
 
-  // 7. Listar profesionales operativos para selectores
+  // 7. Listar profesionales operativos
   getProfesionales: async () => {
     const q = query(collection(db, 'usuarios'));
     const snapshot = await getDocs(q);
@@ -120,7 +119,7 @@ export const adminService = {
     };
   },
 
-  // 8. REASIGNACIÓN INDIVIDUAL (Notación de puntos para proteger el objeto 'representacion')
+  // 8. REASIGNACIÓN INDIVIDUAL
   reasignarVictimaIndividual: async (
     victimaId: string,
     adminResponsableId: string,
@@ -132,8 +131,6 @@ export const adminService = {
   ): Promise<void> => {
     const victimaRef = doc(db, 'victimas', victimaId);
     const fechaCompleta = new Date().toISOString();
-    
-    // IMPORTANTE: Se usan strings como llaves para actualizar campos anidados sin borrar el resto
     const updates: any = {};
     updates['representacion.juridico_asignado_id'] = cambios.juridico_nuevo_id;
     updates['representacion.psicosocial_asignado_id'] = cambios.psicosocial_nuevo_id;
@@ -141,7 +138,6 @@ export const adminService = {
 
     await updateDoc(victimaRef, updates);
 
-    // Registro en el historial
     const historialRef = doc(collection(db, `victimas/${victimaId}/historial_asignaciones`));
     await setDoc(historialRef, {
       fecha_sustitucion: fechaCompleta,
@@ -150,5 +146,20 @@ export const adminService = {
       motivo: cambios.motivo,
       sustitucion_realizada_por_id: adminResponsableId
     });
+  },
+
+  // 9. OBTENER VÍCTIMAS POR PROFESIONAL (Nuevo para supervisión del Admin)
+  getVictimasPorProfesional: async (email: string) => {
+    const victimasRef = collection(db, 'victimas');
+    // Buscamos si el email aparece como jurídico O como psicosocial
+    const q = query(
+      victimasRef,
+      or(
+        where('representacion.juridico_asignado_id', '==', email),
+        where('representacion.psicosocial_asignado_id', '==', email)
+      )
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Victima));
   }
 };
