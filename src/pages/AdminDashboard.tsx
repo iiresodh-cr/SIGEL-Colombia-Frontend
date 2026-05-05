@@ -25,7 +25,7 @@ const AdminDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [showSustitucion, setShowSustitucion] = useState(false);
   
-  const [openCargaModal, setOpenReasignarModal] = useState(false);
+  const [openCargaModal, setOpenCargaModal] = useState(false);
   const [victimasCarga, setVictimasCarga] = useState<Victima[]>([]);
   const [loadingCarga, setLoadingCarga] = useState(false);
   const [usuarioSupervisado, setUsuarioSupervisado] = useState('');
@@ -71,16 +71,18 @@ const AdminDashboard = () => {
   };
 
   const handleVerCarga = async (email: string) => {
+    setUsuarioSupervisado(email);
+    setVictimasCarga([]); // Limpiar carga anterior
+    setOpenCargaModal(true);
+    setLoadingCarga(true);
     try {
-      setUsuarioSupervisado(email);
-      setLoadingCarga(true);
-      setOpenReasignarModal(true);
       const data = await adminService.getVictimasPorProfesional(email);
       setVictimasCarga(data);
     } catch (error) {
+      console.error(error);
       showModal('Error', 'No se pudo obtener la carga de trabajo.', 'error');
     } finally {
-      setLoading(false);
+      setLoadingCarga(false); // Apagar el spinner siempre
     }
   };
 
@@ -225,7 +227,7 @@ const AdminDashboard = () => {
 
       <Dialog 
         open={openCargaModal} 
-        onClose={() => setOpenReasignarModal(false)} 
+        onClose={() => setOpenCargaModal(false)} 
         fullWidth 
         maxWidth="sm"
         scroll="paper"
@@ -256,7 +258,10 @@ const AdminDashboard = () => {
                     <Button 
                       size="small" 
                       variant="outlined" 
-                      onClick={() => navigate(`/victimas/${v.id}`)}
+                      onClick={() => {
+                        setOpenCargaModal(false);
+                        navigate(`/victimas/${v.id}`);
+                      }}
                       sx={{ fontSize: '0.7rem' }}
                     >
                       Ver Detalle
@@ -271,7 +276,7 @@ const AdminDashboard = () => {
                           ID: {v.identificacion}
                         </Typography>
                         <Typography component="span" variant="caption" color="primary">
-                          {v.representacion.caso.join(' · ')}
+                          {v.representacion?.caso?.join(' · ') || 'Sin macrocaso'}
                         </Typography>
                       </React.Fragment>
                     }
@@ -282,7 +287,7 @@ const AdminDashboard = () => {
           )}
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setOpenReasignarModal(false)} variant="contained" sx={{ bgcolor: '#003366' }}>Cerrar</Button>
+          <Button onClick={() => setOpenCargaModal(false)} variant="contained" sx={{ bgcolor: '#003366' }}>Cerrar</Button>
         </DialogActions>
       </Dialog>
     </Box>

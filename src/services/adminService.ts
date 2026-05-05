@@ -7,8 +7,7 @@ import {
   writeBatch, 
   setDoc, 
   deleteDoc,
-  updateDoc,
-  or
+  updateDoc
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { Victima } from '../types/jep';
@@ -148,18 +147,28 @@ export const adminService = {
     });
   },
 
-  // 9. OBTENER VÍCTIMAS POR PROFESIONAL (Nuevo para supervisión del Admin)
+  // 9. OBTENER VÍCTIMAS POR PROFESIONAL (Versión de alto rendimiento y compatibilidad)
   getVictimasPorProfesional: async (email: string) => {
     const victimasRef = collection(db, 'victimas');
-    // Buscamos si el email aparece como jurídico O como psicosocial
-    const q = query(
-      victimasRef,
-      or(
-        where('representacion.juridico_asignado_id', '==', email),
-        where('representacion.psicosocial_asignado_id', '==', email)
-      )
-    );
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Victima));
+    
+    // Ejecutamos dos consultas en paralelo para máxima velocidad y evitar errores de índices 'OR'
+    const [qJuridico, qPsico] = await Promise.all([
+      getDocs(query(victimasRef, where('representacion.juridico_asignado_id', '==', email))),
+      getDocs(query(victimasRef, where('representacion.psicosocial_asignado_id', '==', email)))
+    ]);
+
+    const resultados = new Map();
+
+    qJuridico.forEach(doc => {
+      resultados.set(doc.id, { id: doc.id, ...doc.data() } as Victima);
+    });
+
+    qPsico.forEach(doc => {
+      if (!resultados.has(doc.id)) {
+        resultados.set(doc.id, { id: doc.id, ...doc.data() } as Victima);
+      }
+    });
+
+    return Array.from(resultados.values());
   }
 };
