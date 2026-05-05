@@ -103,11 +103,11 @@ export const FormVictima = ({ onSave, onCancel, profesionales, currentUserRole, 
             <TextField 
               select fullWidth size="small" 
               label="Abogado/a Responsable" 
-              required 
               disabled={!isAltRole && currentUserRole === 'abogado'} 
               value={formData.representacion?.juridico_asignado_id} 
               onChange={(e) => setFormData({ ...formData, representacion: { ...formData.representacion!, juridico_asignado_id: e.target.value } })}
             >
+              <MenuItem value=""><em>Sin asignar por ahora</em></MenuItem>
               {profesionales.abogados.map(u => <MenuItem key={u.uid} value={u.correo}>{u.nombre_completo || u.correo}</MenuItem>)}
             </TextField>
           </Grid>
@@ -115,11 +115,11 @@ export const FormVictima = ({ onSave, onCancel, profesionales, currentUserRole, 
             <TextField 
               select fullWidth size="small" 
               label="Psicosocial Responsable" 
-              required 
               disabled={!isAltRole && currentUserRole === 'psicosocial'} 
               value={formData.representacion?.psicosocial_asignado_id} 
               onChange={(e) => setFormData({ ...formData, representacion: { ...formData.representacion!, psicosocial_asignado_id: e.target.value } })}
             >
+              <MenuItem value=""><em>Sin asignar por ahora</em></MenuItem>
               {profesionales.psicosociales.map(u => <MenuItem key={u.uid} value={u.correo}>{u.nombre_completo || u.correo}</MenuItem>)}
             </TextField>
           </Grid>
