@@ -12,6 +12,7 @@ export interface Audiencia {
   id?: string;
   macrocaso: string[]; // Ej: ['Caso 01', 'Caso 10']
   fecha: string;
+  fecha_fin?: string; // Nuevo campo opcional para rangos de fechas
   despacho: DespachoJEP | string;
   tipo: TipoAudiencia;
   titulo_diligencia: string; // Ej: "Versión Voluntaria de Alias X"

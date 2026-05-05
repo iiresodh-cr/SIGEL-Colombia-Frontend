@@ -32,6 +32,7 @@ const Audiencias = () => {
   const [formData, setFormData] = useState<Partial<Audiencia>>({
     macrocaso: [],
     fecha: new Date().toISOString().split('T')[0],
+    fecha_fin: '',
     despacho: 'SRVR',
     tipo: 'Versión Voluntaria',
     titulo_diligencia: '',
@@ -70,6 +71,7 @@ const Audiencias = () => {
       const nuevaAudiencia: Omit<Audiencia, 'id'> = {
         macrocaso: formData.macrocaso,
         fecha: formData.fecha!,
+        fecha_fin: formData.fecha_fin || '',
         despacho: formData.despacho!,
         tipo: formData.tipo as TipoAudiencia,
         titulo_diligencia: formData.titulo_diligencia!,
@@ -82,7 +84,7 @@ const Audiencias = () => {
       await audienciaService.addAudiencia(nuevaAudiencia);
       showModal('Éxito', 'Actuación judicial registrada correctamente.', 'success');
       setOpenForm(false);
-      setFormData({ macrocaso: [], fecha: new Date().toISOString().split('T')[0], despacho: 'SRVR', tipo: 'Versión Voluntaria', titulo_diligencia: '', observaciones: '', profesionales_asistentes: '' });
+      setFormData({ macrocaso: [], fecha: new Date().toISOString().split('T')[0], fecha_fin: '', despacho: 'SRVR', tipo: 'Versión Voluntaria', titulo_diligencia: '', observaciones: '', profesionales_asistentes: '' });
       await loadAudiencias();
     } catch (error) {
       console.error(error);
@@ -141,7 +143,14 @@ const Audiencias = () => {
             ) : (
               audiencias.map((aud) => (
                 <TableRow key={aud.id} hover>
-                  <TableCell>{new Date(aud.fecha).toLocaleDateString()}</TableCell>
+                  <TableCell>
+                    {new Date(aud.fecha).toLocaleDateString()} 
+                    {aud.fecha_fin && aud.fecha_fin.trim() !== '' && (
+                      <Typography variant="caption" sx={{ display: 'block' }} color="text.secondary">
+                        al {new Date(aud.fecha_fin).toLocaleDateString()}
+                      </Typography>
+                    )}
+                  </TableCell>
                   <TableCell>
                     <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
                       {aud.macrocaso.map(c => <Chip key={c} label={c} size="small" sx={{ bgcolor: '#e0e7ff', color: '#3730a3', fontWeight: 'bold' }} />)}
@@ -196,23 +205,31 @@ const Audiencias = () => {
               </Grid>
               <Grid size={{ xs: 12, md: 3 }}>
                 <TextField 
-                  fullWidth type="date" label="Fecha de la Diligencia" required 
+                  fullWidth type="date" label="Fecha de Inicio" required 
                   slotProps={{ inputLabel: { shrink: true } }} 
                   value={formData.fecha} onChange={(e) => setFormData({ ...formData, fecha: e.target.value })} 
                 />
               </Grid>
               <Grid size={{ xs: 12, md: 3 }}>
+                <TextField 
+                  fullWidth type="date" label="Fecha de Fin (Opcional)" 
+                  slotProps={{ inputLabel: { shrink: true } }} 
+                  value={formData.fecha_fin || ''} onChange={(e) => setFormData({ ...formData, fecha_fin: e.target.value })} 
+                  helperText="Si aplica"
+                />
+              </Grid>
+              <Grid size={{ xs: 12, md: 4 }}>
                 <TextField select fullWidth label="Despacho JEP" required value={formData.despacho} onChange={(e) => setFormData({ ...formData, despacho: e.target.value })}>
                   {DESPACHOS.map(d => <MenuItem key={d} value={d}>{d}</MenuItem>)}
                 </TextField>
               </Grid>
               
-              <Grid size={{ xs: 12, md: 4 }}>
+              <Grid size={{ xs: 12, md: 8 }}>
                 <TextField select fullWidth label="Tipo de Actuación" required value={formData.tipo} onChange={(e) => setFormData({ ...formData, tipo: e.target.value as TipoAudiencia })}>
                   {TIPOS_AUDIENCIA.map(t => <MenuItem key={t} value={t}>{t}</MenuItem>)}
                 </TextField>
               </Grid>
-              <Grid size={{ xs: 12, md: 8 }}>
+              <Grid size={{ xs: 12 }}>
                 <TextField fullWidth label="Título / Detalle de la Diligencia" required placeholder="Ej. Versión Voluntaria de..." value={formData.titulo_diligencia} onChange={(e) => setFormData({ ...formData, titulo_diligencia: e.target.value })} />
               </Grid>
 
