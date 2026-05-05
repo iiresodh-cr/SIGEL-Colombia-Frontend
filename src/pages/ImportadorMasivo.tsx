@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { 
-  Box, Typography, Paper, Button, Tabs, Tab, Alert, CircularProgress, 
-  Divider, List, ListItem, ListItemText, Chip 
+  Box, Typography, Paper, Button, Alert, CircularProgress, 
+  List, ListItem, ListItemText, Chip 
 } from '@mui/material';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
@@ -24,52 +24,47 @@ const ImportadorMasivo = () => {
   const { currentUser } = useAuth();
   const { showModal } = useModal();
   
-  const [tabIndex, setTabIndex] = useState(0);
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
-  const [logs, setLogs] = useState<{ tipo: 'success' | 'error' | 'info', mensaje: string }[]>([]);
+  const [logs, setLogs] = useState<{ tipo: 'success' | 'error' | 'info' | 'warning', mensaje: string }[]>([]);
 
-  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
-    setTabIndex(newValue);
-    setFile(null);
-    setLogs([]);
-  };
-
-  const addLog = (tipo: 'success' | 'error' | 'info', mensaje: string) => {
+  const addLog = (tipo: 'success' | 'error' | 'info' | 'warning', mensaje: string) => {
     setLogs(prev => [...prev, { tipo, mensaje }]);
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       setFile(e.target.files[0]);
-      setLogs([{ tipo: 'info', mensaje: `Archivo "${e.target.files[0].name}" cargado y listo para procesar.` }]);
+      setLogs([{ tipo: 'info', mensaje: `Archivo "${e.target.files[0].name}" cargado y listo para escaneo total.` }]);
     }
   };
 
   // ==========================================
-  // PESTAÑA 1: MOTOR DE CRUCE DE VÍCTIMAS
+  // MOTOR 1: VÍCTIMAS Y CRUCE INTELIGENTE
   // ==========================================
-
   const procesarVictimas = async (workbook: XLSX.WorkBook) => {
-    addLog('info', 'Iniciando cruce inteligente de bases de datos de Víctimas...');
+    addLog('info', '--- INICIANDO ESCANEO DE VÍCTIMAS ---');
     const victimasMap = new Map<string, Victima>();
 
-    // 1. CARGAR BASE MAESTRA
-    const hojasBase = ['Víctimas Caso 01', 'Víctimas Caso 10'];
+    // 1. Buscar hojas que actúan como Base Maestra (dependiendo de cuál de los 2 Excels subiste)
+    const hojasBase = ['Víctimas Caso 01', 'Víctimas Caso 10', 'MATRIZ NUEVA ASIGNACIÓN', 'MATRIZ ANTIGUA ASIGNACIÓN', 'CCC', 'BSUR', 'BOCC', 'BNOR', 'BCAR', 'BORI', 'BMM'];
+    let encontroBase = false;
+
     for (const hoja of hojasBase) {
       const sheet = workbook.Sheets[hoja];
       if (!sheet) continue;
+      encontroBase = true;
       const data: any[] = XLSX.utils.sheet_to_json(sheet, { defval: '' });
 
       for (const row of data) {
-        const rawId = String(row['NÚMERO DOCUMENTO (SIN PUNTOS)'] || row['NÚMERO DOCUMENTO'] || '').replace(/\D/g, '');
+        const rawId = String(row['NÚMERO DOCUMENTO (SIN PUNTOS)'] || row['NÚMERO DOCUMENTO'] || row['Identificación'] || '').replace(/\D/g, '');
         if (!rawId) continue;
 
         if (!victimasMap.has(rawId)) {
           victimasMap.set(rawId, {
             identificacion: rawId,
             tipo_documento: String(row['TIPO DOCUMENTO'] || 'CC'),
-            nombre_completo: String(row['NOMBRE VÍCTIMA'] || '').trim(),
+            nombre_completo: String(row['NOMBRE VÍCTIMA'] || row['Nombre de la víctima'] || '').trim(),
             fecha_registro: new Date().toISOString(),
             datos_demograficos: {
               genero: String(row['GÉNERO'] || ''),
@@ -79,18 +74,18 @@ const ImportadorMasivo = () => {
               discapacidad: String(row['DISCAPACIDAD'] || ''),
             },
             datos_contacto: {
-              telefono: '',
-              correo: '',
-              direccion: '',
+              telefono: String(row['Teléfono'] || ''),
+              correo: String(row['Correo'] || ''),
+              direccion: String(row['Dirección'] || ''),
               departamento: String(row['DEPARTAMENTO RESIDENCIA'] || ''),
             },
             representacion: {
-              caso: hoja === 'Víctimas Caso 01' ? ['Caso 01'] : ['Caso 10'],
-              bloque: [String(row['BLOQUE'] || '')],
-              calidad_victima: String(row['DIRECTA O INDIRECTA'] || ''),
-              juridico_asignado_id: String(row['JURÍDICO'] || ''),
-              psicosocial_asignado_id: String(row['PSICOSOCIAL'] || ''),
-              fecha_asignacion: String(row['FECHA ASIGNACIÓN / ASUNCIÓN'] || ''),
+              caso: hoja.includes('01') ? ['Caso 01'] : (hoja.includes('10') ? ['Caso 10'] : []),
+              bloque: [String(row['BLOQUE'] || row['Bloque'] || '')],
+              calidad_victima: String(row['DIRECTA O INDIRECTA'] || row['Calidad'] || ''),
+              juridico_asignado_id: String(row['JURÍDICO'] || row['Juridico'] || ''),
+              psicosocial_asignado_id: String(row['PSICOSOCIAL'] || row['Psicosocial'] || ''),
+              fecha_asignacion: String(row['FECHA ASIGNACIÓN / ASUNCIÓN'] || row['Fecha de asignación interna'] || ''),
               estado: 'Activo',
             },
             estado_jep: {
@@ -98,18 +93,29 @@ const ImportadorMasivo = () => {
               auto_acreditacion: String(row['AUTO DE ACREDITACION'] || row['AUTO ACREDITACIÓN'] || ''),
               estado_reconocimiento_pj: String(row['ESTADO RECONOCIMIENTO PJ'] || 'Sin PJ (no se ha recibido poder)'),
               auto_reconocimiento: String(row['AUTO RECONOCIMIENTO'] || ''),
+            },
+            seguimiento_vista: {
+              primer_contacto: String(row['Llamada de sentido del proceso']).toLowerCase().includes('realizada'),
+              firma_poder: false,
+              demandas_verdad: false,
+              sol_desasignacion: false
             }
           } as Victima);
         }
       }
     }
-    addLog('success', `Base maestra cargada: ${victimasMap.size} fichas únicas creadas.`);
 
-    // 2. CRUCE CON DESAPARICIÓN (Búsqueda por Nombre)
-    const sheetDesaparicion = workbook.Sheets['DESAPARICIÓN'];
-    if (sheetDesaparicion) {
+    if (!encontroBase) {
+      addLog('warning', 'No se detectaron hojas maestras de víctimas en este archivo. Saltando módulo de víctimas.');
+      return;
+    }
+
+    addLog('success', `Base maestra cargada: ${victimasMap.size} fichas únicas detectadas.`);
+
+    // 2. CRUCE CON DESAPARICIÓN
+    if (workbook.Sheets['DESAPARICIÓN']) {
       let cruzados = 0;
-      const dataDesap: any[] = XLSX.utils.sheet_to_json(sheetDesaparicion, { defval: '' });
+      const dataDesap: any[] = XLSX.utils.sheet_to_json(workbook.Sheets['DESAPARICIÓN'], { defval: '' });
       const nameMap = new Map<string, string>();
       victimasMap.forEach((v, id) => nameMap.set(v.nombre_completo.toLowerCase(), id));
 
@@ -118,21 +124,17 @@ const ImportadorMasivo = () => {
         const idEncontrado = nameMap.get(nombreBusqueda);
         if (idEncontrado) {
           const v = victimasMap.get(idEncontrado)!;
-          v.familiar_desaparecido = {
-            nombre_completo: String(row['Victima Directa'] || '').replace('Ficha_', '').replace(/([A-Z])/g, ' $1').trim(),
-            parentesco: 'Familiar' 
-          };
+          v.familiar_desaparecido = { nombre_completo: String(row['Victima Directa'] || '').replace('Ficha_', '').replace(/([A-Z])/g, ' $1').trim(), parentesco: 'Familiar' };
           cruzados++;
         }
       }
-      addLog('info', `Cruce Inteligente 1: ${cruzados} familiares de desaparecidos vinculados correctamente.`);
+      addLog('info', `Cruce Inteligente 1: ${cruzados} familiares desaparecidos vinculados.`);
     }
 
-    // 3. CRUCE CON DESASIGNADAS (Búsqueda por Cédula)
-    const sheetDesasignadas = workbook.Sheets['DESASIGNADAS'];
-    if (sheetDesasignadas) {
+    // 3. CRUCE CON DESASIGNADAS
+    if (workbook.Sheets['DESASIGNADAS']) {
       let cruzados = 0;
-      const dataDesasig: any[] = XLSX.utils.sheet_to_json(sheetDesasignadas, { defval: '' });
+      const dataDesasig: any[] = XLSX.utils.sheet_to_json(workbook.Sheets['DESASIGNADAS'], { defval: '' });
       for (const row of dataDesasig) {
         const rawId = String(row['Identificación'] || '').replace(/\D/g, '');
         if (victimasMap.has(rawId)) {
@@ -143,34 +145,11 @@ const ImportadorMasivo = () => {
           cruzados++;
         }
       }
-      addLog('info', `Cruce Inteligente 2: ${cruzados} víctimas marcadas como desasignadas con sus motivos.`);
+      addLog('info', `Cruce Inteligente 2: ${cruzados} víctimas marcadas como retiradas/desasignadas.`);
     }
 
-    // 4. CRUCE CON MATRIZ NUEVA ASIGNACIÓN (Búsqueda por Cédula)
-    const sheetNuevaAsignacion = workbook.Sheets['MATRIZ NUEVA ASIGNACIÓN'];
-    if (sheetNuevaAsignacion) {
-      let cruzados = 0;
-      const dataNueva: any[] = XLSX.utils.sheet_to_json(sheetNuevaAsignacion, { defval: '' });
-      for (const row of dataNueva) {
-        const rawId = String(row['Identificación'] || '').replace(/\D/g, '');
-        if (victimasMap.has(rawId)) {
-          const v = victimasMap.get(rawId)!;
-          if (row['Teléfono']) v.datos_contacto.telefono = String(row['Teléfono']);
-          if (row['Correo']) v.datos_contacto.correo = String(row['Correo']);
-          if (row['Dirección']) v.datos_contacto.direccion = String(row['Dirección']);
-          
-          if (String(row['Llamada de sentido del proceso']).toLowerCase().includes('realizada')) {
-            if(!v.seguimiento_vista) v.seguimiento_vista = { primer_contacto: false, firma_poder: false, demandas_verdad: false, sol_desasignacion: false };
-            v.seguimiento_vista.primer_contacto = true;
-          }
-          cruzados++;
-        }
-      }
-      addLog('info', `Cruce Inteligente 3: ${cruzados} fichas actualizadas con datos de contacto recientes.`);
-    }
-
-    // 5. GUARDADO EN LOTE EN FIREBASE
-    addLog('info', 'Guardando Fichas Únicas en la base de datos (Batch Processing)...');
+    // 4. GUARDADO EN LOTE EN FIREBASE
+    addLog('info', 'Guardando Víctimas en la base de datos...');
     try {
       const batchArray = Array.from(victimasMap.values());
       let batch = writeBatch(db);
@@ -178,47 +157,40 @@ const ImportadorMasivo = () => {
       let total = 0;
 
       for (const victima of batchArray) {
-        const docRef = doc(collection(db, 'victimas'));
-        batch.set(docRef, victima);
+        const docRef = doc(collection(db, 'victimas'), victima.identificacion); // Forzamos que el ID de firebase sea la cédula para evitar duplicados en futuros imports
+        batch.set(docRef, victima, { merge: true }); // Merge true actualiza si ya existe
         count++;
         total++;
 
-        if (count === 490) { // Límite de Firebase por transacción
+        if (count === 490) {
           await batch.commit();
           batch = writeBatch(db);
           count = 0;
         }
       }
-      if (count > 0) {
-        await batch.commit();
-      }
-      addLog('success', `¡Éxito Total! Se migró una base de datos impecable de ${total} Fichas Únicas cruzadas.`);
+      if (count > 0) await batch.commit();
+      addLog('success', `Se migró un total de ${total} Fichas Únicas de Víctimas.`);
     } catch (error) {
-      addLog('error', 'Error crítico al escribir en la base de datos.');
+      addLog('error', 'Error al guardar las víctimas en Firebase.');
       console.error(error);
     }
   };
 
   // ==========================================
-  // PESTAÑAS 2, 3 y 4: EVENTOS, AUDIENCIAS Y RADICADOS
+  // MOTOR 2: EVENTOS INSTITUCIONALES
   // ==========================================
-
   const procesarEventos = async (workbook: XLSX.WorkBook) => {
-    addLog('info', 'Iniciando escaneo de pestañas de Eventos (Talleres, Reuniones, Capacitaciones)...');
+    addLog('info', '--- INICIANDO ESCANEO DE EVENTOS ---');
+    const hojasEventos = ['Talleres', 'Reuniones', 'Capacitaciones', 'Actividades', 'Jornadas Divulgación'];
     let eventosGuardados = 0;
 
-    const hojasEventos = ['Talleres', 'Reuniones', 'Capacitaciones', 'Actividades', 'Jornadas Divulgación'];
-    
     for (const nombreHoja of hojasEventos) {
       const sheet = workbook.Sheets[nombreHoja];
       if (!sheet) continue;
 
       const data: any[] = XLSX.utils.sheet_to_json(sheet, { defval: '' });
-      addLog('info', `Procesando "${nombreHoja}"...`);
-
       for (const row of data) {
         if (!row['FECHA'] || (!row['TEMA'] && !row['OBJETIVO ESPECÍFICO'])) continue;
-
         try {
           let tipoEvento: TipoEvento = 'Actividad';
           if (nombreHoja === 'Talleres') tipoEvento = 'Taller';
@@ -237,20 +209,21 @@ const ImportadorMasivo = () => {
             fecha_creacion: new Date().toISOString()
           });
           eventosGuardados++;
-        } catch (error) {
-          addLog('error', `Error guardando evento de la fila: ${row['FECHA']}`);
-        }
+        } catch (error) {}
       }
     }
-    addLog('success', `¡Proceso finalizado! Se importaron ${eventosGuardados} eventos exitosamente.`);
+    if (eventosGuardados > 0) addLog('success', `Se importaron ${eventosGuardados} Eventos Institucionales.`);
+    else addLog('warning', 'No se encontraron registros válidos de Eventos en este archivo.');
   };
 
+  // ==========================================
+  // MOTOR 3: AUDIENCIAS
+  // ==========================================
   const procesarAudiencias = async (workbook: XLSX.WorkBook) => {
-    addLog('info', 'Iniciando escaneo de Audiencias y Diligencias...');
+    addLog('info', '--- INICIANDO ESCANEO DE AUDIENCIAS ---');
     const sheet = workbook.Sheets['AudienciasDiligencias'];
-    
     if (!sheet) {
-      addLog('error', 'No se encontró la pestaña "AudienciasDiligencias".');
+      addLog('warning', 'No se encontró la pestaña "AudienciasDiligencias" en este archivo.');
       return;
     }
 
@@ -259,7 +232,6 @@ const ImportadorMasivo = () => {
 
     for (const row of data) {
       if (!row['FECHA'] || !row['TIPO']) continue;
-
       try {
         await audienciaService.addAudiencia({
           macrocaso: [String(row['CASO'] || 'Institucional')],
@@ -273,28 +245,26 @@ const ImportadorMasivo = () => {
           fecha_creacion: new Date().toISOString()
         });
         audienciasGuardadas++;
-      } catch (error) {
-        addLog('error', `Error guardando audiencia: ${row['TIPO']}`);
-      }
+      } catch (error) {}
     }
-    addLog('success', `¡Proceso finalizado! Se importaron ${audienciasGuardadas} actuaciones judiciales.`);
+    addLog('success', `Se importaron ${audienciasGuardadas} Actuaciones Judiciales.`);
   };
 
+  // ==========================================
+  // MOTOR 4: RADICADOS DOCUMENTALES
+  // ==========================================
   const procesarRadicados = async (workbook: XLSX.WorkBook) => {
-    addLog('info', 'Iniciando escaneo de Control Documental y Radicados...');
+    addLog('info', '--- INICIANDO ESCANEO DE RADICADOS ---');
+    const hojasRadicados = ['Documentos', 'Radicados Jep'];
     let radicadosGuardados = 0;
 
-    const hojasRadicados = ['Documentos', 'Radicados Jep'];
-    
     for (const nombreHoja of hojasRadicados) {
       const sheet = workbook.Sheets[nombreHoja];
       if (!sheet) continue;
 
       const data: any[] = XLSX.utils.sheet_to_json(sheet, { defval: '' });
-
       for (const row of data) {
         if (!row['FECHA'] && !row['Fecha de radicado']) continue;
-
         try {
           await radicadoService.addRadicado({
             numero_radicado: String(row['No. Radicado'] || row['TIPO DE DOCUMENTO'] || 'Sin Radicado'),
@@ -308,35 +278,37 @@ const ImportadorMasivo = () => {
             fecha_creacion: new Date().toISOString()
           });
           radicadosGuardados++;
-        } catch (error) {
-          addLog('error', `Error guardando radicado.`);
-        }
+        } catch (error) {}
       }
     }
-    addLog('success', `¡Proceso finalizado! Se importaron ${radicadosGuardados} radicados documentales.`);
+    if (radicadosGuardados > 0) addLog('success', `Se importaron ${radicadosGuardados} Documentos Radicados.`);
+    else addLog('warning', 'No se encontraron registros de Radicados en este archivo.');
   };
 
   // ==========================================
-  // DISPARADOR PRINCIPAL
+  // DISPARADOR MAESTRO
   // ==========================================
-
-  const handleImport = async () => {
+  const handleImportTotal = async () => {
     if (!file) return;
     setLoading(true);
-    addLog('info', 'Leyendo archivo Excel...');
+    setLogs([]);
+    addLog('info', 'Iniciando lectura estructural del archivo Excel...');
 
     try {
       const data = await file.arrayBuffer();
       const workbook = XLSX.read(data, { type: 'array' });
 
-      if (tabIndex === 0) await procesarVictimas(workbook);
-      if (tabIndex === 1) await procesarEventos(workbook);
-      if (tabIndex === 2) await procesarAudiencias(workbook);
-      if (tabIndex === 3) await procesarRadicados(workbook);
+      // Ejecución paralela controlada de los 4 motores
+      await procesarVictimas(workbook);
+      await procesarEventos(workbook);
+      await procesarAudiencias(workbook);
+      await procesarRadicados(workbook);
+
+      addLog('success', '✅ PROCESO DE MIGRACIÓN GLOBAL COMPLETADO.');
 
     } catch (error) {
       console.error(error);
-      addLog('error', 'Ocurrió un error crítico al leer el archivo Excel. Verifica el formato.');
+      addLog('error', 'Ocurrió un error crítico al procesar el archivo Excel. Verifique que el archivo no esté corrupto.');
       showModal('Error', 'No se pudo leer el archivo.', 'error');
     } finally {
       setLoading(false);
@@ -345,60 +317,47 @@ const ImportadorMasivo = () => {
 
   return (
     <Box sx={{ p: 4 }}>
-      <Typography variant="h4" sx={{ fontWeight: 800, color: '#003366', mb: 1 }}>Centro de Importación Inteligente</Typography>
+      <Typography variant="h4" sx={{ fontWeight: 800, color: '#003366', mb: 1 }}>Carga Estructural de Matrices</Typography>
       <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
-        Sube tu Matriz de Seguimiento o Insumos Consolidados. El sistema extraerá y cruzará la información según la categoría que elijas.
+        Sube cualquiera de tus archivos (Insumos Consolidados o Matriz de Seguimiento). El sistema escaneará todas las hojas automáticamente y distribuirá la información a los módulos correspondientes.
       </Typography>
 
-      <Paper elevation={0} sx={{ borderRadius: 3, border: '1px solid #e2e8f0', overflow: 'hidden', mb: 4 }}>
-        <Tabs 
-          value={tabIndex} 
-          onChange={handleTabChange} 
-          variant="fullWidth" 
-          sx={{ borderBottom: 1, borderColor: 'divider', bgcolor: '#f8fafc' }}
-        >
-          <Tab label="1. Personas (Ficha Única)" sx={{ fontWeight: 'bold' }} />
-          <Tab label="2. Eventos Institucionales" sx={{ fontWeight: 'bold' }} />
-          <Tab label="3. Audiencias JEP" sx={{ fontWeight: 'bold' }} />
-          <Tab label="4. Control Documental" sx={{ fontWeight: 'bold' }} />
-        </Tabs>
-
-        <Box sx={{ p: 4, textAlign: 'center' }}>
-          <Box sx={{ border: '2px dashed #cbd5e1', borderRadius: 2, p: 5, bgcolor: '#f1f5f9', mb: 3 }}>
-            <CloudUploadIcon sx={{ fontSize: 60, color: '#94a3b8', mb: 2 }} />
-            <Typography variant="h6" color="text.secondary" gutterBottom>
-              {file ? `Archivo Seleccionado: ${file.name}` : 'Haz clic o arrastra tu archivo Excel aquí'}
-            </Typography>
-            <Button variant="contained" component="label" sx={{ mt: 1, bgcolor: '#003366' }}>
-              Seleccionar Archivo
-              <input type="file" hidden accept=".xlsx, .xls, .csv" onChange={handleFileUpload} />
-            </Button>
-          </Box>
-
-          <Button 
-            variant="contained" 
-            color="success" 
-            size="large" 
-            fullWidth 
-            disabled={!file || loading} 
-            onClick={handleImport}
-            sx={{ py: 1.5, fontSize: '1.1rem', fontWeight: 'bold' }}
-          >
-            {loading ? <CircularProgress size={26} color="inherit" /> : 'COMENZAR MIGRACIÓN Y CRUCE DE DATOS'}
+      <Paper elevation={0} sx={{ p: 4, textAlign: 'center', borderRadius: 3, border: '1px solid #e2e8f0', mb: 4 }}>
+        <Box sx={{ border: '2px dashed #cbd5e1', borderRadius: 2, p: 5, bgcolor: '#f8fafc', mb: 3 }}>
+          <CloudUploadIcon sx={{ fontSize: 60, color: '#94a3b8', mb: 2 }} />
+          <Typography variant="h6" color="text.secondary" gutterBottom>
+            {file ? `Archivo Listo: ${file.name}` : 'Haz clic o arrastra tu archivo Excel aquí'}
+          </Typography>
+          <Button variant="contained" component="label" sx={{ mt: 1, bgcolor: '#003366' }}>
+            Seleccionar Archivo
+            <input type="file" hidden accept=".xlsx, .xls, .csv" onChange={handleFileUpload} />
           </Button>
         </Box>
+
+        <Button 
+          variant="contained" 
+          color="success" 
+          size="large" 
+          fullWidth 
+          disabled={!file || loading} 
+          onClick={handleImportTotal}
+          sx={{ py: 1.5, fontSize: '1.1rem', fontWeight: 'bold' }}
+        >
+          {loading ? <CircularProgress size={26} color="inherit" /> : 'PROCESAR MATRIZ COMPLETA'}
+        </Button>
       </Paper>
 
       {/* PANEL DE REGISTROS (LOGS) */}
       {logs.length > 0 && (
         <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid #e2e8f0', bgcolor: '#1e293b', color: 'white' }}>
-          <Typography variant="h6" sx={{ mb: 2, borderBottom: '1px solid #334155', pb: 1 }}>Consola de Procesamiento</Typography>
+          <Typography variant="h6" sx={{ mb: 2, borderBottom: '1px solid #334155', pb: 1 }}>Consola de Procesamiento del Sistema</Typography>
           <List dense>
             {logs.map((log, index) => (
               <ListItem key={index} sx={{ py: 0.5 }}>
-                {log.tipo === 'info' && <Chip size="small" label="INFO" sx={{ bgcolor: '#3b82f6', color: 'white', mr: 2 }} />}
-                {log.tipo === 'success' && <CheckCircleIcon sx={{ color: '#22c55e', mr: 2, fontSize: 20 }} />}
-                {log.tipo === 'error' && <ErrorIcon sx={{ color: '#ef4444', mr: 2, fontSize: 20 }} />}
+                {log.tipo === 'info' && <Chip size="small" label="INFO" sx={{ bgcolor: '#3b82f6', color: 'white', mr: 2, minWidth: 70 }} />}
+                {log.tipo === 'success' && <Chip size="small" label="ÉXITO" sx={{ bgcolor: '#22c55e', color: 'white', mr: 2, minWidth: 70 }} />}
+                {log.tipo === 'warning' && <Chip size="small" label="OMITIDO" sx={{ bgcolor: '#f59e0b', color: 'white', mr: 2, minWidth: 70 }} />}
+                {log.tipo === 'error' && <Chip size="small" label="ERROR" sx={{ bgcolor: '#ef4444', color: 'white', mr: 2, minWidth: 70 }} />}
                 <ListItemText primary={log.mensaje} sx={{ '& span': { fontFamily: 'monospace', fontSize: '0.9rem' } }} />
               </ListItem>
             ))}
