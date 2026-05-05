@@ -49,7 +49,7 @@ const VictimaDetalle = () => {
     compromisos: ''
   });
 
-  // Estados para reasignación de caso (Solo Admins)
+  // Estados para reasignación
   const [openReasignarModal, setOpenReasignarModal] = useState(false);
   const [reasignarData, setReasignarData] = useState({
     juridico_nuevo_id: '',
@@ -106,7 +106,13 @@ const VictimaDetalle = () => {
   };
 
   const handleReasignar = async () => {
-    if (!id || !currentUser || !victima || !reasignarData.motivo) return;
+    if (!id || !currentUser || !victima) return;
+    
+    if (!reasignarData.motivo) {
+      showModal('Información Faltante', 'Debe escribir un motivo para la reasignación.', 'error');
+      return;
+    }
+
     try {
       setLoading(true);
       await adminService.reasignarVictimaIndividual(id, currentUser.uid, {
@@ -120,7 +126,8 @@ const VictimaDetalle = () => {
       setOpenReasignarModal(false);
       await loadData();
     } catch (error) {
-      showModal('Error', 'No se pudo reasignar el caso.', 'error');
+      console.error(error);
+      showModal('Error', 'No se pudo procesar la reasignación.', 'error');
     } finally {
       setLoading(false);
     }
@@ -168,13 +175,13 @@ const VictimaDetalle = () => {
       </Button>
 
       <Grid container spacing={4}>
-        {/* COLUMNA IZQUIERDA: DATOS Y ARCHIVOS */}
+        {/* COLUMNA IZQUIERDA */}
         <Grid size={{ xs: 12, lg: 7 }}>
           <Paper elevation={0} sx={{ p: 4, borderRadius: 3, border: '1px solid #e2e8f0', mb: 4 }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3, alignItems: 'flex-start' }}>
               <Box>
                 <Typography variant="h4" sx={{ fontWeight: 800, color: '#003366' }}>{victima.nombre_completo}</Typography>
-                <Typography variant="body1" color="text.secondary" sx={{ mt: 0.5 }}>{victima.tipo_documento} {victima.identificacion}</Typography>
+                <Typography variant="body1" color="text.secondary">CC: {victima.identificacion}</Typography>
               </Box>
               <Chip label={victima.estado_jep.estado_acreditacion} color="primary" variant="outlined" sx={{ fontWeight: 600 }} />
             </Box>
@@ -182,13 +189,11 @@ const VictimaDetalle = () => {
             <Divider sx={{ my: 3 }} />
 
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-              <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#003366' }}>
-                Asignación IIRESODH
-              </Typography>
+              <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#003366' }}>Asignación IIRESODH</Typography>
               {isAdmin && (
                 <Button 
                   size="small" 
-                  variant="outlined" 
+                  variant="contained" 
                   color="warning" 
                   startIcon={<SwapHorizIcon />}
                   onClick={() => {
@@ -217,7 +222,7 @@ const VictimaDetalle = () => {
             </Grid>
           </Paper>
 
-          {/* SECCIÓN DE ARCHIVOS */}
+          {/* DOCUMENTOS */}
           <Paper elevation={0} sx={{ p: 4, borderRadius: 3, border: '1px solid #e2e8f0' }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
               <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#003366' }}>Poderes y Documentos</Typography>
@@ -227,29 +232,25 @@ const VictimaDetalle = () => {
               </Button>
             </Box>
             
-            {poderes.length === 0 ? (
-              <Typography variant="body2" color="text.secondary">No hay archivos adjuntos.</Typography>
-            ) : (
-              <List>
-                {poderes.map((archivo, index) => (
-                  <ListItem key={index} sx={{ border: '1px solid #e2e8f0', borderRadius: 2, mb: 1 }}>
-                    <PictureAsPdfIcon color="error" sx={{ mr: 2 }} />
-                    <ListItemText primary={archivo.name} />
-                    <IconButton color="error" onClick={() => handleDeleteFile(archivo.fullPath)}>
-                      <DeleteIcon />
-                    </IconButton>
-                  </ListItem>
-                ))}
-              </List>
-            )}
+            <List>
+              {poderes.map((archivo, index) => (
+                <ListItem key={index} sx={{ border: '1px solid #e2e8f0', borderRadius: 2, mb: 1 }}>
+                  <PictureAsPdfIcon color="error" sx={{ mr: 2 }} />
+                  <ListItemText primary={archivo.name} />
+                  <IconButton color="error" onClick={() => handleDeleteFile(archivo.fullPath)}>
+                    <DeleteIcon />
+                  </IconButton>
+                </ListItem>
+              ))}
+            </List>
           </Paper>
         </Grid>
 
-        {/* COLUMNA DERECHA: HISTORIAL */}
+        {/* COLUMNA DERECHA */}
         <Grid size={{ xs: 12, lg: 5 }}>
           <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid #e2e8f0', bgcolor: '#f8fafc', height: '100%' }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-              <Typography variant="h6" sx={{ fontWeight: 700 }}>Historial</Typography>
+              <Typography variant="h6" sx={{ fontWeight: 700 }}>Historial de Notas</Typography>
               <Button startIcon={<AddCommentIcon />} variant="contained" size="small" sx={{ bgcolor: '#003366' }} onClick={() => setOpenNoteModal(true)}>
                 Nueva Nota
               </Button>
@@ -272,7 +273,7 @@ const VictimaDetalle = () => {
 
       {/* MODALES */}
       <Dialog open={openNoteModal} onClose={() => setOpenNoteModal(false)} fullWidth maxWidth="sm">
-        <DialogTitle>Registrar Interacción</DialogTitle>
+        <DialogTitle>Registrar Nota</DialogTitle>
         <DialogContent dividers>
           <TextField select fullWidth label="Tipo" value={newNote.tipo} sx={{ mb: 2, mt: 1 }} onChange={(e) => setNewNote({ ...newNote, tipo: e.target.value })}>
             {TIPOS_INTERACCION.map(t => <MenuItem key={t} value={t}>{t}</MenuItem>)}
@@ -290,23 +291,23 @@ const VictimaDetalle = () => {
         <DialogContent dividers>
           <Grid container spacing={2} sx={{ mt: 1 }}>
             <Grid size={{ xs: 12, sm: 6 }}>
-              <TextField select fullWidth label="Nuevo Abogado" value={reasignarData.juridico_nuevo_id} onChange={(e) => setReasignarData({ ...reasignarData, juridico_nuevo_id: e.target.value })}>
+              <TextField select fullWidth label="Abogado/a" value={reasignarData.juridico_nuevo_id} onChange={(e) => setReasignarData({ ...reasignarData, juridico_nuevo_id: e.target.value })}>
                 {listaProfesionales.abogados.map(u => <MenuItem key={u.uid} value={u.uid}>{u.nombre_completo || u.correo}</MenuItem>)}
               </TextField>
             </Grid>
             <Grid size={{ xs: 12, sm: 6 }}>
-              <TextField select fullWidth label="Nuevo Psicosocial" value={reasignarData.psicosocial_nuevo_id} onChange={(e) => setReasignarData({ ...reasignarData, psicosocial_nuevo_id: e.target.value })}>
+              <TextField select fullWidth label="Psicosocial" value={reasignarData.psicosocial_nuevo_id} onChange={(e) => setReasignarData({ ...reasignarData, psicosocial_nuevo_id: e.target.value })}>
                 {listaProfesionales.psicosociales.map(u => <MenuItem key={u.uid} value={u.uid}>{u.nombre_completo || u.correo}</MenuItem>)}
               </TextField>
             </Grid>
             <Grid size={{ xs: 12 }}>
-              <TextField fullWidth multiline rows={3} label="Motivo" value={reasignarData.motivo} onChange={(e) => setReasignarData({ ...reasignarData, motivo: e.target.value })} />
+              <TextField fullWidth multiline rows={3} label="Motivo del Cambio" required value={reasignarData.motivo} onChange={(e) => setReasignarData({ ...reasignarData, motivo: e.target.value })} />
             </Grid>
           </Grid>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setOpenReasignarModal(false)}>Cancelar</Button>
-          <Button onClick={handleReasignar} variant="contained" color="warning">Confirmar</Button>
+          <Button onClick={handleReasignar} variant="contained" color="warning">Confirmar Cambio</Button>
         </DialogActions>
       </Dialog>
     </Box>

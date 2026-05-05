@@ -107,19 +107,18 @@ export const adminService = {
     return totalModificados;
   },
 
-  // 7. LISTAR PROFESIONALES (FILTRADO: Solo operativos, NO Admins)
+  // 7. LISTAR PROFESIONALES (Solo operativos)
   getProfesionales: async () => {
     const q = query(collection(db, 'usuarios'));
     const snapshot = await getDocs(q);
     const todos = snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as Usuario));
     return {
-      // Filtramos para que NO aparezcan admins ni superadmins en la lista de asignación
       abogados: todos.filter(u => u.rol === 'abogado'),
       psicosociales: todos.filter(u => u.rol === 'psicosocial')
     };
   },
 
-  // 8. REASIGNACIÓN INDIVIDUAL
+  // 8. REASIGNACIÓN INDIVIDUAL (Bisturí de casos)
   reasignarVictimaIndividual: async (
     victimaId: string,
     adminResponsableId: string,
@@ -136,6 +135,7 @@ export const adminService = {
     const updates: any = {};
     let huboCambios = false;
 
+    // Cambio de Abogado
     if (cambios.juridico_nuevo_id !== cambios.juridico_anterior_id) {
       updates['representacion.juridico_asignado_id'] = cambios.juridico_nuevo_id;
       updates['representacion.fecha_asignacion'] = new Date().toISOString().split('T')[0];
@@ -153,6 +153,7 @@ export const adminService = {
       });
     }
 
+    // Cambio de Psicosocial
     if (cambios.psicosocial_nuevo_id !== cambios.psicosocial_anterior_id) {
       updates['representacion.psicosocial_asignado_id'] = cambios.psicosocial_nuevo_id;
       updates['representacion.fecha_asignacion'] = new Date().toISOString().split('T')[0];
