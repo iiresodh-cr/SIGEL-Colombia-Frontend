@@ -39,6 +39,17 @@ const ImportadorMasivo = () => {
     }
   };
 
+  // FUNCIÓN AUXILIAR: Busca el valor de una columna ignorando mayúsculas, minúsculas y espacios
+  const getVal = (row: any, ...possibleKeys: string[]) => {
+    for (const key of Object.keys(row)) {
+      const cleanKey = key.trim().toLowerCase();
+      if (possibleKeys.some(pk => pk.toLowerCase() === cleanKey)) {
+        return row[key];
+      }
+    }
+    return '';
+  };
+
   // ==========================================
   // MOTOR 1: VÍCTIMAS Y CRUCE INTELIGENTE
   // ==========================================
@@ -46,7 +57,6 @@ const ImportadorMasivo = () => {
     addLog('info', '--- INICIANDO ESCANEO DE VÍCTIMAS ---');
     const victimasMap = new Map<string, Victima>();
 
-    // 1. Buscar hojas que actúan como Base Maestra (dependiendo de cuál de los 2 Excels subiste)
     const hojasBase = ['Víctimas Caso 01', 'Víctimas Caso 10', 'MATRIZ NUEVA ASIGNACIÓN', 'MATRIZ ANTIGUA ASIGNACIÓN', 'CCC', 'BSUR', 'BOCC', 'BNOR', 'BCAR', 'BORI', 'BMM'];
     let encontroBase = false;
 
@@ -57,45 +67,45 @@ const ImportadorMasivo = () => {
       const data: any[] = XLSX.utils.sheet_to_json(sheet, { defval: '' });
 
       for (const row of data) {
-        const rawId = String(row['NÚMERO DOCUMENTO (SIN PUNTOS)'] || row['NÚMERO DOCUMENTO'] || row['Identificación'] || '').replace(/\D/g, '');
+        const rawId = String(getVal(row, 'NÚMERO DOCUMENTO (SIN PUNTOS)', 'NÚMERO DOCUMENTO', 'Identificación', 'Cédula')).replace(/\D/g, '');
         if (!rawId) continue;
 
         if (!victimasMap.has(rawId)) {
           victimasMap.set(rawId, {
             identificacion: rawId,
-            tipo_documento: String(row['TIPO DOCUMENTO'] || 'CC'),
-            nombre_completo: String(row['NOMBRE VÍCTIMA'] || row['Nombre de la víctima'] || '').trim(),
+            tipo_documento: String(getVal(row, 'TIPO DOCUMENTO') || 'CC'),
+            nombre_completo: String(getVal(row, 'NOMBRE VÍCTIMA', 'Nombre de la víctima', 'Nombres')).trim(),
             fecha_registro: new Date().toISOString(),
             datos_demograficos: {
-              genero: String(row['GÉNERO'] || ''),
-              orientacion_sexual: String(row['ORIENTACIÓN SEXUAL'] || ''),
-              grupo_etnico: String(row['GRUPO ÉTNICO'] || ''),
-              etareo: String(row['ETÁREO'] || ''),
-              discapacidad: String(row['DISCAPACIDAD'] || ''),
+              genero: String(getVal(row, 'GÉNERO')),
+              orientacion_sexual: String(getVal(row, 'ORIENTACIÓN SEXUAL')),
+              grupo_etnico: String(getVal(row, 'GRUPO ÉTNICO')),
+              etareo: String(getVal(row, 'ETÁREO')),
+              discapacidad: String(getVal(row, 'DISCAPACIDAD')),
             },
             datos_contacto: {
-              telefono: String(row['Teléfono'] || ''),
-              correo: String(row['Correo'] || ''),
-              direccion: String(row['Dirección'] || ''),
-              departamento: String(row['DEPARTAMENTO RESIDENCIA'] || ''),
+              telefono: String(getVal(row, 'Teléfono', 'TELEFONO')),
+              correo: String(getVal(row, 'Correo', 'CORREO ELECTRÓNICO')),
+              direccion: String(getVal(row, 'Dirección', 'DIRECCION')),
+              departamento: String(getVal(row, 'DEPARTAMENTO RESIDENCIA', 'DEPARTAMENTO')),
             },
             representacion: {
               caso: hoja.includes('01') ? ['Caso 01'] : (hoja.includes('10') ? ['Caso 10'] : []),
-              bloque: [String(row['BLOQUE'] || row['Bloque'] || '')],
-              calidad_victima: String(row['DIRECTA O INDIRECTA'] || row['Calidad'] || ''),
-              juridico_asignado_id: String(row['JURÍDICO'] || row['Juridico'] || ''),
-              psicosocial_asignado_id: String(row['PSICOSOCIAL'] || row['Psicosocial'] || ''),
-              fecha_asignacion: String(row['FECHA ASIGNACIÓN / ASUNCIÓN'] || row['Fecha de asignación interna'] || ''),
+              bloque: [String(getVal(row, 'BLOQUE', 'Bloque'))],
+              calidad_victima: String(getVal(row, 'DIRECTA O INDIRECTA', 'Calidad')),
+              juridico_asignado_id: String(getVal(row, 'JURÍDICO', 'Juridico', 'Abogado')),
+              psicosocial_asignado_id: String(getVal(row, 'PSICOSOCIAL', 'Psicosocial')),
+              fecha_asignacion: String(getVal(row, 'FECHA ASIGNACIÓN / ASUNCIÓN', 'Fecha de asignación interna')),
               estado: 'Activo',
             },
             estado_jep: {
-              estado_acreditacion: String(row['ESTADO ACREDITACIÓN'] || '').includes('Acreditad') ? 'Acreditada' : (String(row['ESTADO ACREDITACIÓN'] || '').includes('No está') ? 'No está acreditada' : 'En trámite (despacho no ha resuelto)'),
-              auto_acreditacion: String(row['AUTO DE ACREDITACION'] || row['AUTO ACREDITACIÓN'] || ''),
-              estado_reconocimiento_pj: String(row['ESTADO RECONOCIMIENTO PJ'] || 'Sin PJ (no se ha recibido poder)'),
-              auto_reconocimiento: String(row['AUTO RECONOCIMIENTO'] || ''),
+              estado_acreditacion: String(getVal(row, 'ESTADO ACREDITACIÓN')).includes('Acreditad') ? 'Acreditada' : (String(getVal(row, 'ESTADO ACREDITACIÓN')).includes('No está') ? 'No está acreditada' : 'En trámite (despacho no ha resuelto)'),
+              auto_acreditacion: String(getVal(row, 'AUTO DE ACREDITACION', 'AUTO ACREDITACIÓN')),
+              estado_reconocimiento_pj: String(getVal(row, 'ESTADO RECONOCIMIENTO PJ') || 'Sin PJ (no se ha recibido poder)'),
+              auto_reconocimiento: String(getVal(row, 'AUTO RECONOCIMIENTO')),
             },
             seguimiento_vista: {
-              primer_contacto: String(row['Llamada de sentido del proceso']).toLowerCase().includes('realizada'),
+              primer_contacto: String(getVal(row, 'Llamada de sentido del proceso')).toLowerCase().includes('realizada'),
               firma_poder: false,
               demandas_verdad: false,
               sol_desasignacion: false
@@ -106,13 +116,12 @@ const ImportadorMasivo = () => {
     }
 
     if (!encontroBase) {
-      addLog('warning', 'No se detectaron hojas maestras de víctimas en este archivo. Saltando módulo de víctimas.');
+      addLog('warning', 'No se detectaron hojas maestras de víctimas en este archivo.');
       return;
     }
-
     addLog('success', `Base maestra cargada: ${victimasMap.size} fichas únicas detectadas.`);
 
-    // 2. CRUCE CON DESAPARICIÓN
+    // CRUCE CON DESAPARICIÓN
     if (workbook.Sheets['DESAPARICIÓN']) {
       let cruzados = 0;
       const dataDesap: any[] = XLSX.utils.sheet_to_json(workbook.Sheets['DESAPARICIÓN'], { defval: '' });
@@ -120,35 +129,35 @@ const ImportadorMasivo = () => {
       victimasMap.forEach((v, id) => nameMap.set(v.nombre_completo.toLowerCase(), id));
 
       for (const row of dataDesap) {
-        const nombreBusqueda = String(row['Nombres'] || '').trim().toLowerCase();
+        const nombreBusqueda = String(getVal(row, 'Nombres')).trim().toLowerCase();
         const idEncontrado = nameMap.get(nombreBusqueda);
         if (idEncontrado) {
           const v = victimasMap.get(idEncontrado)!;
-          v.familiar_desaparecido = { nombre_completo: String(row['Victima Directa'] || '').replace('Ficha_', '').replace(/([A-Z])/g, ' $1').trim(), parentesco: 'Familiar' };
+          v.familiar_desaparecido = { nombre_completo: String(getVal(row, 'Victima Directa')).replace('Ficha_', '').replace(/([A-Z])/g, ' $1').trim(), parentesco: 'Familiar' };
           cruzados++;
         }
       }
       addLog('info', `Cruce Inteligente 1: ${cruzados} familiares desaparecidos vinculados.`);
     }
 
-    // 3. CRUCE CON DESASIGNADAS
+    // CRUCE CON DESASIGNADAS
     if (workbook.Sheets['DESASIGNADAS']) {
       let cruzados = 0;
       const dataDesasig: any[] = XLSX.utils.sheet_to_json(workbook.Sheets['DESASIGNADAS'], { defval: '' });
       for (const row of dataDesasig) {
-        const rawId = String(row['Identificación'] || '').replace(/\D/g, '');
+        const rawId = String(getVal(row, 'Identificación', 'Cedula')).replace(/\D/g, '');
         if (victimasMap.has(rawId)) {
           const v = victimasMap.get(rawId)!;
           v.representacion.estado = 'Desasignado';
-          v.representacion.motivo_desasignacion = String(row['Respuesta'] || 'Sin motivo registrado');
-          v.representacion.fecha_desasignacion = String(row['Fecha correo'] || row['Fecha'] || '');
+          v.representacion.motivo_desasignacion = String(getVal(row, 'Respuesta', 'Motivo') || 'Sin motivo registrado');
+          v.representacion.fecha_desasignacion = String(getVal(row, 'Fecha correo', 'Fecha'));
           cruzados++;
         }
       }
       addLog('info', `Cruce Inteligente 2: ${cruzados} víctimas marcadas como retiradas/desasignadas.`);
     }
 
-    // 4. GUARDADO EN LOTE EN FIREBASE
+    // GUARDADO
     addLog('info', 'Guardando Víctimas en la base de datos...');
     try {
       const batchArray = Array.from(victimasMap.values());
@@ -157,8 +166,8 @@ const ImportadorMasivo = () => {
       let total = 0;
 
       for (const victima of batchArray) {
-        const docRef = doc(collection(db, 'victimas'), victima.identificacion); // Forzamos que el ID de firebase sea la cédula para evitar duplicados en futuros imports
-        batch.set(docRef, victima, { merge: true }); // Merge true actualiza si ya existe
+        const docRef = doc(collection(db, 'victimas'), victima.identificacion);
+        batch.set(docRef, victima, { merge: true });
         count++;
         total++;
 
@@ -172,7 +181,6 @@ const ImportadorMasivo = () => {
       addLog('success', `Se migró un total de ${total} Fichas Únicas de Víctimas.`);
     } catch (error) {
       addLog('error', 'Error al guardar las víctimas en Firebase.');
-      console.error(error);
     }
   };
 
@@ -190,7 +198,11 @@ const ImportadorMasivo = () => {
 
       const data: any[] = XLSX.utils.sheet_to_json(sheet, { defval: '' });
       for (const row of data) {
-        if (!row['FECHA'] || (!row['TEMA'] && !row['OBJETIVO ESPECÍFICO'])) continue;
+        const fechaVal = getVal(row, 'FECHA', 'Fecha', 'Date');
+        const temaVal = getVal(row, 'TEMA', 'Tema', 'OBJETIVO ESPECÍFICO');
+        
+        if (!fechaVal || !temaVal) continue;
+        
         try {
           let tipoEvento: TipoEvento = 'Actividad';
           if (nombreHoja === 'Talleres') tipoEvento = 'Taller';
@@ -200,11 +212,11 @@ const ImportadorMasivo = () => {
 
           await eventoService.addEvento({
             tipo: tipoEvento,
-            tema_titulo: String(row['TEMA'] || row['OBJETIVO ESPECÍFICO'] || 'Sin título'),
-            fecha: new Date(row['FECHA']).toISOString().split('T')[0] || new Date().toISOString().split('T')[0],
-            lugar: String(row['VIRTUAL / PRESENCIAL (LUGAR)'] || row['LUGAR'] || 'No especificado'),
-            asistentes_total: Number(row['NÚMERO ASISTENTES'] || row['VÍCTIMAS ASISTENTES'] || 0),
-            observaciones: String(row['EXPLICACIÓN (SI LO REQUIERE)'] || row['CONCLUSIONES / RESULTADOS'] || ''),
+            tema_titulo: String(temaVal),
+            fecha: new Date(fechaVal).toISOString().split('T')[0] || new Date().toISOString().split('T')[0],
+            lugar: String(getVal(row, 'VIRTUAL / PRESENCIAL (LUGAR)', 'LUGAR') || 'No especificado'),
+            asistentes_total: Number(getVal(row, 'NÚMERO ASISTENTES', 'VÍCTIMAS ASISTENTES') || 0),
+            observaciones: String(getVal(row, 'EXPLICACIÓN (SI LO REQUIERE)', 'CONCLUSIONES / RESULTADOS') || ''),
             creado_por_email: currentUser?.email || 'sistema',
             fecha_creacion: new Date().toISOString()
           });
@@ -231,23 +243,32 @@ const ImportadorMasivo = () => {
     let audienciasGuardadas = 0;
 
     for (const row of data) {
-      if (!row['FECHA'] || !row['TIPO']) continue;
+      const fechaVal = getVal(row, 'FECHA', 'Fecha');
+      const tipoVal = getVal(row, 'TIPO', 'Tipo', 'Tipo Audiencia');
+
+      if (!fechaVal || !tipoVal) continue;
+      
       try {
         await audienciaService.addAudiencia({
-          macrocaso: [String(row['CASO'] || 'Institucional')],
-          fecha: new Date(row['FECHA']).toISOString().split('T')[0] || new Date().toISOString().split('T')[0],
-          despacho: String(row['SALA/SECCIÓN'] || 'SRVR') as DespachoJEP,
-          tipo: String(row['TIPO']) as TipoAudiencia,
-          titulo_diligencia: String(row['EXPLICACIÓN (SI LO REQUIERE)'] || 'Diligencia Judicial'),
-          observaciones: `Víctimas asistentes: ${row['VÍCTIMAS ASISTENTES'] || 0}`,
-          profesionales_asistentes: String(row['JURÍDICO(S)'] || '') + ' - ' + String(row['PSICOSOCIAL'] || ''),
+          macrocaso: [String(getVal(row, 'CASO', 'Caso') || 'Institucional')],
+          fecha: new Date(fechaVal).toISOString().split('T')[0] || new Date().toISOString().split('T')[0],
+          despacho: String(getVal(row, 'SALA/SECCIÓN', 'Despacho') || 'SRVR') as DespachoJEP,
+          tipo: String(tipoVal) as TipoAudiencia,
+          titulo_diligencia: String(getVal(row, 'EXPLICACIÓN (SI LO REQUIERE)', 'Explicacion') || 'Diligencia Judicial'),
+          observaciones: `Víctimas asistentes: ${getVal(row, 'VÍCTIMAS ASISTENTES', 'Víctimas') || 0}`,
+          profesionales_asistentes: String(getVal(row, 'JURÍDICO(S)')) + ' - ' + String(getVal(row, 'PSICOSOCIAL')),
           creado_por_email: currentUser?.email || 'sistema',
           fecha_creacion: new Date().toISOString()
         });
         audienciasGuardadas++;
       } catch (error) {}
     }
-    addLog('success', `Se importaron ${audienciasGuardadas} Actuaciones Judiciales.`);
+    
+    if (audienciasGuardadas > 0) {
+      addLog('success', `Se importaron ${audienciasGuardadas} Actuaciones Judiciales.`);
+    } else {
+      addLog('warning', `Se encontró la pestaña, pero las columnas no coinciden con los encabezados esperados (Fecha, Tipo). Importados: 0.`);
+    }
   };
 
   // ==========================================
@@ -264,16 +285,18 @@ const ImportadorMasivo = () => {
 
       const data: any[] = XLSX.utils.sheet_to_json(sheet, { defval: '' });
       for (const row of data) {
-        if (!row['FECHA'] && !row['Fecha de radicado']) continue;
+        const fechaVal = getVal(row, 'FECHA', 'Fecha', 'Fecha de radicado', 'Fecha radicado');
+        if (!fechaVal) continue;
+        
         try {
           await radicadoService.addRadicado({
-            numero_radicado: String(row['No. Radicado'] || row['TIPO DE DOCUMENTO'] || 'Sin Radicado'),
-            fecha_radicado: new Date(row['Fecha de radicado'] || row['FECHA']).toISOString().split('T')[0],
-            asunto: String(row['Asunto del correo'] || row['EXPLICACIÓN CORTA'] || 'Sin asunto'),
-            emisor: String(row['ENTIDAD '] || 'IIRESODH') as EmisorRadicado,
-            receptor: String(row['Destinatario'] || 'JEP / Otra Entidad'),
-            macrocaso: [String(row['CASO'] || 'Institucional')],
-            observaciones: String(row['VÍCTIMA(S)'] || ''),
+            numero_radicado: String(getVal(row, 'No. Radicado', 'TIPO DE DOCUMENTO', 'Radicado') || 'Sin Radicado'),
+            fecha_radicado: new Date(fechaVal).toISOString().split('T')[0],
+            asunto: String(getVal(row, 'Asunto del correo', 'EXPLICACIÓN CORTA', 'Asunto') || 'Sin asunto'),
+            emisor: String(getVal(row, 'ENTIDAD ', 'Entidad') || 'IIRESODH') as EmisorRadicado,
+            receptor: String(getVal(row, 'Destinatario', 'DESTINATARIO') || 'JEP / Otra Entidad'),
+            macrocaso: [String(getVal(row, 'CASO', 'Caso') || 'Institucional')],
+            observaciones: String(getVal(row, 'VÍCTIMA(S)', 'Victimas') || ''),
             creado_por_email: currentUser?.email || 'sistema',
             fecha_creacion: new Date().toISOString()
           });
@@ -282,7 +305,7 @@ const ImportadorMasivo = () => {
       }
     }
     if (radicadosGuardados > 0) addLog('success', `Se importaron ${radicadosGuardados} Documentos Radicados.`);
-    else addLog('warning', 'No se encontraron registros de Radicados en este archivo.');
+    else addLog('warning', 'No se encontraron registros de Radicados válidos en las columnas de este archivo.');
   };
 
   // ==========================================
