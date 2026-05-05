@@ -4,8 +4,6 @@ import {
   List, ListItem, ListItemText, Chip 
 } from '@mui/material';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import ErrorIcon from '@mui/icons-material/Error';
 import * as XLSX from 'xlsx';
 import { writeBatch, doc, collection } from 'firebase/firestore';
 import { db } from '../config/firebase';
@@ -39,15 +37,32 @@ const ImportadorMasivo = () => {
     }
   };
 
-  // FUNCIÓN AUXILIAR: Busca el valor de una columna ignorando mayúsculas, minúsculas y espacios
+  // FUNCIÓN AUXILIAR 1: Búsqueda parcial ultra flexible (ignora todo lo que sobra en el título)
   const getVal = (row: any, ...possibleKeys: string[]) => {
     for (const key of Object.keys(row)) {
       const cleanKey = key.trim().toLowerCase();
-      if (possibleKeys.some(pk => pk.toLowerCase() === cleanKey)) {
+      if (possibleKeys.some(pk => cleanKey.includes(pk.toLowerCase()))) {
         return row[key];
       }
     }
     return '';
+  };
+
+  // FUNCIÓN AUXILIAR 2: Salta los títulos combinados de la fila 1 y busca los encabezados reales
+  const extractData = (sheet: XLSX.WorkSheet, keywords: string[]) => {
+    const rawData: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+    let headerRowIndex = 0;
+    
+    // Escanea las primeras 10 filas buscando los encabezados reales
+    for (let i = 0; i < Math.min(10, rawData.length); i++) {
+      const rowString = (rawData[i] || []).map(cell => String(cell).toLowerCase()).join(' ');
+      if (keywords.some(kw => rowString.includes(kw.toLowerCase()))) {
+        headerRowIndex = i;
+        break;
+      }
+    }
+    // Retorna los datos empezando desde la fila correcta
+    return XLSX.utils.sheet_to_json(sheet, { defval: '', range: headerRowIndex });
   };
 
   // ==========================================
@@ -64,7 +79,7 @@ const ImportadorMasivo = () => {
       const sheet = workbook.Sheets[hoja];
       if (!sheet) continue;
       encontroBase = true;
-      const data: any[] = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+      const data: any[] = extractData(sheet, ['identificación', 'documento', 'cédula', 'nombre']);
 
       for (const row of data) {
         const rawId = String(getVal(row, 'NÚMERO DOCUMENTO (SIN PUNTOS)', 'NÚMERO DOCUMENTO', 'Identificación', 'Cédula')).replace(/\D/g, '');
@@ -121,10 +136,9 @@ const ImportadorMasivo = () => {
     }
     addLog('success', `Base maestra cargada: ${victimasMap.size} fichas únicas detectadas.`);
 
-    // CRUCE CON DESAPARICIÓN
     if (workbook.Sheets['DESAPARICIÓN']) {
       let cruzados = 0;
-      const dataDesap: any[] = XLSX.utils.sheet_to_json(workbook.Sheets['DESAPARICIÓN'], { defval: '' });
+      const dataDesap: any[] = extractData(workbook.Sheets['DESAPARICIÓN'], ['nombres', 'victima']);
       const nameMap = new Map<string, string>();
       victimasMap.forEach((v, id) => nameMap.set(v.nombre_completo.toLowerCase(), id));
 
@@ -140,10 +154,9 @@ const ImportadorMasivo = () => {
       addLog('info', `Cruce Inteligente 1: ${cruzados} familiares desaparecidos vinculados.`);
     }
 
-    // CRUCE CON DESASIGNADAS
     if (workbook.Sheets['DESASIGNADAS']) {
       let cruzados = 0;
-      const dataDesasig: any[] = XLSX.utils.sheet_to_json(workbook.Sheets['DESASIGNADAS'], { defval: '' });
+      const dataDesasig: any[] = extractData(workbook.Sheets['DESASIGNADAS'], ['identificación', 'cedula']);
       for (const row of dataDesasig) {
         const rawId = String(getVal(row, 'Identificación', 'Cedula')).replace(/\D/g, '');
         if (victimasMap.has(rawId)) {
@@ -157,7 +170,6 @@ const ImportadorMasivo = () => {
       addLog('info', `Cruce Inteligente 2: ${cruzados} víctimas marcadas como retiradas/desasignadas.`);
     }
 
-    // GUARDADO
     addLog('info', 'Guardando Víctimas en la base de datos...');
     try {
       const batchArray = Array.from(victimasMap.values());
@@ -196,7 +208,7 @@ const ImportadorMasivo = () => {
       const sheet = workbook.Sheets[nombreHoja];
       if (!sheet) continue;
 
-      const data: any[] = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+      const data: any[] = extractData(sheet, ['fecha', 'tema', 'objetivo']);
       for (const row of data) {
         const fechaVal = getVal(row, 'FECHA', 'Fecha', 'Date');
         const temaVal = getVal(row, 'TEMA', 'Tema', 'OBJETIVO ESPECÍFICO');
@@ -214,9 +226,9 @@ const ImportadorMasivo = () => {
             tipo: tipoEvento,
             tema_titulo: String(temaVal),
             fecha: new Date(fechaVal).toISOString().split('T')[0] || new Date().toISOString().split('T')[0],
-            lugar: String(getVal(row, 'VIRTUAL / PRESENCIAL (LUGAR)', 'LUGAR') || 'No especificado'),
+            lugar: String(getVal(row, 'VIRTUAL / PRESENCIAL', 'LUGAR') || 'No especificado'),
             asistentes_total: Number(getVal(row, 'NÚMERO ASISTENTES', 'VÍCTIMAS ASISTENTES') || 0),
-            observaciones: String(getVal(row, 'EXPLICACIÓN (SI LO REQUIERE)', 'CONCLUSIONES / RESULTADOS') || ''),
+            observaciones: String(getVal(row, 'EXPLICACIÓN', 'CONCLUSIONES', 'RESULTADOS') || ''),
             creado_por_email: currentUser?.email || 'sistema',
             fecha_creacion: new Date().toISOString()
           });
@@ -239,7 +251,7 @@ const ImportadorMasivo = () => {
       return;
     }
 
-    const data: any[] = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+    const data: any[] = extractData(sheet, ['fecha', 'tipo', 'sala']);
     let audienciasGuardadas = 0;
 
     for (const row of data) {
@@ -252,11 +264,11 @@ const ImportadorMasivo = () => {
         await audienciaService.addAudiencia({
           macrocaso: [String(getVal(row, 'CASO', 'Caso') || 'Institucional')],
           fecha: new Date(fechaVal).toISOString().split('T')[0] || new Date().toISOString().split('T')[0],
-          despacho: String(getVal(row, 'SALA/SECCIÓN', 'Despacho') || 'SRVR') as DespachoJEP,
+          despacho: String(getVal(row, 'SALA', 'SECCIÓN', 'Despacho') || 'SRVR') as DespachoJEP,
           tipo: String(tipoVal) as TipoAudiencia,
-          titulo_diligencia: String(getVal(row, 'EXPLICACIÓN (SI LO REQUIERE)', 'Explicacion') || 'Diligencia Judicial'),
+          titulo_diligencia: String(getVal(row, 'EXPLICACIÓN', 'Explicacion') || 'Diligencia Judicial'),
           observaciones: `Víctimas asistentes: ${getVal(row, 'VÍCTIMAS ASISTENTES', 'Víctimas') || 0}`,
-          profesionales_asistentes: String(getVal(row, 'JURÍDICO(S)')) + ' - ' + String(getVal(row, 'PSICOSOCIAL')),
+          profesionales_asistentes: String(getVal(row, 'JURÍDICO')) + ' - ' + String(getVal(row, 'PSICOSOCIAL')),
           creado_por_email: currentUser?.email || 'sistema',
           fecha_creacion: new Date().toISOString()
         });
@@ -283,20 +295,20 @@ const ImportadorMasivo = () => {
       const sheet = workbook.Sheets[nombreHoja];
       if (!sheet) continue;
 
-      const data: any[] = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+      const data: any[] = extractData(sheet, ['radicado', 'asunto', 'entidad', 'documento']);
       for (const row of data) {
-        const fechaVal = getVal(row, 'FECHA', 'Fecha', 'Fecha de radicado', 'Fecha radicado');
+        const fechaVal = getVal(row, 'FECHA', 'Fecha', 'radicado'); 
         if (!fechaVal) continue;
         
         try {
           await radicadoService.addRadicado({
-            numero_radicado: String(getVal(row, 'No. Radicado', 'TIPO DE DOCUMENTO', 'Radicado') || 'Sin Radicado'),
+            numero_radicado: String(getVal(row, 'Radicado', 'TIPO DE DOCUMENTO') || 'Sin Radicado'),
             fecha_radicado: new Date(fechaVal).toISOString().split('T')[0],
-            asunto: String(getVal(row, 'Asunto del correo', 'EXPLICACIÓN CORTA', 'Asunto') || 'Sin asunto'),
-            emisor: String(getVal(row, 'ENTIDAD ', 'Entidad') || 'IIRESODH') as EmisorRadicado,
-            receptor: String(getVal(row, 'Destinatario', 'DESTINATARIO') || 'JEP / Otra Entidad'),
+            asunto: String(getVal(row, 'Asunto', 'EXPLICACIÓN CORTA') || 'Sin asunto'),
+            emisor: String(getVal(row, 'ENTIDAD', 'Entidad') || 'IIRESODH') as EmisorRadicado,
+            receptor: String(getVal(row, 'Destinatario', 'QUIEN RADICA') || 'JEP / Otra Entidad'),
             macrocaso: [String(getVal(row, 'CASO', 'Caso') || 'Institucional')],
-            observaciones: String(getVal(row, 'VÍCTIMA(S)', 'Victimas') || ''),
+            observaciones: String(getVal(row, 'VÍCTIMA', 'Victimas') || ''),
             creado_por_email: currentUser?.email || 'sistema',
             fecha_creacion: new Date().toISOString()
           });
@@ -321,7 +333,6 @@ const ImportadorMasivo = () => {
       const data = await file.arrayBuffer();
       const workbook = XLSX.read(data, { type: 'array' });
 
-      // Ejecución paralela controlada de los 4 motores
       await procesarVictimas(workbook);
       await procesarEventos(workbook);
       await procesarAudiencias(workbook);
