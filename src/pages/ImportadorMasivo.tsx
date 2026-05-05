@@ -275,6 +275,7 @@ const ImportadorMasivo = () => {
 
           const fechas = formatFechaArray(fechaVal);
 
+          // Cast temporal a 'any' eliminado en Audiencias/Radicados, pero se deja aquí si Eventos aún no tiene fecha_fin en sus types.
           await eventoService.addEvento({
             tipo: tipoEvento,
             tema_titulo: String(temaVal),
@@ -328,7 +329,7 @@ const ImportadorMasivo = () => {
           profesionales_asistentes: String(getVal(row, 'JURÍDICO')) + ' - ' + String(getVal(row, 'PSICOSOCIAL')),
           creado_por_email: currentUser?.email || 'sistema',
           fecha_creacion: new Date().toISOString()
-        } as any);
+        });
         audienciasGuardadas++;
       } catch (error) {}
     }
@@ -360,11 +361,21 @@ const ImportadorMasivo = () => {
         try {
           const fechas = formatFechaArray(fechaVal);
 
+          // Lógica de traducción de Emisores para compatibilidad con Radicados.tsx
+          let emisorExcel = String(getVal(row, 'ENTIDAD', 'Entidad') || 'IIRESODH').toUpperCase();
+          let emisorTraducido: EmisorRadicado = 'Otro';
+          
+          if (emisorExcel.includes('SRVR')) emisorTraducido = 'JEP (SRVR)';
+          else if (emisorExcel.includes('UIA')) emisorTraducido = 'JEP (UIA)';
+          else if (emisorExcel.includes('AMNIST')) emisorTraducido = 'JEP (Sala de Amnistía)';
+          else if (emisorExcel.includes('DEFINIC')) emisorTraducido = 'JEP (Sala de Definición)';
+          else if (emisorExcel.includes('IIRESODH')) emisorTraducido = 'IIRESODH';
+
           await radicadoService.addRadicado({
             numero_radicado: String(getVal(row, 'Radicado', 'TIPO DE DOCUMENTO') || 'Sin Radicado'),
             fecha_radicado: fechas[0],
             asunto: String(getVal(row, 'Asunto', 'EXPLICACIÓN CORTA') || 'Sin asunto'),
-            emisor: String(getVal(row, 'ENTIDAD', 'Entidad') || 'IIRESODH') as EmisorRadicado,
+            emisor: emisorTraducido,
             receptor: String(getVal(row, 'Destinatario', 'QUIEN RADICA') || 'JEP / Otra Entidad'),
             macrocaso: [String(getVal(row, 'CASO', 'Caso') || 'Institucional')],
             observaciones: String(getVal(row, 'VÍCTIMA', 'Victimas') || ''),
