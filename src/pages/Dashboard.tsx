@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { 
   Box, Typography, Grid, Paper, CircularProgress, TextField, 
   InputAdornment, Table, TableBody, TableCell, TableHead, TableRow, 
-  IconButton, Chip, Button 
+  IconButton, Chip, Divider, Button
 } from '@mui/material';
 import PeopleIcon from '@mui/icons-material/People';
 import FolderIcon from '@mui/icons-material/Folder';
@@ -36,7 +36,7 @@ const Dashboard = () => {
       setLoading(true);
       
       if (isAdmin) {
-        // Carga de datos globales para el Administrador
+        // Carga para el ADMINISTRADOR (Control Total)
         const [globalStats, snapVictimas, snapUsers] = await Promise.all([
           adminService.getGlobalStats(),
           getDocs(query(collection(db, 'victimas'))),
@@ -54,7 +54,7 @@ const Dashboard = () => {
         setProfesionales(snapUsers);
 
       } else {
-        // Carga de datos individuales para Abogados/Psicosociales
+        // Carga para ABOGADO/PSICOSOCIAL (Carga Individual)
         const rolBusqueda = role === 'psicosocial' ? 'psicosocial' : 'abogado';
         const victimas = await jepService.getVictimasAsignadas(currentUser.uid, rolBusqueda);
         
@@ -66,7 +66,7 @@ const Dashboard = () => {
         });
       }
     } catch (error) {
-      console.error("Error al cargar Dashboard:", error);
+      console.error("Error al cargar datos del Dashboard:", error);
     } finally {
       setLoading(false);
     }
@@ -91,20 +91,24 @@ const Dashboard = () => {
   return (
     <Box sx={{ p: 4 }}>
       <Box sx={{ mb: 4 }}>
-        <Typography variant="h3" sx={{ fontWeight: 800, color: '#003366', mb: 1 }}>¡Hola!</Typography>
-        <Typography variant="h6" sx={{ color: '#003366', mb: 1, fontWeight: 500 }}>{currentUser?.email}</Typography>
+        <Typography variant="h4" sx={{ fontWeight: 800, color: '#003366', mb: 1 }}>
+          {isAdmin ? "Control Maestro de Casos" : "Mi Panel de Trabajo"}
+        </Typography>
         <Typography variant="body1" color="text.secondary">
-          {isAdmin ? "Resumen global y control maestro de casos del IIRESODH." : "Resumen de tu carga de trabajo actual."}
+          {isAdmin 
+            ? "Resumen global y gestión de asignaciones del IIRESODH." 
+            : "Estado actual de tu carga de trabajo y procesos asignados."}
         </Typography>
       </Box>
 
+      {/* TARJETAS DE ESTADÍSTICAS */}
       <Grid container spacing={3} sx={{ mb: 6 }}>
         <Grid size={{ xs: 12, md: 4 }}>
           <Paper elevation={0} sx={{ p: 3, display: 'flex', alignItems: 'center', borderRadius: 3, bgcolor: '#f0f9ff', border: '1px solid #e0f2fe' }}>
             <PeopleIcon sx={{ fontSize: 40, color: '#0369a1', mr: 2 }} />
             <Box>
               <Typography variant="h4" sx={{ fontWeight: 800 }}>{stats.total}</Typography>
-              <Typography variant="body2" color="text.secondary">{isAdmin ? "VÍCTIMAS TOTALES" : "VÍCTIMAS ASIGNADAS"}</Typography>
+              <Typography variant="body2" color="text.secondary">{isAdmin ? "VÍCTIMAS EN EL SISTEMA" : "VÍCTIMAS ASIGNADAS"}</Typography>
             </Box>
           </Paper>
         </Grid>
@@ -117,7 +121,7 @@ const Dashboard = () => {
                 <Typography variant="h6" sx={{ fontWeight: 800, color: '#be185d' }}>{stats.caso01} <Typography component="span" variant="caption">C01</Typography></Typography>
                 <Typography variant="h6" sx={{ fontWeight: 800, color: '#be185d' }}>{stats.caso10} <Typography component="span" variant="caption">C10</Typography></Typography>
               </Box>
-              <Typography variant="body2" color="text.secondary">POR MACROCASO</Typography>
+              <Typography variant="body2" color="text.secondary">DISTRIBUCIÓN POR MACROCASO</Typography>
             </Box>
           </Paper>
         </Grid>
@@ -127,23 +131,28 @@ const Dashboard = () => {
             <AssignmentTurnedInIcon sx={{ fontSize: 40, color: '#15803d', mr: 2 }} />
             <Box>
               <Typography variant="h4" sx={{ fontWeight: 800 }}>{stats.acreditadas}</Typography>
-              <Typography variant="body2" color="text.secondary">ACREDITADAS JEP</Typography>
+              <Typography variant="body2" color="text.secondary">ACREDITADAS EN LA JEP</Typography>
             </Box>
           </Paper>
         </Grid>
       </Grid>
 
+      {/* SECCIÓN DE ADMINISTRACIÓN: CONTROL DE ASIGNACIONES */}
       {isAdmin && (
         <Box>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-            <Typography variant="h5" sx={{ fontWeight: 800, color: '#003366' }}>Buscador para Reasignación</Typography>
+            <Typography variant="h5" sx={{ fontWeight: 800, color: '#003366' }}>
+              Buscador para Reasignación
+            </Typography>
             <TextField 
               size="small"
               placeholder="Buscar por nombre o cédula..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               sx={{ width: 350, bgcolor: 'white' }}
-              slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchIcon /></InputAdornment> } }}
+              slotProps={{
+                input: { startAdornment: <InputAdornment position="start"><SearchIcon /></InputAdornment> }
+              }}
             />
           </Box>
 
@@ -152,43 +161,57 @@ const Dashboard = () => {
               <TableHead sx={{ bgcolor: '#f8fafc' }}>
                 <TableRow>
                   <TableCell sx={{ fontWeight: 'bold' }}>Víctima</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Abogado Asignado</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>Abogado/a Actual</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>Psicosocial Actual</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 'bold' }}>Acción</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
-                {victimasFiltradas.map((v) => (
-                  <TableRow key={v.id} hover>
-                    <TableCell>
-                      <Typography variant="body2" sx={{ fontWeight: 700 }}>{v.nombre_completo}</Typography>
-                      <Typography variant="caption" color="text.secondary">CC: {v.identificacion}</Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Chip label={getNombreProfesional(v.representacion.juridico_asignado_id)} size="small" variant="outlined" />
-                    </TableCell>
-                    <TableCell align="right">
-                      <Button 
-                        variant="contained" 
-                        size="small" 
-                        color="warning"
-                        startIcon={<VisibilityIcon />}
-                        onClick={() => navigate(`/victimas/${v.id}`)}
-                      >
-                        Reasignar
-                      </Button>
-                    </TableCell>
+                {victimasFiltradas.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={4} align="center" sx={{ py: 3 }}>No se encontraron registros.</TableCell>
                   </TableRow>
-                ))}
+                ) : (
+                  victimasFiltradas.map((v) => (
+                    <TableRow key={v.id} hover>
+                      <TableCell>
+                        <Typography variant="body2" sx={{ fontWeight: 700 }}>{v.nombre_completo}</Typography>
+                        <Typography variant="caption" color="text.secondary">ID: {v.identificacion}</Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Chip label={getNombreProfesional(v.representacion.juridico_asignado_id)} size="small" variant="outlined" />
+                      </TableCell>
+                      <TableCell>
+                        <Chip label={getNombreProfesional(v.representacion.psicosocial_asignado_id)} size="small" variant="outlined" />
+                      </TableCell>
+                      <TableCell align="right">
+                        <Button 
+                          variant="contained" 
+                          size="small" 
+                          color="warning"
+                          startIcon={<VisibilityIcon />}
+                          onClick={() => navigate(`/victimas/${v.id}`)}
+                          sx={{ fontWeight: 'bold', textTransform: 'none' }}
+                        >
+                          Reasignar
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </Paper>
+          <Typography variant="caption" sx={{ mt: 2, display: 'block', textAlign: 'right', color: 'text.secondary' }}>
+            * Mostrando resultados recientes. Para búsquedas profundas use la Matriz de Víctimas.
+          </Typography>
         </Box>
       )}
 
       {!isAdmin && (
         <Paper elevation={0} sx={{ p: 4, borderRadius: 3, border: '1px solid #e2e8f0', textAlign: 'center' }}>
           <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
-            En próximas actualizaciones aquí verás tu agenda institucional.
+            En próximas actualizaciones aquí verás tu agenda de próximas audiencias, talleres y reuniones institucionales.
           </Typography>
         </Paper>
       )}
