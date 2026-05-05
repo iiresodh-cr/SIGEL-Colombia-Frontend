@@ -30,16 +30,18 @@ const MainLayout = () => {
             </Button>
           )}
 
-          {/* MATRIZ HABILITADA PARA TODOS (Admins y Abogados) */}
+          {/* MÓDULOS HABILITADOS PARA TODOS (Admins, Abogados, Psicosociales) */}
           <Button color="inherit" onClick={() => navigate('/victimas')}>
             Matriz de Víctimas
           </Button>
 
-          {!isAdminApp && (
-            <Button color="inherit" onClick={() => navigate('/eventos')}>
-              Eventos y Talleres
-            </Button>
-          )}
+          <Button color="inherit" onClick={() => navigate('/eventos')}>
+            Eventos y Talleres
+          </Button>
+
+          <Button color="inherit" onClick={() => navigate('/audiencias')}>
+            Actuaciones Judiciales
+          </Button>
 
           <Box sx={{ display: 'flex', alignItems: 'center', ml: 2, pl: 2, borderLeft: '1px solid rgba(255,255,255,0.3)' }}>
             <Typography variant="body2" color="inherit" sx={{ mr: 2, fontWeight: 500 }}>
