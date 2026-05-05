@@ -12,6 +12,7 @@ import VictimaDetalle from '../pages/VictimaDetalle';
 import Eventos from '../pages/Eventos';
 import Audiencias from '../pages/Audiencias';
 import ImportadorMasivo from '../pages/ImportadorMasivo';
+import Radicados from '../pages/Radicados';
 
 const isAdminApp = import.meta.env.VITE_APP_TYPE === 'ADMIN';
 
@@ -53,6 +54,7 @@ const AppRouter = () => {
               <Route path="/victimas/:id" element={<VictimaDetalle />} />
               <Route path="/eventos" element={<Eventos />} />
               <Route path="/audiencias" element={<Audiencias />} />
+              <Route path="/radicados" element={<Radicados />} />
 
             </Route>
 

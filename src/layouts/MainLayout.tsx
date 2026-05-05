@@ -43,6 +43,10 @@ const MainLayout = () => {
             Actuaciones Judiciales
           </Button>
 
+          <Button color="inherit" onClick={() => navigate('/radicados')}>
+            Documentos
+          </Button>
+
           <Box sx={{ display: 'flex', alignItems: 'center', ml: 2, pl: 2, borderLeft: '1px solid rgba(255,255,255,0.3)' }}>
             <Typography variant="body2" color="inherit" sx={{ mr: 2, fontWeight: 500 }}>
               {currentUser?.email}
