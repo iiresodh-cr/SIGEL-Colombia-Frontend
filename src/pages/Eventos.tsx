@@ -156,25 +156,67 @@ const Eventos = () => {
         <Box component="form" onSubmit={handleSave}>
           <DialogContent dividers>
             <Grid container spacing={3}>
-              <Grid item xs={12} md={4}>
-                <TextField select fullWidth label="Tipo de Evento" required value={formData.tipo} onChange={(e) => setFormData({ ...formData, tipo: e.target.value })}>
+              <Grid size={{ xs: 12, md: 4 }}>
+                <TextField 
+                  select 
+                  fullWidth 
+                  label="Tipo de Evento" 
+                  required 
+                  value={formData.tipo} 
+                  onChange={(e) => setFormData({ ...formData, tipo: e.target.value as TipoEvento })}
+                >
                   {TIPOS_EVENTO.map(t => <MenuItem key={t} value={t}>{t}</MenuItem>)}
                 </TextField>
               </Grid>
-              <Grid item xs={12} md={8}>
-                <TextField fullWidth label="Tema o Título del Evento" required value={formData.tema_titulo} onChange={(e) => setFormData({ ...formData, tema_titulo: e.target.value })} />
+              <Grid size={{ xs: 12, md: 8 }}>
+                <TextField 
+                  fullWidth 
+                  label="Tema o Título del Evento" 
+                  required 
+                  value={formData.tema_titulo} 
+                  onChange={(e) => setFormData({ ...formData, tema_titulo: e.target.value })} 
+                />
               </Grid>
-              <Grid item xs={12} md={4}>
-                <TextField fullWidth type="date" label="Fecha" required InputLabelProps={{ shrink: true }} value={formData.fecha} onChange={(e) => setFormData({ ...formData, fecha: e.target.value })} />
+              <Grid size={{ xs: 12, md: 4 }}>
+                <TextField 
+                  fullWidth 
+                  type="date" 
+                  label="Fecha" 
+                  required 
+                  slotProps={{ inputLabel: { shrink: true } }} 
+                  value={formData.fecha} 
+                  onChange={(e) => setFormData({ ...formData, fecha: e.target.value })} 
+                />
               </Grid>
-              <Grid item xs={12} md={5}>
-                <TextField fullWidth label="Lugar (Municipio, Vereda, Sede)" required value={formData.lugar} onChange={(e) => setFormData({ ...formData, lugar: e.target.value })} />
+              <Grid size={{ xs: 12, md: 5 }}>
+                <TextField 
+                  fullWidth 
+                  label="Lugar (Municipio, Vereda, Sede)" 
+                  required 
+                  value={formData.lugar} 
+                  onChange={(e) => setFormData({ ...formData, lugar: e.target.value })} 
+                />
               </Grid>
-              <Grid item xs={12} md={3}>
-                <TextField fullWidth type="number" label="Total Asistentes" required inputProps={{ min: 0 }} value={formData.asistentes_total} onChange={(e) => setFormData({ ...formData, asistentes_total: parseInt(e.target.value) || 0 })} />
+              <Grid size={{ xs: 12, md: 3 }}>
+                <TextField 
+                  fullWidth 
+                  type="number" 
+                  label="Total Asistentes" 
+                  required 
+                  slotProps={{ htmlInput: { min: 0 } }} 
+                  value={formData.asistentes_total} 
+                  onChange={(e) => setFormData({ ...formData, asistentes_total: parseInt(e.target.value) || 0 })} 
+                />
               </Grid>
-              <Grid item xs={12}>
-                <TextField fullWidth multiline rows={3} label="Observaciones / Conclusiones" value={formData.observaciones} onChange={(e) => setFormData({ ...formData, observaciones: e.target.value })} />
+              <Grid size={{ xs: 12 }}>
+                <TextField 
+                  fullWidth 
+                  multiline 
+                  rows={3} 
+                  label="Observaciones / Conclusiones" 
+                  value={formData.observaciones} 
+                  onChange={(e) => setFormData({ ...formData, observaciones: e.target.value })} 
+                />
               </Grid>
             </Grid>
           </DialogContent>
