@@ -37,11 +37,10 @@ const ImportadorMasivo = () => {
     }
   };
 
-  // FUNCIÓN AUXILIAR 1: Extractor de fechas avanzado (Devuelve array para soportar Inicio y Fin)
+  // FUNCIÓN AUXILIAR 1: Extractor de fechas avanzado
   const formatFechaArray = (val: any): string[] => {
     if (!val) return [new Date().toISOString().split('T')[0]];
 
-    // 1. Si es un número serial de Excel
     if (typeof val === 'number' || (!isNaN(Number(val)) && Number(val) > 20000)) {
       const serial = Number(val);
       const date = new Date((serial - 25569) * 86400 * 1000);
@@ -50,17 +49,14 @@ const ImportadorMasivo = () => {
     }
 
     const strVal = String(val).trim();
-
-    // 2. Extraer TODAS las fechas válidas en la cadena
     const regex = /(\d{2})[/-](\d{2})[/-](\d{4}|\d{2})/g;
     let match;
     const fechasEncontradas: string[] = [];
 
     while ((match = regex.exec(strVal)) !== null) {
       const dia = parseInt(match[1], 10);
-      const mes = parseInt(match[2], 10) - 1; // Mes en JS es 0-11
+      const mes = parseInt(match[2], 10) - 1; 
       let anio = parseInt(match[3], 10);
-      
       if (anio < 100) anio += 2000;
 
       const d = new Date(anio, mes, dia);
@@ -69,21 +65,14 @@ const ImportadorMasivo = () => {
       }
     }
 
-    // Retorna hasta 2 fechas [fecha_inicio, fecha_fin]
-    if (fechasEncontradas.length > 0) {
-      return fechasEncontradas.slice(0, 2);
-    }
+    if (fechasEncontradas.length > 0) return fechasEncontradas.slice(0, 2);
 
-    // 3. Fallback estándar de JS
     const fallbackDate = new Date(strVal);
     if (!isNaN(fallbackDate.getTime())) {
       const iso = fallbackDate.toISOString().split('T')[0];
-      if (!iso.startsWith('1969') && !iso.startsWith('1970')) {
-          return [iso];
-      }
+      if (!iso.startsWith('1969') && !iso.startsWith('1970')) return [iso];
     }
 
-    // Si todo falla, usar la fecha actual
     return [new Date().toISOString().split('T')[0]];
   };
 
@@ -120,11 +109,16 @@ const ImportadorMasivo = () => {
     addLog('info', '--- INICIANDO ESCANEO DE VÍCTIMAS ---');
     const victimasMap = new Map<string, Victima>();
 
-    const hojasBase = ['Víctimas Caso 01', 'Víctimas Caso 10', 'MATRIZ NUEVA ASIGNACIÓN', 'MATRIZ ANTIGUA ASIGNACIÓN', 'CCC', 'BSUR', 'BOCC', 'BNOR', 'BCAR', 'BORI', 'BMM'];
+    const hojasBase = ['Caso 01', 'Caso 10', 'NUEVA ASIGNACIÓN', 'ANTIGUA ASIGNACIÓN', 'CCC', 'BSUR', 'BOCC', 'BNOR', 'BCAR', 'BORI', 'BMM'];
     let encontroBase = false;
 
-    for (const hoja of hojasBase) {
-      const sheet = workbook.Sheets[hoja];
+    // Busca las hojas siendo tolerante a mayúsculas y espacios
+    const hojasVictimasEncontradas = workbook.SheetNames.filter(s => 
+      hojasBase.some(h => s.toLowerCase().includes(h.toLowerCase()))
+    );
+
+    for (const nombreHoja of hojasVictimasEncontradas) {
+      const sheet = workbook.Sheets[nombreHoja];
       if (!sheet) continue;
       encontroBase = true;
       const data: any[] = extractData(sheet, ['identificación', 'documento', 'cédula', 'nombre']);
@@ -155,7 +149,7 @@ const ImportadorMasivo = () => {
               departamento: String(getVal(row, 'DEPARTAMENTO RESIDENCIA', 'DEPARTAMENTO')),
             },
             representacion: {
-              caso: hoja.includes('01') ? ['Caso 01'] : (hoja.includes('10') ? ['Caso 10'] : []),
+              caso: nombreHoja.includes('01') ? ['Caso 01'] : (nombreHoja.includes('10') ? ['Caso 10'] : []),
               bloque: [String(getVal(row, 'BLOQUE', 'Bloque'))],
               calidad_victima: String(getVal(row, 'DIRECTA O INDIRECTA', 'Calidad')),
               juridico_asignado_id: String(getVal(row, 'JURÍDICO', 'Juridico', 'Abogado')),
@@ -186,9 +180,10 @@ const ImportadorMasivo = () => {
     }
     addLog('success', `Base maestra cargada: ${victimasMap.size} fichas únicas detectadas.`);
 
-    if (workbook.Sheets['DESAPARICIÓN']) {
+    const nombreHojaDesap = workbook.SheetNames.find(s => s.toLowerCase().includes('desapari'));
+    if (nombreHojaDesap) {
       let cruzados = 0;
-      const dataDesap: any[] = extractData(workbook.Sheets['DESAPARICIÓN'], ['nombres', 'victima']);
+      const dataDesap: any[] = extractData(workbook.Sheets[nombreHojaDesap], ['nombres', 'victima']);
       const nameMap = new Map<string, string>();
       victimasMap.forEach((v, id) => nameMap.set(v.nombre_completo.toLowerCase(), id));
 
@@ -204,9 +199,10 @@ const ImportadorMasivo = () => {
       addLog('info', `Cruce Inteligente 1: ${cruzados} familiares desaparecidos vinculados.`);
     }
 
-    if (workbook.Sheets['DESASIGNADAS']) {
+    const nombreHojaDesasig = workbook.SheetNames.find(s => s.toLowerCase().includes('desasig'));
+    if (nombreHojaDesasig) {
       let cruzados = 0;
-      const dataDesasig: any[] = extractData(workbook.Sheets['DESASIGNADAS'], ['identificación', 'cedula']);
+      const dataDesasig: any[] = extractData(workbook.Sheets[nombreHojaDesasig], ['identificación', 'cedula']);
       for (const row of dataDesasig) {
         const rawId = String(getVal(row, 'Identificación', 'Cedula')).replace(/\D/g, '');
         if (victimasMap.has(rawId)) {
@@ -252,10 +248,18 @@ const ImportadorMasivo = () => {
   // ==========================================
   const procesarEventos = async (workbook: XLSX.WorkBook) => {
     addLog('info', '--- INICIANDO ESCANEO DE EVENTOS ---');
-    const hojasEventos = ['Talleres', 'Reuniones', 'Capacitaciones', 'Actividades', 'Jornadas Divulgación'];
     let eventosGuardados = 0;
 
-    for (const nombreHoja of hojasEventos) {
+    const hojasEventosEncontradas = workbook.SheetNames.filter(nombre => 
+      nombre.toLowerCase().includes('taller') || 
+      nombre.toLowerCase().includes('reunion') || 
+      nombre.toLowerCase().includes('reunión') || 
+      nombre.toLowerCase().includes('capacita') || 
+      nombre.toLowerCase().includes('actividad') || 
+      nombre.toLowerCase().includes('divulga')
+    );
+
+    for (const nombreHoja of hojasEventosEncontradas) {
       const sheet = workbook.Sheets[nombreHoja];
       if (!sheet) continue;
 
@@ -268,14 +272,13 @@ const ImportadorMasivo = () => {
         
         try {
           let tipoEvento: TipoEvento = 'Actividad';
-          if (nombreHoja === 'Talleres') tipoEvento = 'Taller';
-          if (nombreHoja === 'Reuniones') tipoEvento = 'Reunión';
-          if (nombreHoja === 'Capacitaciones') tipoEvento = 'Capacitación';
-          if (nombreHoja === 'Jornadas Divulgación') tipoEvento = 'Jornada de Divulgación';
+          if (nombreHoja.toLowerCase().includes('taller')) tipoEvento = 'Taller';
+          if (nombreHoja.toLowerCase().includes('reuni')) tipoEvento = 'Reunión';
+          if (nombreHoja.toLowerCase().includes('capacita')) tipoEvento = 'Capacitación';
+          if (nombreHoja.toLowerCase().includes('divulga')) tipoEvento = 'Jornada de Divulgación';
 
           const fechas = formatFechaArray(fechaVal);
 
-          // Cast temporal a 'any' eliminado en Audiencias/Radicados, pero se deja aquí si Eventos aún no tiene fecha_fin en sus types.
           await eventoService.addEvento({
             tipo: tipoEvento,
             tema_titulo: String(temaVal),
@@ -300,44 +303,53 @@ const ImportadorMasivo = () => {
   // ==========================================
   const procesarAudiencias = async (workbook: XLSX.WorkBook) => {
     addLog('info', '--- INICIANDO ESCANEO DE AUDIENCIAS ---');
-    const sheet = workbook.Sheets['AudienciasDiligencias'];
-    if (!sheet) {
-      addLog('warning', 'No se encontró la pestaña "AudienciasDiligencias" en este archivo.');
+    
+    const hojasAudienciasEncontradas = workbook.SheetNames.filter(nombre => 
+      nombre.toLowerCase().includes('audiencia') || 
+      nombre.toLowerCase().includes('diligencia')
+    );
+
+    if (hojasAudienciasEncontradas.length === 0) {
+      addLog('warning', 'No se encontraron pestañas relacionadas con Audiencias o Diligencias.');
       return;
     }
 
-    const data: any[] = extractData(sheet, ['fecha', 'tipo', 'sala']);
     let audienciasGuardadas = 0;
 
-    for (const row of data) {
-      const fechaVal = getVal(row, 'FECHA', 'Fecha');
-      const tipoVal = getVal(row, 'TIPO', 'Tipo', 'Tipo Audiencia');
+    for (const nombreHoja of hojasAudienciasEncontradas) {
+      const sheet = workbook.Sheets[nombreHoja];
+      const data: any[] = extractData(sheet, ['fecha', 'tipo', 'sala', 'despacho']);
 
-      if (!fechaVal || !tipoVal) continue;
-      
-      try {
-        const fechas = formatFechaArray(fechaVal);
+      for (const row of data) {
+        const fechaVal = getVal(row, 'FECHA', 'Fecha');
+        const tipoVal = getVal(row, 'TIPO', 'Tipo', 'Tipo Audiencia');
 
-        await audienciaService.addAudiencia({
-          macrocaso: [String(getVal(row, 'CASO', 'Caso') || 'Institucional')],
-          fecha: fechas[0],
-          fecha_fin: fechas[1] || '',
-          despacho: String(getVal(row, 'SALA', 'SECCIÓN', 'Despacho') || 'SRVR') as DespachoJEP,
-          tipo: String(tipoVal) as TipoAudiencia,
-          titulo_diligencia: String(getVal(row, 'EXPLICACIÓN', 'Explicacion') || 'Diligencia Judicial'),
-          observaciones: `Víctimas asistentes: ${getVal(row, 'VÍCTIMAS ASISTENTES', 'Víctimas') || 0}`,
-          profesionales_asistentes: String(getVal(row, 'JURÍDICO')) + ' - ' + String(getVal(row, 'PSICOSOCIAL')),
-          creado_por_email: currentUser?.email || 'sistema',
-          fecha_creacion: new Date().toISOString()
-        });
-        audienciasGuardadas++;
-      } catch (error) {}
+        if (!fechaVal || !tipoVal) continue;
+        
+        try {
+          const fechas = formatFechaArray(fechaVal);
+
+          await audienciaService.addAudiencia({
+            macrocaso: [String(getVal(row, 'CASO', 'Caso', 'Macrocaso') || 'Institucional')],
+            fecha: fechas[0],
+            fecha_fin: fechas[1] || '',
+            despacho: String(getVal(row, 'SALA', 'SECCIÓN', 'Despacho') || 'SRVR') as DespachoJEP,
+            tipo: String(tipoVal) as TipoAudiencia,
+            titulo_diligencia: String(getVal(row, 'EXPLICACIÓN', 'Explicacion', 'Asunto') || 'Diligencia Judicial'),
+            observaciones: `Víctimas asistentes: ${getVal(row, 'VÍCTIMAS ASISTENTES', 'Víctimas') || 0}`,
+            profesionales_asistentes: String(getVal(row, 'JURÍDICO', 'Profesional', 'Responsable')) + ' - ' + String(getVal(row, 'PSICOSOCIAL')),
+            creado_por_email: currentUser?.email || 'sistema',
+            fecha_creacion: new Date().toISOString()
+          });
+          audienciasGuardadas++;
+        } catch (error) {}
+      }
     }
     
     if (audienciasGuardadas > 0) {
       addLog('success', `Se importaron ${audienciasGuardadas} Actuaciones Judiciales.`);
     } else {
-      addLog('warning', `Se encontró la pestaña, pero las columnas no coinciden con los encabezados esperados (Fecha, Tipo). Importados: 0.`);
+      addLog('warning', `Se encontraron las pestañas, pero las columnas no coinciden con los encabezados esperados.`);
     }
   };
 
@@ -346,23 +358,29 @@ const ImportadorMasivo = () => {
   // ==========================================
   const procesarRadicados = async (workbook: XLSX.WorkBook) => {
     addLog('info', '--- INICIANDO ESCANEO DE RADICADOS ---');
-    const hojasRadicados = ['Documentos', 'Radicados Jep'];
     let radicadosGuardados = 0;
 
-    for (const nombreHoja of hojasRadicados) {
+    // AHORA ES INMUNE A MAYÚSCULAS/MINÚSCULAS Y ATRAPARÁ LA HOJA 'DOCUMENTOS'
+    const hojasRadicadosEncontradas = workbook.SheetNames.filter(nombre => 
+      nombre.toLowerCase().includes('documento') || 
+      nombre.toLowerCase().includes('radicado')
+    );
+
+    for (const nombreHoja of hojasRadicadosEncontradas) {
       const sheet = workbook.Sheets[nombreHoja];
       if (!sheet) continue;
 
-      const data: any[] = extractData(sheet, ['radicado', 'asunto', 'entidad', 'documento']);
+      const data: any[] = extractData(sheet, ['radicado', 'asunto', 'entidad', 'documento', 'emisor', 'fecha', 'auto', 'n°']);
       for (const row of data) {
-        const fechaVal = getVal(row, 'FECHA', 'Fecha', 'radicado'); 
+        
+        // CORRECCIÓN CRÍTICA: Se eliminó la palabra 'radicado' para que no atrape el N° de Radicado por error
+        const fechaVal = getVal(row, 'FECHA', 'Fecha', 'Date'); 
         if (!fechaVal) continue;
         
         try {
           const fechas = formatFechaArray(fechaVal);
 
-          // Lógica de traducción de Emisores para compatibilidad con Radicados.tsx
-          let emisorExcel = String(getVal(row, 'ENTIDAD', 'Entidad') || 'IIRESODH').toUpperCase();
+          let emisorExcel = String(getVal(row, 'ENTIDAD', 'Entidad', 'Emisor') || 'IIRESODH').toUpperCase();
           let emisorTraducido: EmisorRadicado = 'Otro';
           
           if (emisorExcel.includes('SRVR')) emisorTraducido = 'JEP (SRVR)';
@@ -370,15 +388,17 @@ const ImportadorMasivo = () => {
           else if (emisorExcel.includes('AMNIST')) emisorTraducido = 'JEP (Sala de Amnistía)';
           else if (emisorExcel.includes('DEFINIC')) emisorTraducido = 'JEP (Sala de Definición)';
           else if (emisorExcel.includes('IIRESODH')) emisorTraducido = 'IIRESODH';
+          else if (emisorExcel.includes('DEFENSA')) emisorTraducido = 'Defensa';
+          else if (emisorExcel.includes('SAAD') || emisorExcel.includes('REPRESENTA') || emisorExcel.includes('VICTIMA')) emisorTraducido = 'Representación de Víctimas';
 
           await radicadoService.addRadicado({
-            numero_radicado: String(getVal(row, 'Radicado', 'TIPO DE DOCUMENTO') || 'Sin Radicado'),
+            numero_radicado: String(getVal(row, 'Radicado', 'TIPO DE DOCUMENTO', 'Auto', 'N°') || 'Sin Radicado'),
             fecha_radicado: fechas[0],
-            asunto: String(getVal(row, 'Asunto', 'EXPLICACIÓN CORTA') || 'Sin asunto'),
+            asunto: String(getVal(row, 'Asunto', 'EXPLICACIÓN CORTA', 'Detalle') || 'Sin asunto'),
             emisor: emisorTraducido,
-            receptor: String(getVal(row, 'Destinatario', 'QUIEN RADICA') || 'JEP / Otra Entidad'),
-            macrocaso: [String(getVal(row, 'CASO', 'Caso') || 'Institucional')],
-            observaciones: String(getVal(row, 'VÍCTIMA', 'Victimas') || ''),
+            receptor: String(getVal(row, 'Destinatario', 'QUIEN RADICA', 'Receptor') || 'JEP / Otra Entidad'),
+            macrocaso: [String(getVal(row, 'CASO', 'Caso', 'Macrocaso') || 'Institucional')],
+            observaciones: String(getVal(row, 'VÍCTIMA', 'Victimas', 'Responsable') || ''),
             creado_por_email: currentUser?.email || 'sistema',
             fecha_creacion: new Date().toISOString()
           });
