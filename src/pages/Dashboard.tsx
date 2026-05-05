@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { 
   Box, Typography, Grid, Paper, CircularProgress, TextField, 
   InputAdornment, Table, TableBody, TableCell, TableHead, TableRow, 
-  IconButton, Chip, Divider, Button
+  Chip, Button
 } from '@mui/material';
 import PeopleIcon from '@mui/icons-material/People';
 import FolderIcon from '@mui/icons-material/Folder';
@@ -36,7 +36,7 @@ const Dashboard = () => {
       setLoading(true);
       
       if (isAdmin) {
-        // Carga para el ADMINISTRADOR (Control Total)
+        // Carga para el ADMINISTRADOR (Estadísticas globales + Lista total)
         const [globalStats, snapVictimas, snapUsers] = await Promise.all([
           adminService.getGlobalStats(),
           getDocs(query(collection(db, 'victimas'))),
@@ -77,6 +77,7 @@ const Dashboard = () => {
   }, [currentUser, role, isAdmin]);
 
   const getNombreProfesional = (id: string) => {
+    if (!id || id === "") return 'Sin asignar';
     const prof = profesionales.find(u => u.uid === id);
     return prof ? (prof.nombre_completo || prof.correo) : 'Sin asignar';
   };
@@ -84,7 +85,7 @@ const Dashboard = () => {
   const victimasFiltradas = victimasGlobales.filter(v => 
     v.nombre_completo.toLowerCase().includes(search.toLowerCase()) ||
     v.identificacion.includes(search)
-  ).slice(0, 10);
+  ).slice(0, 15);
 
   if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', mt: 10 }}><CircularProgress /></Box>;
 
@@ -108,7 +109,7 @@ const Dashboard = () => {
             <PeopleIcon sx={{ fontSize: 40, color: '#0369a1', mr: 2 }} />
             <Box>
               <Typography variant="h4" sx={{ fontWeight: 800 }}>{stats.total}</Typography>
-              <Typography variant="body2" color="text.secondary">{isAdmin ? "VÍCTIMAS EN EL SISTEMA" : "VÍCTIMAS ASIGNADAS"}</Typography>
+              <Typography variant="body2" color="text.secondary">VÍCTIMAS EN EL SISTEMA</Typography>
             </Box>
           </Paper>
         </Grid>
@@ -137,7 +138,7 @@ const Dashboard = () => {
         </Grid>
       </Grid>
 
-      {/* SECCIÓN DE ADMINISTRACIÓN: CONTROL DE ASIGNACIONES */}
+      {/* SECCIÓN PARA ADMINISTRADORES: BUSCADOR MAESTRO */}
       {isAdmin && (
         <Box>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
@@ -162,27 +163,23 @@ const Dashboard = () => {
                 <TableRow>
                   <TableCell sx={{ fontWeight: 'bold' }}>Víctima</TableCell>
                   <TableCell sx={{ fontWeight: 'bold' }}>Abogado/a Actual</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Psicosocial Actual</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 'bold' }}>Acción</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {victimasFiltradas.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={4} align="center" sx={{ py: 3 }}>No se encontraron registros.</TableCell>
+                    <TableCell colSpan={3} align="center" sx={{ py: 3 }}>No se encontraron víctimas con ese criterio.</TableCell>
                   </TableRow>
                 ) : (
                   victimasFiltradas.map((v) => (
                     <TableRow key={v.id} hover>
                       <TableCell>
                         <Typography variant="body2" sx={{ fontWeight: 700 }}>{v.nombre_completo}</Typography>
-                        <Typography variant="caption" color="text.secondary">ID: {v.identificacion}</Typography>
+                        <Typography variant="caption" color="text.secondary">CC: {v.identificacion}</Typography>
                       </TableCell>
                       <TableCell>
                         <Chip label={getNombreProfesional(v.representacion.juridico_asignado_id)} size="small" variant="outlined" />
-                      </TableCell>
-                      <TableCell>
-                        <Chip label={getNombreProfesional(v.representacion.psicosocial_asignado_id)} size="small" variant="outlined" />
                       </TableCell>
                       <TableCell align="right">
                         <Button 
@@ -202,16 +199,13 @@ const Dashboard = () => {
               </TableBody>
             </Table>
           </Paper>
-          <Typography variant="caption" sx={{ mt: 2, display: 'block', textAlign: 'right', color: 'text.secondary' }}>
-            * Mostrando resultados recientes. Para búsquedas profundas use la Matriz de Víctimas.
-          </Typography>
         </Box>
       )}
 
       {!isAdmin && (
         <Paper elevation={0} sx={{ p: 4, borderRadius: 3, border: '1px solid #e2e8f0', textAlign: 'center' }}>
           <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
-            En próximas actualizaciones aquí verás tu agenda de próximas audiencias, talleres y reuniones institucionales.
+            En próximas actualizaciones aquí verás tu agenda institucional.
           </Typography>
         </Paper>
       )}

@@ -6,10 +6,11 @@ import {
   doc, 
   writeBatch, 
   setDoc, 
-  deleteDoc 
+  deleteDoc,
+  updateDoc
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import { HistorialAsignacion, Victima } from '../types/jep';
+import { Victima } from '../types/jep';
 import { Usuario, RolUsuario } from '../types/user';
 
 export const adminService = {
@@ -57,7 +58,7 @@ export const adminService = {
     };
   },
 
-  // 6. SUSTITUCIÓN MASIVA DE CASOS
+  // 6. SUSTITUCIÓN MASIVA DE CASOS (Fase 3: Sustituciones por renuncia)
   reasignarCasosMasivamente: async (
     profesionalAnteriorId: string,
     profesionalNuevoId: string,
@@ -107,7 +108,7 @@ export const adminService = {
     return totalModificados;
   },
 
-  // 7. LISTAR PROFESIONALES (Solo operativos)
+  // 7. Listar profesionales para selectores
   getProfesionales: async () => {
     const q = query(collection(db, 'usuarios'));
     const snapshot = await getDocs(q);
@@ -118,62 +119,38 @@ export const adminService = {
     };
   },
 
-  // 8. REASIGNACIÓN INDIVIDUAL (Bisturí de casos)
+  // 8. REASIGNACIÓN INDIVIDUAL (Bisturí de casos - Corregido para persistencia)
   reasignarVictimaIndividual: async (
     victimaId: string,
     adminResponsableId: string,
     cambios: {
-      juridico_anterior_id: string;
       juridico_nuevo_id: string;
-      psicosocial_anterior_id: string;
       psicosocial_nuevo_id: string;
       motivo: string;
     }
   ): Promise<void> => {
-    const batch = writeBatch(db);
     const victimaRef = doc(db, 'victimas', victimaId);
-    const updates: any = {};
-    let huboCambios = false;
+    const fechaCompleta = new Date().toISOString();
+    const fechaCorta = fechaCompleta.split('T')[0];
 
-    // Cambio de Abogado
-    if (cambios.juridico_nuevo_id !== cambios.juridico_anterior_id) {
-      updates['representacion.juridico_asignado_id'] = cambios.juridico_nuevo_id;
-      updates['representacion.fecha_asignacion'] = new Date().toISOString().split('T')[0];
-      huboCambios = true;
-      
-      const historialRef = doc(collection(db, `victimas/${victimaId}/historial_asignaciones`));
-      batch.set(historialRef, {
-        fecha_sustitucion: new Date().toISOString(),
-        tipo_profesional: 'Jurídico',
-        abogado_anterior_id: cambios.juridico_anterior_id || 'Sin asignar',
-        abogado_nuevo_id: cambios.juridico_nuevo_id,
-        motivo: cambios.motivo,
-        sustitucion_realizada_por_id: adminResponsableId,
-        radicado_sustitucion_jep: ''
-      });
-    }
+    // IMPORTANTE: Se usa notación de puntos para actualizar campos anidados en Firestore
+    const updates = {
+      'representacion.juridico_asignado_id': cambios.juridico_nuevo_id,
+      'representacion.psicosocial_asignado_id': cambios.psicosocial_nuevo_id,
+      'representacion.fecha_asignacion': fechaCorta
+    };
 
-    // Cambio de Psicosocial
-    if (cambios.psicosocial_nuevo_id !== cambios.psicosocial_anterior_id) {
-      updates['representacion.psicosocial_asignado_id'] = cambios.psicosocial_nuevo_id;
-      updates['representacion.fecha_asignacion'] = new Date().toISOString().split('T')[0];
-      huboCambios = true;
-      
-      const historialRef2 = doc(collection(db, `victimas/${victimaId}/historial_asignaciones`));
-      batch.set(historialRef2, {
-        fecha_sustitucion: new Date().toISOString(),
-        tipo_profesional: 'Psicosocial',
-        abogado_anterior_id: cambios.psicosocial_anterior_id || 'Sin asignar',
-        abogado_nuevo_id: cambios.psicosocial_nuevo_id,
-        motivo: cambios.motivo,
-        sustitucion_realizada_por_id: adminResponsableId,
-        radicado_sustitucion_jep: ''
-      });
-    }
+    // Actualizamos el documento principal
+    await updateDoc(victimaRef, updates);
 
-    if (huboCambios) {
-      batch.update(victimaRef, updates);
-      await batch.commit();
-    }
+    // Registramos en el sub-historial de la víctima
+    const historialRef = doc(collection(db, `victimas/${victimaId}/historial_asignaciones`));
+    await setDoc(historialRef, {
+      fecha_sustitucion: fechaCompleta,
+      juridico_nuevo_id: cambios.juridico_nuevo_id,
+      psicosocial_nuevo_id: cambios.psicosocial_nuevo_id,
+      motivo: cambios.motivo,
+      sustitucion_realizada_por_id: adminResponsableId
+    });
   }
 };
