@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { 
   Box, Typography, Grid, Paper, CircularProgress, TextField, 
   InputAdornment, Table, TableBody, TableCell, TableHead, TableRow, 
-  Chip, Button
+  Chip, Button, useTheme
 } from '@mui/material';
 import PeopleIcon from '@mui/icons-material/People';
 import FolderIcon from '@mui/icons-material/Folder';
@@ -21,6 +21,7 @@ import { Usuario } from '../types/user';
 const Dashboard = () => {
   const { currentUser, role } = useAuth();
   const navigate = useNavigate();
+  const theme = useTheme();
   
   const [stats, setStats] = useState({ total: 0, caso01: 0, caso10: 0, acreditadas: 0 });
   const [victimasList, setVictimasList] = useState<Victima[]>([]);
@@ -42,14 +43,17 @@ const Dashboard = () => {
           adminService.getAllUsers()
         ]);
 
+        const victimasData = snapVictimas.docs.map(doc => ({ id: doc.id, ...doc.data() } as Victima));
+
         setStats({
           total: globalStats.totalVictimas,
           caso01: globalStats.totalCaso01,
           caso10: globalStats.totalCaso10,
-          acreditadas: 0 
+          // Corrección: Ahora se calcula dinámicamente filtrando el estado
+          acreditadas: victimasData.filter(v => v.estado_jep?.estado_acreditacion === 'Acreditada').length 
         });
 
-        setVictimasList(snapVictimas.docs.map(doc => ({ id: doc.id, ...doc.data() } as Victima)));
+        setVictimasList(victimasData);
         setProfesionales(snapUsers);
 
       } else {
@@ -60,7 +64,7 @@ const Dashboard = () => {
           total: data.length,
           caso01: data.filter(v => v.representacion.caso.includes('Caso 01')).length,
           caso10: data.filter(v => v.representacion.caso.includes('Caso 10')).length,
-          acreditadas: data.filter(v => v.estado_jep.estado_acreditacion === 'Acreditada').length
+          acreditadas: data.filter(v => v.estado_jep?.estado_acreditacion === 'Acreditada').length
         });
         setVictimasList(data);
       }
@@ -91,7 +95,7 @@ const Dashboard = () => {
   return (
     <Box sx={{ p: 4 }}>
       <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" sx={{ fontWeight: 800, color: '#003366', mb: 1 }}>
+        <Typography variant="h4" sx={{ mb: 1 }}>
           {isAdmin ? "Control Maestro de Casos" : "Mi Panel de Trabajo"}
         </Typography>
         <Typography variant="body1" color="text.secondary">
@@ -101,35 +105,39 @@ const Dashboard = () => {
         </Typography>
       </Box>
 
-      {/* TARJETAS DE ESTADÍSTICAS (MUI V6 Syntax) */}
+      {/* TARJETAS DE ESTADÍSTICAS CORREGIDAS (Diseño Institucional) */}
       <Grid container spacing={3} sx={{ mb: 6 }}>
         <Grid size={{ xs: 12, md: 4 }}>
-          <Paper elevation={0} sx={{ p: 3, display: 'flex', alignItems: 'center', borderRadius: 3, bgcolor: '#f0f9ff', border: '1px solid #e0f2fe' }}>
-            <PeopleIcon sx={{ fontSize: 40, color: '#0369a1', mr: 2 }} />
+          <Paper elevation={0} sx={{ p: 3, display: 'flex', alignItems: 'center', border: '1px solid', borderColor: 'divider' }}>
+            <PeopleIcon sx={{ fontSize: 40, color: theme.palette.primary.main, mr: 2 }} />
             <Box>
-              <Typography variant="h4" sx={{ fontWeight: 800 }}>{stats.total}</Typography>
-              <Typography variant="body2" color="text.secondary">VÍCTIMAS TOTALES</Typography>
+              <Typography variant="h4" sx={{ fontWeight: 800, color: theme.palette.text.primary }}>{stats.total}</Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600 }}>VÍCTIMAS TOTALES</Typography>
             </Box>
           </Paper>
         </Grid>
         <Grid size={{ xs: 12, md: 4 }}>
-          <Paper elevation={0} sx={{ p: 3, display: 'flex', alignItems: 'center', borderRadius: 3, bgcolor: '#fdf2f8', border: '1px solid #fce7f3' }}>
-            <FolderIcon sx={{ fontSize: 40, color: '#be185d', mr: 2 }} />
+          <Paper elevation={0} sx={{ p: 3, display: 'flex', alignItems: 'center', border: '1px solid', borderColor: 'divider' }}>
+            <FolderIcon sx={{ fontSize: 40, color: theme.palette.warning.main, mr: 2 }} />
             <Box>
               <Box sx={{ display: 'flex', gap: 2 }}>
-                <Typography variant="h6" sx={{ fontWeight: 800, color: '#be185d' }}>{stats.caso01} <Typography component="span" variant="caption">C01</Typography></Typography>
-                <Typography variant="h6" sx={{ fontWeight: 800, color: '#be185d' }}>{stats.caso10} <Typography component="span" variant="caption">C10</Typography></Typography>
+                <Typography variant="h6" sx={{ fontWeight: 800, color: theme.palette.text.primary }}>
+                  {stats.caso01} <Typography component="span" variant="caption" color="text.secondary">C01</Typography>
+                </Typography>
+                <Typography variant="h6" sx={{ fontWeight: 800, color: theme.palette.text.primary }}>
+                  {stats.caso10} <Typography component="span" variant="caption" color="text.secondary">C10</Typography>
+                </Typography>
               </Box>
-              <Typography variant="body2" color="text.secondary">DISTRIBUCIÓN JEP</Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600 }}>DISTRIBUCIÓN JEP</Typography>
             </Box>
           </Paper>
         </Grid>
         <Grid size={{ xs: 12, md: 4 }}>
-          <Paper elevation={0} sx={{ p: 3, display: 'flex', alignItems: 'center', borderRadius: 3, bgcolor: '#f0fdf4', border: '1px solid #dcfce7' }}>
-            <AssignmentTurnedInIcon sx={{ fontSize: 40, color: '#15803d', mr: 2 }} />
+          <Paper elevation={0} sx={{ p: 3, display: 'flex', alignItems: 'center', border: '1px solid', borderColor: 'divider' }}>
+            <AssignmentTurnedInIcon sx={{ fontSize: 40, color: theme.palette.secondary.main, mr: 2 }} />
             <Box>
-              <Typography variant="h4" sx={{ fontWeight: 800 }}>{stats.acreditadas}</Typography>
-              <Typography variant="body2" color="text.secondary">ACREDITADAS EN JEP</Typography>
+              <Typography variant="h4" sx={{ fontWeight: 800, color: theme.palette.text.primary }}>{stats.acreditadas}</Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600 }}>ACREDITADAS EN JEP</Typography>
             </Box>
           </Paper>
         </Grid>
@@ -137,20 +145,20 @@ const Dashboard = () => {
 
       <Box>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-          <Typography variant="h5" sx={{ fontWeight: 800, color: '#003366' }}>
+          <Typography variant="h5">
             {isAdmin ? "Buscador para Reasignación" : "Listado de mis Víctimas"}
           </Typography>
           <TextField 
             size="small"
-            placeholder="Buscar..."
+            placeholder="Buscar por nombre o ID..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            sx={{ width: 350, bgcolor: 'white' }}
+            sx={{ width: 350, bgcolor: 'background.paper' }}
             slotProps={{
               input: {
                 startAdornment: (
                   <InputAdornment position="start">
-                    <SearchIcon />
+                    <SearchIcon color="action" />
                   </InputAdornment>
                 ),
               },
@@ -158,37 +166,42 @@ const Dashboard = () => {
           />
         </Box>
 
-        <Paper elevation={0} sx={{ borderRadius: 3, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+        <Paper elevation={0} sx={{ border: '1px solid', borderColor: 'divider', overflow: 'hidden' }}>
           <Table>
-            <TableHead sx={{ bgcolor: '#f8fafc' }}>
+            <TableHead sx={{ bgcolor: 'background.default' }}>
               <TableRow>
-                <TableCell sx={{ fontWeight: 'bold' }}>Víctima</TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>{isAdmin ? "Abogado/a Actual" : "Estado Acreditación"}</TableCell>
-                <TableCell align="right" sx={{ fontWeight: 'bold' }}>Acción</TableCell>
+                <TableCell sx={{ fontWeight: 600, color: 'text.secondary' }}>Víctima</TableCell>
+                <TableCell sx={{ fontWeight: 600, color: 'text.secondary' }}>{isAdmin ? "Abogado/a Actual" : "Estado Acreditación"}</TableCell>
+                <TableCell align="right" sx={{ fontWeight: 600, color: 'text.secondary' }}>Acción</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {filtered.length === 0 ? (
-                <TableRow><TableCell colSpan={3} align="center" sx={{ py: 3 }}>No hay registros.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={3} align="center" sx={{ py: 4, color: 'text.secondary' }}>No hay registros que coincidan con la búsqueda.</TableCell></TableRow>
               ) : (
                 filtered.map((v) => (
                   <TableRow key={v.id} hover>
                     <TableCell>
-                      <Typography variant="body2" sx={{ fontWeight: 700 }}>{v.nombre_completo}</Typography>
-                      <Typography variant="caption" color="text.secondary">ID: {v.identificacion}</Typography>
+                      <Typography variant="body1" sx={{ fontWeight: 500 }}>{v.nombre_completo}</Typography>
+                      <Typography variant="body2" color="text.secondary">ID: {v.identificacion}</Typography>
                     </TableCell>
                     <TableCell>
                       {isAdmin ? (
                         <Chip label={getNombreProfesional(v.representacion.juridico_asignado_id)} size="small" variant="outlined" />
                       ) : (
-                        <Chip label={v.estado_jep.estado_acreditacion} size="small" color="primary" variant="outlined" />
+                        <Chip 
+                          label={v.estado_jep.estado_acreditacion} 
+                          size="small" 
+                          color={v.estado_jep.estado_acreditacion === 'Acreditada' ? 'primary' : 'default'}
+                          variant="outlined" 
+                        />
                       )}
                     </TableCell>
                     <TableCell align="right">
                       <Button 
                         variant="contained" 
                         size="small" 
-                        color={isAdmin ? "warning" : "primary"}
+                        color={isAdmin ? "secondary" : "primary"}
                         startIcon={<VisibilityIcon />}
                         onClick={() => navigate(`/victimas/${v.id}`)}
                       >

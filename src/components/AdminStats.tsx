@@ -1,5 +1,5 @@
 import React from 'react';
-import { Grid, Paper, Typography, Box } from '@mui/material';
+import { Grid, Paper, Typography, Box, useTheme } from '@mui/material';
 
 interface StatsProps {
   totalVictimas: number;
@@ -8,24 +8,26 @@ interface StatsProps {
 }
 
 export const AdminStats = ({ totalVictimas, totalCaso01, totalCaso10 }: StatsProps) => {
+  const theme = useTheme();
+
   return (
     <Grid container spacing={3} sx={{ mb: 4 }}>
       <Grid size={{ xs: 12, md: 4 }}>
-        <Paper sx={{ p: 3, textAlign: 'center', borderTop: '5px solid #1a365d' }}>
-          <Typography variant="h6">Víctimas Totales</Typography>
-          <Typography variant="h3" sx={{ fontWeight: 'bold' }}>{totalVictimas}</Typography>
+        <Paper elevation={0} sx={{ p: 3, textAlign: 'center', border: '1px solid', borderColor: 'divider', borderTop: `4px solid ${theme.palette.primary.main}` }}>
+          <Typography variant="h6" color="text.secondary" sx={{ mb: 1 }}>Víctimas Totales</Typography>
+          <Typography variant="h3" sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>{totalVictimas}</Typography>
         </Paper>
       </Grid>
       <Grid size={{ xs: 12, md: 4 }}>
-        <Paper sx={{ p: 3, textAlign: 'center', borderTop: '5px solid #d32f2f' }}>
-          <Typography variant="h6">Macrocaso 01</Typography>
-          <Typography variant="h3" sx={{ fontWeight: 'bold', color: '#d32f2f' }}>{totalCaso01}</Typography>
+        <Paper elevation={0} sx={{ p: 3, textAlign: 'center', border: '1px solid', borderColor: 'divider', borderTop: `4px solid ${theme.palette.warning.main}` }}>
+          <Typography variant="h6" color="text.secondary" sx={{ mb: 1 }}>Macrocaso 01</Typography>
+          <Typography variant="h3" sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>{totalCaso01}</Typography>
         </Paper>
       </Grid>
       <Grid size={{ xs: 12, md: 4 }}>
-        <Paper sx={{ p: 3, textAlign: 'center', borderTop: '5px solid #2e7d32' }}>
-          <Typography variant="h6">Macrocaso 10</Typography>
-          <Typography variant="h3" sx={{ fontWeight: 'bold', color: '#2e7d32' }}>{totalCaso10}</Typography>
+        <Paper elevation={0} sx={{ p: 3, textAlign: 'center', border: '1px solid', borderColor: 'divider', borderTop: `4px solid ${theme.palette.secondary.main}` }}>
+          <Typography variant="h6" color="text.secondary" sx={{ mb: 1 }}>Macrocaso 10</Typography>
+          <Typography variant="h3" sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>{totalCaso10}</Typography>
         </Paper>
       </Grid>
     </Grid>
