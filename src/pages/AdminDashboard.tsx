@@ -6,7 +6,7 @@ import {
 import DeleteIcon from '@mui/icons-material/Delete';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import VisibilityIcon from '@mui/icons-material/Visibility';
-import { useNavigate } from 'react-router-dom'; // Importamos el navegador
+import { useNavigate } from 'react-router-dom';
 import { adminService } from '../services/adminService';
 import { AdminStats } from '../components/AdminStats';
 import { UserManagement } from '../components/UserManagement';
@@ -23,7 +23,7 @@ const AdminDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [showSustitucion, setShowSustitucion] = useState(false);
   
-  const navigate = useNavigate(); // Hook para redirección
+  const navigate = useNavigate();
   const { showModal } = useModal();
   const { currentUser } = useAuth();
 
