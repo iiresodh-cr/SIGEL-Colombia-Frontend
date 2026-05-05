@@ -1,77 +1,122 @@
-import { collection, doc, getDocs, getDoc, addDoc, updateDoc, query, where, orderBy, limit } from 'firebase/firestore';
+import { 
+  collection, 
+  addDoc, 
+  getDocs, 
+  query, 
+  where, 
+  doc, 
+  getDoc, 
+  orderBy, 
+  limit,
+  updateDoc
+} from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { Victima, Interaccion, Evento } from '../types/jep';
 
-const VICTIMAS_COLLECTION = 'victimas';
-const EVENTOS_COLLECTION = 'eventos';
-
 export const jepService = {
-  // ==========================================
-  // MÉTODOS PARA NUEVA ARQUITECTURA (VÍCTIMAS)
-  // ==========================================
-  getVictimasAsignadas: async (usuarioId: string, rol: 'abogado' | 'psicosocial'): Promise<Victima[]> => {
-    const campoAsignacion = rol === 'abogado' 
-      ? 'representacion.juridico_asignado_id' 
-      : 'representacion.psicosocial_asignado_id';
-    const q = query(collection(db, VICTIMAS_COLLECTION), where(campoAsignacion, '==', usuarioId), where('representacion.estado', '==', 'Activo'));
+  // --- SECCIÓN VÍCTIMAS ---
+
+  // 1. Crear una nueva víctima
+  createVictima: async (data: Omit<Victima, 'id' | 'fecha_registro'>) => {
+    const victimasRef = collection(db, 'victimas');
+    const nuevaVictima = {
+      ...data,
+      fecha_registro: new Date().toISOString(),
+      storage_folder_url: '' 
+    };
+    const docRef = await addDoc(victimasRef, nuevaVictima);
+    return docRef.id;
+  },
+
+  // 2. Obtener víctimas asignadas (Filtro por Email/ID)
+  getVictimasAsignadas: async (profesionalId: string, tipo: 'abogado' | 'psicosocial') => {
+    const campo = tipo === 'abogado' ? 'representacion.juridico_asignado_id' : 'representacion.psicosocial_asignado_id';
+    const q = query(
+      collection(db, 'victimas'),
+      where(campo, '==', profesionalId),
+      where('representacion.estado', '==', 'Activo')
+    );
     const snapshot = await getDocs(q);
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Victima));
   },
 
-  getVictimaById: async (victimaId: string): Promise<Victima | null> => {
-    const docRef = doc(db, VICTIMAS_COLLECTION, victimaId);
-    const snapshot = await getDoc(docRef);
-    if (snapshot.exists()) return { id: snapshot.id, ...snapshot.data() } as Victima;
-    return null;
+  // 3. Obtener víctima por ID
+  getVictimaById: async (id: string) => {
+    const docRef = doc(db, 'victimas', id);
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      return { id: docSnap.id, ...docSnap.data() } as Victima;
+    }
+    throw new Error("Víctima no encontrada");
   },
 
-  createVictima: async (data: Omit<Victima, 'id' | 'fecha_registro'>): Promise<string> => {
-    const payload = { ...data, fecha_registro: new Date().toISOString() };
-    const docRef = await addDoc(collection(db, VICTIMAS_COLLECTION), payload);
-    return docRef.id;
+  // 4. Obtener todas las víctimas (utilizado en listados generales)
+  getVictimas: async (expedienteId?: string) => {
+    let q;
+    if (expedienteId) {
+      q = query(collection(db, 'victimas'), where('expedienteId', '==', expedienteId));
+    } else {
+      q = query(collection(db, 'victimas'));
+    }
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Victima));
   },
 
-  updateVictima: async (victimaId: string, data: Partial<Victima>): Promise<void> => {
-    const docRef = doc(db, VICTIMAS_COLLECTION, victimaId);
-    await updateDoc(docRef, data);
+  // 5. Vincular víctima a un expediente
+  addVictima: async (expedienteId: string, data: any) => {
+    const victimasRef = collection(db, 'victimas');
+    await addDoc(victimasRef, {
+      ...data,
+      expedienteId,
+      fecha_registro: new Date().toISOString()
+    });
   },
 
-  addInteraccion: async (victimaId: string, data: Omit<Interaccion, 'id'>): Promise<string> => {
-    const interaccionesRef = collection(db, `${VICTIMAS_COLLECTION}/${victimaId}/interacciones`);
-    const docRef = await addDoc(interaccionesRef, data);
-    return docRef.id;
+
+  // --- SECCIÓN INTERACCIONES Y NOTAS ---
+
+  // 6. Registrar interacción/nota
+  addInteraccion: async (victimaId: string, data: Omit<Interaccion, 'id'>) => {
+    const interaccionesRef = collection(db, `victimas/${victimaId}/interacciones`);
+    await addDoc(interaccionesRef, data);
   },
 
-  getInteraccionesRecientes: async (victimaId: string, limite: number = 20): Promise<Interaccion[]> => {
-    const q = query(collection(db, `${VICTIMAS_COLLECTION}/${victimaId}/interacciones`), orderBy('fecha', 'desc'), limit(limite));
+  // 7. Obtener interacciones recientes
+  getInteraccionesRecientes: async (victimaId: string) => {
+    const interaccionesRef = collection(db, `victimas/${victimaId}/interacciones`);
+    const q = query(interaccionesRef, orderBy('fecha', 'desc'), limit(10));
     const snapshot = await getDocs(q);
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Interaccion));
   },
 
-  // ==========================================
-  // MÉTODOS PARA EVENTOS
-  // ==========================================
-  getEventosProximos: async (): Promise<Evento[]> => {
-    const q = query(
-      collection(db, EVENTOS_COLLECTION), 
-      orderBy('fecha_inicio', 'desc'), 
-      limit(20)
-    );
+
+  // --- SECCIÓN EVENTOS Y TALLERES ---
+
+  // 8. Obtener eventos próximos
+  getEventosProximos: async () => {
+    const eventosRef = collection(db, 'eventos');
+    const q = query(eventosRef, orderBy('fecha', 'asc'));
     const snapshot = await getDocs(q);
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Evento));
   },
 
-  createEvento: async (data: Omit<Evento, 'id'>): Promise<string> => {
-    const docRef = await addDoc(collection(db, EVENTOS_COLLECTION), data);
+  // 9. Crear un nuevo evento
+  createEvento: async (data: Omit<Evento, 'id'>) => {
+    const eventosRef = collection(db, 'eventos');
+    const docRef = await addDoc(eventosRef, data);
     return docRef.id;
   },
 
-  // ==========================================
-  // MÉTODOS PUENTE (Compatibilidad con UI antigua)
-  // ==========================================
-  crearExpediente: async (data: any) => { console.log('Deprecated. Se usará createVictima', data); },
-  getExpedientes: async () => { return []; },
-  getExpedienteById: async (id: string) => { return { id, codigoExpediente: 'TRANSICIÓN', macrocaso: 'Caso 01' }; },
-  getVictimas: async (expedienteId: string) => { return []; },
-  addVictima: async (expedienteId: string, data: any) => { console.log('Deprecated.', data); }
+
+  // --- SECCIÓN EXPEDIENTES (LEGACY/BACKUP) ---
+
+  // 10. Obtener expediente por ID
+  getExpedienteById: async (id: string) => {
+    const docRef = doc(db, 'expedientes', id);
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      return { id: docSnap.id, ...docSnap.data() };
+    }
+    return null;
+  }
 };

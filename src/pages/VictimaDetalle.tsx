@@ -19,13 +19,7 @@ import { Usuario } from '../types/user';
 import { useAuth } from '../context/AuthContext';
 import { useModal } from '../context/ModalContext';
 
-const TIPOS_INTERACCION = [
-  'Llamada de sentido del proceso',
-  'Asesoría jurídica',
-  'Acompañamiento psicosocial',
-  'Gestión de acreditación',
-  'Otra'
-];
+const TIPOS_INTERACCION = ['Llamada de sentido del proceso', 'Asesoría jurídica', 'Acompañamiento psicosocial', 'Gestión de acreditación', 'Otra'];
 
 const VictimaDetalle = () => {
   const { id } = useParams<{ id: string }>();
@@ -41,9 +35,7 @@ const VictimaDetalle = () => {
   const [uploading, setUploading] = useState(false);
 
   const [openNoteModal, setOpenNoteModal] = useState(false);
-  const [newNote, setNewNote] = useState<Partial<Interaccion>>({
-    tipo: 'Llamada de sentido del proceso', estado_contacto: 'Contactado', observaciones: '', compromisos: ''
-  });
+  const [newNote, setNewNote] = useState<Partial<Interaccion>>({ tipo: 'Llamada de sentido del proceso', estado_contacto: 'Contactado', observaciones: '', compromisos: '' });
 
   const [openReasignarModal, setOpenReasignarModal] = useState(false);
   const [reasignarData, setReasignarData] = useState({ juridico_nuevo_id: '', psicosocial_nuevo_id: '', motivo: '' });
@@ -85,7 +77,7 @@ const VictimaDetalle = () => {
         compromisos: newNote.compromisos || ''
       };
       await jepService.addInteraccion(id, interaccionToSave);
-      showModal('Éxito', 'Interacción guardada correctamente.', 'success');
+      showModal('Éxito', 'Interacción guardada.', 'success');
       setOpenNoteModal(false);
       setNewNote({ tipo: 'Llamada de sentido del proceso', estado_contacto: 'Contactado', observaciones: '', compromisos: '' });
       await loadData();
@@ -103,11 +95,11 @@ const VictimaDetalle = () => {
     try {
       setLoading(true);
       await adminService.reasignarVictimaIndividual(id, currentUser.uid, reasignarData);
-      showModal('Éxito', 'El caso ha sido reasignado y el historial actualizado.', 'success');
+      showModal('Éxito', 'Caso reasignado correctamente.', 'success');
       setOpenReasignarModal(false);
-      await loadData(); // Recarga vital para ver el cambio de nombre
+      await loadData();
     } catch (error) {
-      showModal('Error', 'No se pudo procesar la reasignación.', 'error');
+      showModal('Error', 'Error en la reasignación.', 'error');
     } finally {
       setLoading(false);
     }
@@ -142,11 +134,11 @@ const VictimaDetalle = () => {
 
   const getNombreAbo = (uid: string) => {
     if (!uid) return 'Sin asignar';
-    return listaProfesionales.abogados.find(u => u.uid === uid)?.nombre_completo || 'Sin asignar';
+    return listaProfesionales.abogados.find(u => u.uid.toLowerCase() === uid.toLowerCase())?.nombre_completo || uid;
   };
   const getNombrePsi = (uid: string) => {
     if (!uid) return 'Sin asignar';
-    return listaProfesionales.psicosociales.find(u => u.uid === uid)?.nombre_completo || 'Sin asignar';
+    return listaProfesionales.psicosociales.find(u => u.uid.toLowerCase() === uid.toLowerCase())?.nombre_completo || uid;
   };
 
   if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', mt: 10 }}><CircularProgress /></Box>;
@@ -171,6 +163,29 @@ const VictimaDetalle = () => {
 
             <Divider sx={{ my: 3 }} />
 
+            {/* SECCIÓN DATOS DEMOGRÁFICOS (RESTAURADO) */}
+            <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 2, fontWeight: 700 }}>Información Demográfica</Typography>
+            <Grid container spacing={2} sx={{ mb: 3 }}>
+              <Grid size={{ xs: 6, md: 4 }}><Typography variant="caption">Género</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{victima.datos_demograficos.genero}</Typography></Grid>
+              <Grid size={{ xs: 6, md: 4 }}><Typography variant="caption">Orientación</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{victima.datos_demograficos.orientacion_sexual || 'N/A'}</Typography></Grid>
+              <Grid size={{ xs: 6, md: 4 }}><Typography variant="caption">Etnia</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{victima.datos_demograficos.grupo_etnico}</Typography></Grid>
+              <Grid size={{ xs: 6, md: 4 }}><Typography variant="caption">Ciclo Vital</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{victima.datos_demograficos.etareo}</Typography></Grid>
+              <Grid size={{ xs: 6, md: 4 }}><Typography variant="caption">Discapacidad</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{victima.datos_demograficos.discapacidad}</Typography></Grid>
+            </Grid>
+
+            <Divider sx={{ my: 3 }} />
+
+            {/* SECCIÓN CONTACTO (RESTAURADO) */}
+            <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 2, fontWeight: 700 }}>Datos de Contacto</Typography>
+            <Grid container spacing={2} sx={{ mb: 3 }}>
+              <Grid size={{ xs: 6 }}><Typography variant="caption">Teléfono</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{victima.datos_contacto.telefono}</Typography></Grid>
+              <Grid size={{ xs: 6 }}><Typography variant="caption">Correo</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{victima.datos_contacto.correo || 'No registra'}</Typography></Grid>
+              <Grid size={{ xs: 12 }}><Typography variant="caption">Ubicación</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{victima.datos_contacto.departamento} - {victima.datos_contacto.direccion}</Typography></Grid>
+            </Grid>
+
+            <Divider sx={{ my: 3 }} />
+
+            {/* SECCIÓN ASIGNACIÓN */}
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
               <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#003366' }}>Asignación IIRESODH</Typography>
               {isAdmin && (
@@ -185,15 +200,9 @@ const VictimaDetalle = () => {
               )}
             </Box>
 
-            <Grid container spacing={2} sx={{ mb: 2 }}>
-              <Grid size={{ xs: 12, sm: 6 }}>
-                <Typography variant="caption" color="text.secondary">Abogado/a Responsable</Typography>
-                <Typography variant="body2" sx={{ fontWeight: 600 }}>{getNombreAbo(victima.representacion.juridico_asignado_id)}</Typography>
-              </Grid>
-              <Grid size={{ xs: 12, sm: 6 }}>
-                <Typography variant="caption" color="text.secondary">Psicosocial Responsable</Typography>
-                <Typography variant="body2" sx={{ fontWeight: 600 }}>{getNombrePsi(victima.representacion.psicosocial_asignado_id)}</Typography>
-              </Grid>
+            <Grid container spacing={2} sx={{ mb: 3 }}>
+              <Grid size={{ xs: 12, sm: 6 }}><Typography variant="caption">Abogado/a Responsable</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{getNombreAbo(victima.representacion.juridico_asignado_id)}</Typography></Grid>
+              <Grid size={{ xs: 12, sm: 6 }}><Typography variant="caption">Psicosocial Responsable</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{getNombrePsi(victima.representacion.psicosocial_asignado_id)}</Typography></Grid>
             </Grid>
 
             <Grid container spacing={2}>
@@ -212,69 +221,37 @@ const VictimaDetalle = () => {
           <Paper elevation={0} sx={{ p: 4, borderRadius: 3, border: '1px solid #e2e8f0' }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
               <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#003366' }}>Documentación</Typography>
-              <Button component="label" variant="outlined" startIcon={<CloudUploadIcon />}>
-                Subir PDF
-                <input type="file" hidden accept=".pdf" onChange={handleFileUpload} />
-              </Button>
+              <Button component="label" variant="outlined" startIcon={<CloudUploadIcon />}>Subir PDF<input type="file" hidden accept=".pdf" onChange={handleFileUpload} /></Button>
             </Box>
-            <List>
-              {poderes.map((archivo, index) => (
-                <ListItem key={index} sx={{ border: '1px solid #e2e8f0', borderRadius: 2, mb: 1 }}>
-                  <PictureAsPdfIcon color="error" sx={{ mr: 2 }} />
-                  <ListItemText primary={archivo.name} />
-                  <IconButton color="error" onClick={() => handleDeleteFile(archivo.fullPath)}><DeleteIcon /></IconButton>
-                </ListItem>
-              ))}
-            </List>
+            <List>{poderes.map((archivo, index) => (<ListItem key={index} sx={{ border: '1px solid #e2e8f0', borderRadius: 2, mb: 1 }}><PictureAsPdfIcon color="error" sx={{ mr: 2 }} /><ListItemText primary={archivo.name} /><IconButton color="error" onClick={() => handleDeleteFile(archivo.fullPath)}><DeleteIcon /></IconButton></ListItem>))}</List>
           </Paper>
         </Grid>
 
-        {/* COLUMNA DERECHA: HISTORIAL */}
         <Grid size={{ xs: 12, lg: 5 }}>
           <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid #e2e8f0', bgcolor: '#f8fafc', height: '100%' }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-              <Typography variant="h6" sx={{ fontWeight: 700 }}>Historial de Notas</Typography>
-              <Button startIcon={<AddCommentIcon />} variant="contained" size="small" sx={{ bgcolor: '#003366' }} onClick={() => setOpenNoteModal(true)}>Nota</Button>
-            </Box>
-            <List>
-              {interacciones.map((nota) => (
-                <Paper key={nota.id} elevation={0} sx={{ p: 2, mb: 2, border: '1px solid #e2e8f0' }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                    <Chip label={nota.tipo} size="small" variant="outlined" color="primary" />
-                    <Typography variant="caption" color="text.secondary">{new Date(nota.fecha).toLocaleDateString()}</Typography>
-                  </Box>
-                  <Typography variant="body2" sx={{ mt: 1 }}>{nota.observaciones}</Typography>
-                </Paper>
-              ))}
-            </List>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}><Typography variant="h6" sx={{ fontWeight: 700 }}>Historial de Notas</Typography><Button startIcon={<AddCommentIcon />} variant="contained" size="small" sx={{ bgcolor: '#003366' }} onClick={() => setOpenNoteModal(true)}>Nota</Button></Box>
+            <List>{interacciones.map((nota) => (<Paper key={nota.id} elevation={0} sx={{ p: 2, mb: 2, border: '1px solid #e2e8f0' }}><Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}><Chip label={nota.tipo} size="small" variant="outlined" color="primary" /><Typography variant="caption">{new Date(nota.fecha).toLocaleDateString()}</Typography></Box><Typography variant="body2" sx={{ mt: 1 }}>{nota.observaciones}</Typography></Paper>))}</List>
           </Paper>
         </Grid>
       </Grid>
 
-      {/* MODAL REASIGNACIÓN */}
+      {/* MODALES */}
+      <Dialog open={openNoteModal} onClose={() => setOpenNoteModal(false)} fullWidth maxWidth="sm">
+        <DialogTitle sx={{ fontWeight: 'bold' }}>Registrar Interacción</DialogTitle>
+        <DialogContent dividers><TextField fullWidth multiline rows={4} label="Observaciones" value={newNote.observaciones} onChange={(e) => setNewNote({ ...newNote, observaciones: e.target.value })} /></DialogContent>
+        <DialogActions sx={{ p: 2 }}><Button onClick={() => setOpenNoteModal(false)}>Cancelar</Button><Button onClick={handleSaveNote} variant="contained" sx={{ bgcolor: '#003366' }}>Guardar</Button></DialogActions>
+      </Dialog>
+
       <Dialog open={openReasignarModal} onClose={() => setOpenReasignarModal(false)} fullWidth maxWidth="sm">
         <DialogTitle sx={{ fontWeight: 'bold' }}>Reasignar Responsables</DialogTitle>
         <DialogContent dividers>
           <Grid container spacing={2} sx={{ mt: 1 }}>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <TextField select fullWidth label="Nuevo Abogado" value={reasignarData.juridico_nuevo_id} onChange={(e) => setReasignarData({ ...reasignarData, juridico_nuevo_id: e.target.value })}>
-                {listaProfesionales.abogados.map(u => <MenuItem key={u.uid} value={u.uid}>{u.nombre_completo || u.correo}</MenuItem>)}
-              </TextField>
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <TextField select fullWidth label="Nuevo Psicosocial" value={reasignarData.psicosocial_nuevo_id} onChange={(e) => setReasignarData({ ...reasignarData, psicosocial_nuevo_id: e.target.value })}>
-                {listaProfesionales.psicosociales.map(u => <MenuItem key={u.uid} value={u.uid}>{u.nombre_completo || u.correo}</MenuItem>)}
-              </TextField>
-            </Grid>
-            <Grid size={{ xs: 12 }}>
-              <TextField fullWidth multiline rows={3} label="Motivo" required value={reasignarData.motivo} onChange={(e) => setReasignarData({ ...reasignarData, motivo: e.target.value })} />
-            </Grid>
+            <Grid size={{ xs: 12, sm: 6 }}><TextField select fullWidth label="Abogado" value={reasignarData.juridico_nuevo_id} onChange={(e) => setReasignarData({ ...reasignarData, juridico_nuevo_id: e.target.value })}>{listaProfesionales.abogados.map(u => <MenuItem key={u.uid} value={u.uid}>{u.nombre_completo || u.correo}</MenuItem>)}</TextField></Grid>
+            <Grid size={{ xs: 12, sm: 6 }}><TextField select fullWidth label="Psicosocial" value={reasignarData.psicosocial_nuevo_id} onChange={(e) => setReasignarData({ ...reasignarData, psicosocial_nuevo_id: e.target.value })}>{listaProfesionales.psicosociales.map(u => <MenuItem key={u.uid} value={u.uid}>{u.nombre_completo || u.correo}</MenuItem>)}</TextField></Grid>
+            <Grid size={{ xs: 12 }}><TextField fullWidth multiline rows={3} label="Motivo" required value={reasignarData.motivo} onChange={(e) => setReasignarData({ ...reasignarData, motivo: e.target.value })} /></Grid>
           </Grid>
         </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setOpenReasignarModal(false)}>Cancelar</Button>
-          <Button onClick={handleReasignar} variant="contained" color="warning">Confirmar Cambio</Button>
-        </DialogActions>
+        <DialogActions sx={{ p: 2 }}><Button onClick={() => setOpenReasignarModal(false)}>Cancelar</Button><Button onClick={handleReasignar} variant="contained" color="warning">Confirmar</Button></DialogActions>
       </Dialog>
     </Box>
   );

@@ -18,6 +18,7 @@ export const adminService = {
   getAllUsers: async (): Promise<Usuario[]> => {
     const q = query(collection(db, 'usuarios'));
     const snapshot = await getDocs(q);
+    // IMPORTANTE: En tu DB el ID del documento es el correo
     return snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as Usuario));
   },
 
@@ -58,7 +59,7 @@ export const adminService = {
     };
   },
 
-  // 6. SUSTITUCIÓN MASIVA DE CASOS
+  // 6. SUSTITUCIÓN MASIVA DE CASOS (Por renuncia o cambio de personal)
   reasignarCasosMasivamente: async (
     profesionalAnteriorId: string,
     profesionalNuevoId: string,
@@ -108,7 +109,7 @@ export const adminService = {
     return totalModificados;
   },
 
-  // 7. Listar profesionales operativos
+  // 7. Listar profesionales operativos para selectores
   getProfesionales: async () => {
     const q = query(collection(db, 'usuarios'));
     const snapshot = await getDocs(q);
@@ -119,7 +120,7 @@ export const adminService = {
     };
   },
 
-  // 8. REASIGNACIÓN INDIVIDUAL (USO OBLIGATORIO DE NOTACIÓN DE PUNTOS)
+  // 8. REASIGNACIÓN INDIVIDUAL (Notación de puntos para proteger el objeto 'representacion')
   reasignarVictimaIndividual: async (
     victimaId: string,
     adminResponsableId: string,
@@ -132,7 +133,7 @@ export const adminService = {
     const victimaRef = doc(db, 'victimas', victimaId);
     const fechaCompleta = new Date().toISOString();
     
-    // Objeto de actualización parcial. IMPORTANTE: Usar strings como llaves para no borrar el resto de 'representacion'
+    // IMPORTANTE: Se usan strings como llaves para actualizar campos anidados sin borrar el resto
     const updates: any = {};
     updates['representacion.juridico_asignado_id'] = cambios.juridico_nuevo_id;
     updates['representacion.psicosocial_asignado_id'] = cambios.psicosocial_nuevo_id;
@@ -140,7 +141,7 @@ export const adminService = {
 
     await updateDoc(victimaRef, updates);
 
-    // Guardamos historial del cambio
+    // Registro en el historial
     const historialRef = doc(collection(db, `victimas/${victimaId}/historial_asignaciones`));
     await setDoc(historialRef, {
       fecha_sustitucion: fechaCompleta,

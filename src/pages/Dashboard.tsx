@@ -31,12 +31,13 @@ const Dashboard = () => {
   const isAdmin = role === 'admin' || role === 'superadmin';
 
   const loadData = async () => {
-    if (!currentUser?.uid) return;
+    // IMPORTANTE: El administrador y los usuarios usan el Email como llave de asignación
+    if (!currentUser?.email) return;
     try {
       setLoading(true);
       
       if (isAdmin) {
-        // Carga global para dominio de Administración
+        // Carga global para Administración
         const [globalStats, snapVictimas, snapUsers] = await Promise.all([
           adminService.getGlobalStats(),
           getDocs(query(collection(db, 'victimas'))),
@@ -54,9 +55,9 @@ const Dashboard = () => {
         setProfesionales(snapUsers);
 
       } else {
-        // Carga individual para dominio de Usuarios
+        // Carga individual para Usuarios (Consulta por Email)
         const rolBusqueda = role === 'psicosocial' ? 'psicosocial' : 'abogado';
-        const victimas = await jepService.getVictimasAsignadas(currentUser.uid, rolBusqueda);
+        const victimas = await jepService.getVictimasAsignadas(currentUser.email, rolBusqueda);
         
         setStats({
           total: victimas.length,
@@ -64,9 +65,10 @@ const Dashboard = () => {
           caso10: victimas.filter(v => v.representacion.caso.includes('Caso 10')).length,
           acreditadas: victimas.filter(v => v.estado_jep.estado_acreditacion === 'Acreditada').length
         });
+        setVictimasGlobales(victimas);
       }
     } catch (error) {
-      console.error("Error al cargar datos:", error);
+      console.error("Error Dashboard:", error);
     } finally {
       setLoading(false);
     }
@@ -78,8 +80,8 @@ const Dashboard = () => {
 
   const getNombreProfesional = (id: string) => {
     if (!id || id === "") return 'Sin asignar';
-    const prof = profesionales.find(u => u.uid === id);
-    return prof ? (prof.nombre_completo || prof.correo) : 'Sin asignar';
+    const prof = profesionales.find(u => u.uid.toLowerCase() === id.toLowerCase());
+    return prof ? (prof.nombre_completo || prof.correo) : id;
   };
 
   const victimasFiltradas = victimasGlobales.filter(v => 
@@ -96,9 +98,7 @@ const Dashboard = () => {
           {isAdmin ? "Control Maestro de Casos" : "Mi Panel de Trabajo"}
         </Typography>
         <Typography variant="body1" color="text.secondary">
-          {isAdmin 
-            ? "Resumen global y gestión de asignaciones del IIRESODH." 
-            : "Estado actual de tu carga de trabajo y procesos asignados."}
+          {isAdmin ? "Gestión global de asignaciones IIRESODH." : "Estado de tus procesos asignados."}
         </Typography>
       </Box>
 
@@ -121,7 +121,7 @@ const Dashboard = () => {
                 <Typography variant="h6" sx={{ fontWeight: 800, color: '#be185d' }}>{stats.caso01} <Typography component="span" variant="caption">C01</Typography></Typography>
                 <Typography variant="h6" sx={{ fontWeight: 800, color: '#be185d' }}>{stats.caso10} <Typography component="span" variant="caption">C10</Typography></Typography>
               </Box>
-              <Typography variant="body2" color="text.secondary">DISTRIBUCIÓN MACROCASO</Typography>
+              <Typography variant="body2" color="text.secondary">POR MACROCASO</Typography>
             </Box>
           </Paper>
         </Grid>
@@ -130,64 +130,67 @@ const Dashboard = () => {
             <AssignmentTurnedInIcon sx={{ fontSize: 40, color: '#15803d', mr: 2 }} />
             <Box>
               <Typography variant="h4" sx={{ fontWeight: 800 }}>{stats.acreditadas}</Typography>
-              <Typography variant="body2" color="text.secondary">ACREDITADAS EN JEP</Typography>
+              <Typography variant="body2" color="text.secondary">ACREDITADAS JEP</Typography>
             </Box>
           </Paper>
         </Grid>
       </Grid>
 
-      {/* BUSCADOR MAESTRO (SOLO ADMIN) */}
-      {isAdmin && (
-        <Box>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-            <Typography variant="h5" sx={{ fontWeight: 800, color: '#003366' }}>Buscador para Reasignación</Typography>
-            <TextField 
-              size="small"
-              placeholder="Buscar por nombre o cédula..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              sx={{ width: 350, bgcolor: 'white' }}
-              slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchIcon /></InputAdornment> } }}
-            />
-          </Box>
-
-          <Paper elevation={0} sx={{ borderRadius: 3, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
-            <Table>
-              <TableHead sx={{ bgcolor: '#f8fafc' }}>
-                <TableRow>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Víctima</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Abogado/a Actual</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 'bold' }}>Acción</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {victimasFiltradas.map((v) => (
-                  <TableRow key={v.id} hover>
-                    <TableCell>
-                      <Typography variant="body2" sx={{ fontWeight: 700 }}>{v.nombre_completo}</Typography>
-                      <Typography variant="caption" color="text.secondary">ID: {v.identificacion}</Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Chip label={getNombreProfesional(v.representacion.juridico_asignado_id)} size="small" variant="outlined" />
-                    </TableCell>
-                    <TableCell align="right">
-                      <Button 
-                        variant="contained" 
-                        size="small" 
-                        color="warning"
-                        startIcon={<VisibilityIcon />}
-                        onClick={() => navigate(`/victimas/${v.id}`)}
-                      >
-                        Reasignar
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </Paper>
+      <Box>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+          <Typography variant="h5" sx={{ fontWeight: 800, color: '#003366' }}>
+            {isAdmin ? "Buscador para Reasignación" : "Mis Víctimas Asignadas"}
+          </Typography>
+          <TextField 
+            size="small"
+            placeholder="Buscar..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            sx={{ width: 350, bgcolor: 'white' }}
+            slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchIcon /></InputAdornment> } }}
+          />
         </Box>
-      )}
+
+        <Paper elevation={0} sx={{ borderRadius: 3, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+          <Table>
+            <TableHead sx={{ bgcolor: '#f8fafc' }}>
+              <TableRow>
+                <TableCell sx={{ fontWeight: 'bold' }}>Víctima</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>{isAdmin ? "Abogado/a Actual" : "Estado JEP"}</TableCell>
+                <TableCell align="right" sx={{ fontWeight: 'bold' }}>Acción</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {victimasFiltradas.map((v) => (
+                <TableRow key={v.id} hover>
+                  <TableCell>
+                    <Typography variant="body2" sx={{ fontWeight: 700 }}>{v.nombre_completo}</Typography>
+                    <Typography variant="caption" color="text.secondary">CC: {v.identificacion}</Typography>
+                  </TableCell>
+                  <TableCell>
+                    {isAdmin ? (
+                      <Chip label={getNombreProfesional(v.representacion.juridico_asignado_id)} size="small" variant="outlined" />
+                    ) : (
+                      <Chip label={v.estado_jep.estado_acreditacion} size="small" variant="outlined" color="primary" />
+                    )}
+                  </TableCell>
+                  <TableCell align="right">
+                    <Button 
+                      variant="contained" 
+                      size="small" 
+                      color={isAdmin ? "warning" : "primary"}
+                      startIcon={<VisibilityIcon />}
+                      onClick={() => navigate(`/victimas/${v.id}`)}
+                    >
+                      {isAdmin ? "Reasignar" : "Ver Ficha"}
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </Paper>
+      </Box>
     </Box>
   );
 };
