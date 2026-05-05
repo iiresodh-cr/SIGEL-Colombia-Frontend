@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { 
   Box, TextField, Button, Grid, Typography, Paper, 
   MenuItem, Select, InputLabel, FormControl, Chip, OutlinedInput, Divider 
@@ -57,11 +57,11 @@ export const FormVictima = ({ onSave, onCancel, profesionales, currentUserRole, 
           {/* DATOS PERSONALES */}
           <Grid size={{ xs: 12 }}><Divider textAlign="left"><Typography variant="subtitle2" color="text.secondary">Datos Personales</Typography></Divider></Grid>
           <Grid size={{ xs: 12, md: 8 }}><TextField fullWidth size="small" label="Nombre Completo" required value={formData.nombre_completo} onChange={(e) => setFormData({ ...formData, nombre_completo: e.target.value })} /></Grid>
-          <Grid size={{ xs: 12, md: 4 }}><TextField select fullWidth size="small" label="Tipo Doc." value={formData.tipo_documento} onChange={(e) => setFormData({ ...formData, tipo_documento: e.target.value })}><MenuItem value="CC">CC</MenuItem><MenuItem value="TI">TI</MenuItem></TextField></Grid>
-          <Grid size={{ xs: 12, md: 6 }}><TextField fullWidth size="small" label="Número Identificación" required value={formData.identificacion} onChange={(e) => setFormData({ ...formData, identificacion: e.target.value })} /></Grid>
+          <Grid size={{ xs: 12, md: 4 }}><TextField select fullWidth size="small" label="Tipo Doc." value={formData.tipo_documento} onChange={(e) => setFormData({ ...formData, tipo_documento: e.target.value })}><MenuItem value="CC">Cédula de Ciudadanía</MenuItem><MenuItem value="TI">Tarjeta de Identidad</MenuItem></TextField></Grid>
+          <Grid size={{ xs: 12, md: 6 }}><TextField fullWidth size="small" label="Número de Identificación" required value={formData.identificacion} onChange={(e) => setFormData({ ...formData, identificacion: e.target.value })} /></Grid>
           <Grid size={{ xs: 12, md: 6 }}><TextField select fullWidth size="small" label="Género" required value={formData.datos_demograficos.genero} onChange={(e) => setFormData({ ...formData, datos_demograficos: { ...formData.datos_demograficos, genero: e.target.value } })}>{GENEROS.map(o => <MenuItem key={o} value={o}>{o}</MenuItem>)}</TextField></Grid>
           
-          {/* ASIGNACIÓN (AQUÍ ESTÁ LA LÓGICA DE ROLES) */}
+          {/* ASIGNACIÓN DE RESPONSABLES */}
           <Grid size={{ xs: 12 }}><Divider textAlign="left"><Typography variant="subtitle2" color="text.secondary">Asignación de Responsables</Typography></Divider></Grid>
           
           <Grid size={{ xs: 12, md: 6 }}>
@@ -69,7 +69,7 @@ export const FormVictima = ({ onSave, onCancel, profesionales, currentUserRole, 
               select fullWidth size="small" 
               label="Abogado/a Responsable" 
               required
-              disabled={!isAltRole && currentUserRole === 'abogado'} // Bloqueado si el usuario es abogado
+              disabled={!isAltRole && currentUserRole === 'abogado'} 
               value={formData.representacion.juridico_asignado_id}
               onChange={(e) => setFormData({ ...formData, representacion: { ...formData.representacion, juridico_asignado_id: e.target.value } })}
             >
@@ -82,7 +82,7 @@ export const FormVictima = ({ onSave, onCancel, profesionales, currentUserRole, 
               select fullWidth size="small" 
               label="Psicosocial Responsable" 
               required
-              disabled={!isAltRole && currentUserRole === 'psicosocial'} // Bloqueado si el usuario es psicosocial
+              disabled={!isAltRole && currentUserRole === 'psicosocial'} 
               value={formData.representacion.psicosocial_asignado_id}
               onChange={(e) => setFormData({ ...formData, representacion: { ...formData.representacion, psicosocial_asignado_id: e.target.value } })}
             >
@@ -90,11 +90,14 @@ export const FormVictima = ({ onSave, onCancel, profesionales, currentUserRole, 
             </TextField>
           </Grid>
 
-          {/* RESTO DEL FORMULARIO */}
-          <Grid size={{ xs: 12 }}><Divider textAlign="left"><Typography variant="subtitle2" color="text.secondary">Contacto y JEP</Typography></Divider></Grid>
+          {/* UBICACIÓN Y CONTACTO */}
+          <Grid size={{ xs: 12 }}><Divider textAlign="left"><Typography variant="subtitle2" color="text.secondary">Ubicación y Contacto</Typography></Divider></Grid>
           <Grid size={{ xs: 12, md: 6 }}><TextField select fullWidth size="small" label="Departamento" required value={formData.datos_contacto.departamento} onChange={(e) => setFormData({ ...formData, datos_contacto: { ...formData.datos_contacto, departamento: e.target.value } })}>{DEPARTAMENTOS.map(d => <MenuItem key={d} value={d}>{d}</MenuItem>)}</TextField></Grid>
           <Grid size={{ xs: 12, md: 6 }}><TextField fullWidth size="small" label="Teléfono" required value={formData.datos_contacto.telefono} onChange={(e) => setFormData({ ...formData, datos_contacto: { ...formData.datos_contacto, telefono: e.target.value } })} /></Grid>
-          
+          <Grid size={{ xs: 12 }}><TextField fullWidth multiline rows={2} label="Dirección" value={formData.datos_contacto.direccion} onChange={(e) => setFormData({ ...formData, datos_contacto: { ...formData.datos_contacto, direccion: e.target.value } })} /></Grid>
+
+          {/* REPRESENTACIÓN JEP */}
+          <Grid size={{ xs: 12 }}><Divider textAlign="left"><Typography variant="subtitle2" color="text.secondary">Representación JEP</Typography></Divider></Grid>
           <Grid size={{ xs: 12, md: 6 }}>
             <FormControl fullWidth size="small"><InputLabel>Macrocaso(s)</InputLabel><Select multiple value={formData.representacion.caso} input={<OutlinedInput label="Macrocaso(s)" />} onChange={(e) => setFormData({ ...formData, representacion: { ...formData.representacion, caso: typeof e.target.value === 'string' ? e.target.value.split(',') : e.target.value } })} renderValue={(selected) => <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>{selected.map((value) => <Chip key={value} label={value} size="small" color="primary" />)}</Box>}>{CASOS_JEP.map((caso) => <MenuItem key={caso} value={caso}>{caso}</MenuItem>)}</Select></FormControl>
           </Grid>

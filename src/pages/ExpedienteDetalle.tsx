@@ -33,8 +33,6 @@ const ExpedienteDetalle = () => {
   const [victimas, setVictimas] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showVictimaForm, setShowVictimaForm] = useState(false);
-  
-  // Estado para manejar la lista de profesionales exigida por FormVictima
   const [listaProfesionales, setListaProfesionales] = useState<{ abogados: Usuario[], psicosociales: Usuario[] }>({ 
     abogados: [], 
     psicosociales: [] 
@@ -45,7 +43,6 @@ const ExpedienteDetalle = () => {
       if (!id) return;
       try {
         setLoading(true);
-        // Cargamos simultáneamente el expediente, las víctimas y los profesionales
         const [expData, victimasData, profsData] = await Promise.all([
           jepService.getExpedienteById(id),
           jepService.getVictimas(id),
@@ -90,10 +87,7 @@ const ExpedienteDetalle = () => {
         Volver al Listado
       </Button>
 
-      {/* Grid en MUI v6 utiliza 'container' y 'size' */}
       <Grid container spacing={4}>
-        
-        {/* Información del Expediente */}
         <Grid size={{ xs: 12, lg: 8 }}>
           <Paper elevation={0} sx={{ p: 4, borderRadius: 3, border: '1px solid #e2e8f0' }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3, alignItems: 'flex-start' }}>
@@ -120,7 +114,6 @@ const ExpedienteDetalle = () => {
           </Paper>
         </Grid>
 
-        {/* Sección de Víctimas */}
         <Grid size={{ xs: 12, lg: 4 }}>
           <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid #e2e8f0', bgcolor: '#f8fafc' }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
