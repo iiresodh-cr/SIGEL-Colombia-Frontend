@@ -207,10 +207,12 @@ const AdminDashboard = () => {
                           size="small" 
                           value={u.rol} 
                           onChange={(e) => handleRoleChange(u.correo, e.target.value)} 
+                          sx={{ minWidth: 175, textAlign: 'left' }} // FIX: Ancho fijo para alineación perfecta
                         >
+                          <MenuItem value="admin">Administrador/a</MenuItem>
                           <MenuItem value="abogado">Abogado/a</MenuItem>
                           <MenuItem value="psicosocial">Psicosocial</MenuItem>
-                          <MenuItem value="admin">Administrador/a</MenuItem>
+                          <MenuItem value="lector">Lector (Solo Lectura)</MenuItem>
                         </Select>
                         <IconButton color="error" onClick={() => handleDeleteUser(u.correo)}>
                           <DeleteIcon />
