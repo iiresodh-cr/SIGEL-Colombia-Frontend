@@ -37,7 +37,30 @@ const ImportadorMasivo = () => {
     }
   };
 
-  // FUNCIÓN AUXILIAR 1: Búsqueda parcial ultra flexible (ignora todo lo que sobra en el título)
+  // FUNCIÓN AUXILIAR 1: Conversión matemática infalible de fechas Excel a JS
+  const formatFecha = (val: any) => {
+    if (!val) return '';
+    
+    const serial = Number(val);
+    // Si es un número de Excel (ej. 45417)
+    if (!isNaN(serial) && serial > 20000) {
+      // 25569 = Días entre 1/1/1900 (Excel) y 1/1/1970 (JS)
+      const date = new Date((serial - 25569) * 86400 * 1000);
+      // Corrección de zona horaria para evitar el desfase al 31 de diciembre
+      const adjustedDate = new Date(date.getTime() + Math.abs(date.getTimezoneOffset() * 60000));
+      return adjustedDate.toISOString().split('T')[0];
+    }
+
+    // Si ya viene como texto ("2024-05-10")
+    const textDate = new Date(val);
+    if (!isNaN(textDate.getTime())) {
+      return textDate.toISOString().split('T')[0];
+    }
+
+    return String(val); // Si es un texto raro, retornarlo crudo
+  };
+
+  // FUNCIÓN AUXILIAR 2: Búsqueda parcial ultra flexible
   const getVal = (row: any, ...possibleKeys: string[]) => {
     for (const key of Object.keys(row)) {
       const cleanKey = key.trim().toLowerCase();
@@ -48,12 +71,11 @@ const ImportadorMasivo = () => {
     return '';
   };
 
-  // FUNCIÓN AUXILIAR 2: Salta los títulos combinados de la fila 1 y busca los encabezados reales
+  // FUNCIÓN AUXILIAR 3: Salta los títulos combinados
   const extractData = (sheet: XLSX.WorkSheet, keywords: string[]) => {
     const rawData: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1 });
     let headerRowIndex = 0;
     
-    // Escanea las primeras 10 filas buscando los encabezados reales
     for (let i = 0; i < Math.min(10, rawData.length); i++) {
       const rowString = (rawData[i] || []).map(cell => String(cell).toLowerCase()).join(' ');
       if (keywords.some(kw => rowString.includes(kw.toLowerCase()))) {
@@ -61,7 +83,6 @@ const ImportadorMasivo = () => {
         break;
       }
     }
-    // Retorna los datos empezando desde la fila correcta
     return XLSX.utils.sheet_to_json(sheet, { defval: '', range: headerRowIndex });
   };
 
@@ -110,7 +131,7 @@ const ImportadorMasivo = () => {
               calidad_victima: String(getVal(row, 'DIRECTA O INDIRECTA', 'Calidad')),
               juridico_asignado_id: String(getVal(row, 'JURÍDICO', 'Juridico', 'Abogado')),
               psicosocial_asignado_id: String(getVal(row, 'PSICOSOCIAL', 'Psicosocial')),
-              fecha_asignacion: String(getVal(row, 'FECHA ASIGNACIÓN / ASUNCIÓN', 'Fecha de asignación interna')),
+              fecha_asignacion: formatFecha(getVal(row, 'FECHA ASIGNACIÓN / ASUNCIÓN', 'Fecha de asignación interna')),
               estado: 'Activo',
             },
             estado_jep: {
@@ -163,7 +184,7 @@ const ImportadorMasivo = () => {
           const v = victimasMap.get(rawId)!;
           v.representacion.estado = 'Desasignado';
           v.representacion.motivo_desasignacion = String(getVal(row, 'Respuesta', 'Motivo') || 'Sin motivo registrado');
-          v.representacion.fecha_desasignacion = String(getVal(row, 'Fecha correo', 'Fecha'));
+          v.representacion.fecha_desasignacion = formatFecha(getVal(row, 'Fecha correo', 'Fecha'));
           cruzados++;
         }
       }
@@ -225,7 +246,7 @@ const ImportadorMasivo = () => {
           await eventoService.addEvento({
             tipo: tipoEvento,
             tema_titulo: String(temaVal),
-            fecha: new Date(fechaVal).toISOString().split('T')[0] || new Date().toISOString().split('T')[0],
+            fecha: formatFecha(fechaVal) || new Date().toISOString().split('T')[0],
             lugar: String(getVal(row, 'VIRTUAL / PRESENCIAL', 'LUGAR') || 'No especificado'),
             asistentes_total: Number(getVal(row, 'NÚMERO ASISTENTES', 'VÍCTIMAS ASISTENTES') || 0),
             observaciones: String(getVal(row, 'EXPLICACIÓN', 'CONCLUSIONES', 'RESULTADOS') || ''),
@@ -263,7 +284,7 @@ const ImportadorMasivo = () => {
       try {
         await audienciaService.addAudiencia({
           macrocaso: [String(getVal(row, 'CASO', 'Caso') || 'Institucional')],
-          fecha: new Date(fechaVal).toISOString().split('T')[0] || new Date().toISOString().split('T')[0],
+          fecha: formatFecha(fechaVal) || new Date().toISOString().split('T')[0],
           despacho: String(getVal(row, 'SALA', 'SECCIÓN', 'Despacho') || 'SRVR') as DespachoJEP,
           tipo: String(tipoVal) as TipoAudiencia,
           titulo_diligencia: String(getVal(row, 'EXPLICACIÓN', 'Explicacion') || 'Diligencia Judicial'),
@@ -303,7 +324,7 @@ const ImportadorMasivo = () => {
         try {
           await radicadoService.addRadicado({
             numero_radicado: String(getVal(row, 'Radicado', 'TIPO DE DOCUMENTO') || 'Sin Radicado'),
-            fecha_radicado: new Date(fechaVal).toISOString().split('T')[0],
+            fecha_radicado: formatFecha(fechaVal) || new Date().toISOString().split('T')[0],
             asunto: String(getVal(row, 'Asunto', 'EXPLICACIÓN CORTA') || 'Sin asunto'),
             emisor: String(getVal(row, 'ENTIDAD', 'Entidad') || 'IIRESODH') as EmisorRadicado,
             receptor: String(getVal(row, 'Destinatario', 'QUIEN RADICA') || 'JEP / Otra Entidad'),
@@ -331,7 +352,8 @@ const ImportadorMasivo = () => {
 
     try {
       const data = await file.arrayBuffer();
-      const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+      // NO usamos cellDates: true, procesamos el raw date directamente en formatFecha
+      const workbook = XLSX.read(data, { type: 'array' });
 
       await procesarVictimas(workbook);
       await procesarEventos(workbook);
