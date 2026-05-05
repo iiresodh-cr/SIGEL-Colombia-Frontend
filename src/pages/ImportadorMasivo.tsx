@@ -37,7 +37,6 @@ const ImportadorMasivo = () => {
     }
   };
 
-  // FUNCIÓN AUXILIAR 1: Extractor de fechas avanzado
   const formatFechaArray = (val: any): string[] => {
     if (!val) return [new Date().toISOString().split('T')[0]];
 
@@ -76,7 +75,6 @@ const ImportadorMasivo = () => {
     return [new Date().toISOString().split('T')[0]];
   };
 
-  // FUNCIÓN AUXILIAR 2: Búsqueda parcial ultra flexible
   const getVal = (row: any, ...possibleKeys: string[]) => {
     for (const key of Object.keys(row)) {
       const cleanKey = key.trim().toLowerCase();
@@ -87,7 +85,6 @@ const ImportadorMasivo = () => {
     return '';
   };
 
-  // FUNCIÓN AUXILIAR 3: Salta los títulos combinados
   const extractData = (sheet: XLSX.WorkSheet, keywords: string[]) => {
     const rawData: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1 });
     let headerRowIndex = 0;
@@ -112,7 +109,6 @@ const ImportadorMasivo = () => {
     const hojasBase = ['Caso 01', 'Caso 10', 'NUEVA ASIGNACIÓN', 'ANTIGUA ASIGNACIÓN', 'CCC', 'BSUR', 'BOCC', 'BNOR', 'BCAR', 'BORI', 'BMM'];
     let encontroBase = false;
 
-    // Busca las hojas siendo tolerante a mayúsculas y espacios
     const hojasVictimasEncontradas = workbook.SheetNames.filter(s => 
       hojasBase.some(h => s.toLowerCase().includes(h.toLowerCase()))
     );
@@ -360,7 +356,6 @@ const ImportadorMasivo = () => {
     addLog('info', '--- INICIANDO ESCANEO DE RADICADOS ---');
     let radicadosGuardados = 0;
 
-    // AHORA ES INMUNE A MAYÚSCULAS/MINÚSCULAS Y ATRAPARÁ LA HOJA 'DOCUMENTOS'
     const hojasRadicadosEncontradas = workbook.SheetNames.filter(nombre => 
       nombre.toLowerCase().includes('documento') || 
       nombre.toLowerCase().includes('radicado')
@@ -370,17 +365,17 @@ const ImportadorMasivo = () => {
       const sheet = workbook.Sheets[nombreHoja];
       if (!sheet) continue;
 
-      const data: any[] = extractData(sheet, ['radicado', 'asunto', 'entidad', 'documento', 'emisor', 'fecha', 'auto', 'n°']);
-      for (const row of data) {
-        
-        // CORRECCIÓN CRÍTICA: Se eliminó la palabra 'radicado' para que no atrape el N° de Radicado por error
-        const fechaVal = getVal(row, 'FECHA', 'Fecha', 'Date'); 
+      // Buscamos exactamente las palabras reveladas tras quitar el filtro
+      const dataObjects: any[] = extractData(sheet, ['explicación', 'entidad', 'documentos#', 'fecha', 'víctima', 'abogadx']);
+      
+      for (const row of dataObjects) {
+        const fechaVal = getVal(row, 'FECHA', 'Date'); 
         if (!fechaVal) continue;
         
         try {
           const fechas = formatFechaArray(fechaVal);
 
-          let emisorExcel = String(getVal(row, 'ENTIDAD', 'Entidad', 'Emisor') || 'IIRESODH').toUpperCase();
+          let emisorExcel = String(getVal(row, 'ENTIDAD', 'Emisor') || 'IIRESODH').toUpperCase();
           let emisorTraducido: EmisorRadicado = 'Otro';
           
           if (emisorExcel.includes('SRVR')) emisorTraducido = 'JEP (SRVR)';
@@ -391,14 +386,24 @@ const ImportadorMasivo = () => {
           else if (emisorExcel.includes('DEFENSA')) emisorTraducido = 'Defensa';
           else if (emisorExcel.includes('SAAD') || emisorExcel.includes('REPRESENTA') || emisorExcel.includes('VICTIMA')) emisorTraducido = 'Representación de Víctimas';
 
+          // Combina el "Tipo de Documento" con la "Explicación Corta"
+          const tipoDoc = String(getVal(row, 'TIPO DE DOCUMENTO', 'Auto') || '').trim();
+          const expCorta = String(getVal(row, 'EXPLICACIÓN CORTA', 'Asunto') || '').trim();
+          const asuntoFinal = tipoDoc ? `${tipoDoc} - ${expCorta}` : expCorta || 'Sin asunto';
+
+          // Combina Víctimas implicadas con el Abogadx
+          const obsVictimas = String(getVal(row, 'VÍCTIMA', 'Victimas') || '').trim();
+          const obsAbogado = String(getVal(row, 'ABOGADX', 'Responsable') || '').trim();
+          const observacionesFinales = `${obsVictimas} ${obsAbogado ? ` - Abogadx: ${obsAbogado}` : ''}`.trim();
+
           await radicadoService.addRadicado({
-            numero_radicado: String(getVal(row, 'Radicado', 'TIPO DE DOCUMENTO', 'Auto', 'N°') || 'Sin Radicado'),
+            numero_radicado: String(getVal(row, 'DOCUMENTOS#', 'Radicado', 'N°') || 'Sin Radicado'),
             fecha_radicado: fechas[0],
-            asunto: String(getVal(row, 'Asunto', 'EXPLICACIÓN CORTA', 'Detalle') || 'Sin asunto'),
+            asunto: asuntoFinal,
             emisor: emisorTraducido,
-            receptor: String(getVal(row, 'Destinatario', 'QUIEN RADICA', 'Receptor') || 'JEP / Otra Entidad'),
-            macrocaso: [String(getVal(row, 'CASO', 'Caso', 'Macrocaso') || 'Institucional')],
-            observaciones: String(getVal(row, 'VÍCTIMA', 'Victimas', 'Responsable') || ''),
+            receptor: 'JEP / Otra Entidad',
+            macrocaso: [String(getVal(row, 'CASO', 'Macrocaso') || 'Institucional')],
+            observaciones: observacionesFinales,
             creado_por_email: currentUser?.email || 'sistema',
             fecha_creacion: new Date().toISOString()
           });
@@ -406,6 +411,7 @@ const ImportadorMasivo = () => {
         } catch (error) {}
       }
     }
+    
     if (radicadosGuardados > 0) addLog('success', `Se importaron ${radicadosGuardados} Documentos Radicados.`);
     else addLog('warning', 'No se encontraron registros de Radicados válidos en las columnas de este archivo.');
   };
