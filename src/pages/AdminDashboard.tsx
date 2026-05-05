@@ -25,7 +25,6 @@ const AdminDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [showSustitucion, setShowSustitucion] = useState(false);
   
-  // Estados para la supervisión de carga
   const [openCargaModal, setOpenReasignarModal] = useState(false);
   const [victimasCarga, setVictimasCarga] = useState<Victima[]>([]);
   const [loadingCarga, setLoadingCarga] = useState(false);
@@ -81,7 +80,7 @@ const AdminDashboard = () => {
     } catch (error) {
       showModal('Error', 'No se pudo obtener la carga de trabajo.', 'error');
     } finally {
-      setLoadingCarga(false);
+      setLoading(false);
     }
   };
 
@@ -194,7 +193,7 @@ const AdminDashboard = () => {
                   <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
                     <IconButton 
                       color="info" 
-                      title="Ver víctimas asignadas"
+                      title="Ver carga de trabajo"
                       onClick={() => handleVerCarga(u.correo)}
                     >
                       <FolderSharedIcon />
@@ -224,41 +223,66 @@ const AdminDashboard = () => {
         </Table>
       </Paper>
 
-      {/* MODAL PARA SUPERVISIÓN DE CARGA */}
-      <Dialog open={openCargaModal} onClose={() => setOpenReasignarModal(false)} fullWidth maxWidth="sm">
-        <DialogTitle sx={{ fontWeight: 'bold', color: '#003366' }}>
-          Víctimas Asignadas a: {usuarioSupervisado}
+      <Dialog 
+        open={openCargaModal} 
+        onClose={() => setOpenReasignarModal(false)} 
+        fullWidth 
+        maxWidth="sm"
+        scroll="paper"
+      >
+        <DialogTitle sx={{ fontWeight: 'bold', color: '#003366', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Box>
+            <Typography variant="h6" sx={{ fontWeight: 800 }}>Carga de Trabajo</Typography>
+            <Typography variant="caption" color="text.secondary">{usuarioSupervisado}</Typography>
+          </Box>
+          <Chip label={`${victimasCarga.length} víctimas`} color="primary" size="small" />
         </DialogTitle>
-        <DialogContent dividers>
+        
+        <DialogContent dividers sx={{ minHeight: '300px', maxHeight: '450px' }}>
           {loadingCarga ? (
-            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}><CircularProgress /></Box>
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}><CircularProgress /></Box>
           ) : victimasCarga.length === 0 ? (
-            <Typography variant="body2" color="text.secondary" sx={{ py: 2, textAlign: 'center' }}>
-              Este profesional no tiene víctimas asignadas actualmente.
-            </Typography>
+            <Box sx={{ py: 6, textAlign: 'center' }}>
+              <Typography variant="body1" color="text.secondary">No hay casos vinculados a este perfil.</Typography>
+            </Box>
           ) : (
-            <List>
+            <List disablePadding>
               {victimasCarga.map((v) => (
                 <ListItem 
                   key={v.id} 
                   divider
+                  sx={{ py: 1.5 }}
                   secondaryAction={
-                    <IconButton edge="end" onClick={() => navigate(`/victimas/${v.id}`)}>
-                      <VisibilityIcon color="primary" />
-                    </IconButton>
+                    <Button 
+                      size="small" 
+                      variant="outlined" 
+                      onClick={() => navigate(`/victimas/${v.id}`)}
+                      sx={{ fontSize: '0.7rem' }}
+                    >
+                      Ver Detalle
+                    </Button>
                   }
                 >
                   <ListItemText 
                     primary={v.nombre_completo} 
-                    secondary={`ID: ${v.identificacion} | Caso: ${v.representacion.caso.join(', ')}`}
+                    secondary={
+                      <React.Fragment>
+                        <Typography component="span" variant="caption" sx={{ display: 'block' }}>
+                          ID: {v.identificacion}
+                        </Typography>
+                        <Typography component="span" variant="caption" color="primary">
+                          {v.representacion.caso.join(' · ')}
+                        </Typography>
+                      </React.Fragment>
+                    }
                   />
                 </ListItem>
               ))}
             </List>
           )}
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpenReasignarModal(false)}>Cerrar</Button>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setOpenReasignarModal(false)} variant="contained" sx={{ bgcolor: '#003366' }}>Cerrar</Button>
         </DialogActions>
       </Dialog>
     </Box>
