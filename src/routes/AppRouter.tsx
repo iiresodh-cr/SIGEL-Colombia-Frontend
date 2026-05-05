@@ -10,6 +10,7 @@ import AdminDashboard from '../pages/AdminDashboard';
 import Victimas from '../pages/Victimas';
 import VictimaDetalle from '../pages/VictimaDetalle';
 import Eventos from '../pages/Eventos';
+import ImportadorMasivo from '../pages/ImportadorMasivo';
 
 const isAdminApp = import.meta.env.VITE_APP_TYPE === 'ADMIN';
 
@@ -28,17 +29,25 @@ const AppRouter = () => {
               {/* Dashboard común para ambos dominios */}
               <Route path="/dashboard" element={<Dashboard />} />
               
-              {/* Rutas exclusivas del dominio ADMIN */}
+              {/* RUTAS EXCLUSIVAS DEL DOMINIO ADMIN */}
               {isAdminApp && (
-                <Route path="/admin" element={
-                  <RoleGuard allowedRoles={['superadmin', 'admin']}>
-                    <AdminDashboard />
-                  </RoleGuard>
-                } />
+                <>
+                  <Route path="/admin" element={
+                    <RoleGuard allowedRoles={['superadmin', 'admin']}>
+                      <AdminDashboard />
+                    </RoleGuard>
+                  } />
+                  
+                  {/* El importador ahora solo existe en el build de ADMIN */}
+                  <Route path="/importar" element={
+                    <RoleGuard allowedRoles={['superadmin', 'admin']}>
+                      <ImportadorMasivo />
+                    </RoleGuard>
+                  } />
+                </>
               )}
               
-              {/* RUTAS DE VÍCTIMAS: Ahora visibles para AMBOS dominios */}
-              {/* El Admin las necesita para reasignar, el Usuario para trabajar */}
+              {/* RUTAS DE VÍCTIMAS: Visibles para AMBOS dominios */}
               <Route path="/victimas" element={<Victimas />} />
               <Route path="/victimas/:id" element={<VictimaDetalle />} />
               
