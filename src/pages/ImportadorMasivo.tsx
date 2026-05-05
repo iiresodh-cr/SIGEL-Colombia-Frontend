@@ -37,52 +37,54 @@ const ImportadorMasivo = () => {
     }
   };
 
-  // FUNCIÓN AUXILIAR 1: Traductor robusto de fechas (Evita el error 1969)
-  const formatFecha = (val: any) => {
-    // Si viene vacío, asigna la fecha de hoy para no quebrar el sistema
-    if (!val) return new Date().toISOString().split('T')[0];
-    
-    // 1. Si es un número serial nativo de Excel
+  // FUNCIÓN AUXILIAR 1: Extractor de fechas avanzado (Devuelve array para soportar Inicio y Fin)
+  const formatFechaArray = (val: any): string[] => {
+    if (!val) return [new Date().toISOString().split('T')[0]];
+
+    // 1. Si es un número serial de Excel
     if (typeof val === 'number' || (!isNaN(Number(val)) && Number(val) > 20000)) {
       const serial = Number(val);
       const date = new Date((serial - 25569) * 86400 * 1000);
       const localDate = new Date(date.getTime() + date.getTimezoneOffset() * 60000);
-      return localDate.toISOString().split('T')[0];
+      return [localDate.toISOString().split('T')[0]];
     }
 
-    // 2. Si es un texto con barras o guiones (ej. "15/08/2024" o "15-08-24")
     const strVal = String(val).trim();
-    if (strVal.includes('/') || strVal.includes('-')) {
-      const separator = strVal.includes('/') ? '/' : '-';
-      const partes = strVal.split(separator);
+
+    // 2. Extraer TODAS las fechas válidas en la cadena
+    const regex = /(\d{2})[/-](\d{2})[/-](\d{4}|\d{2})/g;
+    let match;
+    const fechasEncontradas: string[] = [];
+
+    while ((match = regex.exec(strVal)) !== null) {
+      const dia = parseInt(match[1], 10);
+      const mes = parseInt(match[2], 10) - 1; // Mes en JS es 0-11
+      let anio = parseInt(match[3], 10);
       
-      // Formato YYYY-MM-DD
-      if (partes[0].length === 4) {
-         const d = new Date(strVal);
-         if(!isNaN(d.getTime())) return d.toISOString().split('T')[0];
-      } 
-      // Formato DD/MM/YYYY (El más común en LatAm)
-      else if (partes.length === 3) {
-        let dia = parseInt(partes[0], 10);
-        let mes = parseInt(partes[1], 10) - 1; // JS cuenta los meses del 0 al 11
-        let anio = parseInt(partes[2], 10);
-        
-        // Si el año es corto (ej. "24"), lo vuelve "2024"
-        if (anio < 100) anio += 2000;
-        
-        const d = new Date(anio, mes, dia);
-        if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
+      if (anio < 100) anio += 2000;
+
+      const d = new Date(anio, mes, dia);
+      if (!isNaN(d.getTime())) {
+        fechasEncontradas.push(d.toISOString().split('T')[0]);
       }
     }
 
-    // 3. Intento final usando el lector estándar de JS
-    const fallbackDate = new Date(strVal);
-    if (!isNaN(fallbackDate.getTime())) {
-      return fallbackDate.toISOString().split('T')[0];
+    // Retorna hasta 2 fechas [fecha_inicio, fecha_fin]
+    if (fechasEncontradas.length > 0) {
+      return fechasEncontradas.slice(0, 2);
     }
 
-    // Si todo falla, no retornamos null. Retornamos hoy para evitar el 1969.
-    return new Date().toISOString().split('T')[0];
+    // 3. Fallback estándar de JS
+    const fallbackDate = new Date(strVal);
+    if (!isNaN(fallbackDate.getTime())) {
+      const iso = fallbackDate.toISOString().split('T')[0];
+      if (!iso.startsWith('1969') && !iso.startsWith('1970')) {
+          return [iso];
+      }
+    }
+
+    // Si todo falla, usar la fecha actual
+    return [new Date().toISOString().split('T')[0]];
   };
 
   // FUNCIÓN AUXILIAR 2: Búsqueda parcial ultra flexible
@@ -132,6 +134,8 @@ const ImportadorMasivo = () => {
         if (!rawId) continue;
 
         if (!victimasMap.has(rawId)) {
+          const fechasAsignacion = formatFechaArray(getVal(row, 'FECHA ASIGNACIÓN / ASUNCIÓN', 'Fecha de asignación interna'));
+
           victimasMap.set(rawId, {
             identificacion: rawId,
             tipo_documento: String(getVal(row, 'TIPO DOCUMENTO') || 'CC'),
@@ -156,7 +160,7 @@ const ImportadorMasivo = () => {
               calidad_victima: String(getVal(row, 'DIRECTA O INDIRECTA', 'Calidad')),
               juridico_asignado_id: String(getVal(row, 'JURÍDICO', 'Juridico', 'Abogado')),
               psicosocial_asignado_id: String(getVal(row, 'PSICOSOCIAL', 'Psicosocial')),
-              fecha_asignacion: formatFecha(getVal(row, 'FECHA ASIGNACIÓN / ASUNCIÓN', 'Fecha de asignación interna')),
+              fecha_asignacion: fechasAsignacion[0],
               estado: 'Activo',
             },
             estado_jep: {
@@ -207,9 +211,10 @@ const ImportadorMasivo = () => {
         const rawId = String(getVal(row, 'Identificación', 'Cedula')).replace(/\D/g, '');
         if (victimasMap.has(rawId)) {
           const v = victimasMap.get(rawId)!;
+          const fechasDesasig = formatFechaArray(getVal(row, 'Fecha correo', 'Fecha'));
           v.representacion.estado = 'Desasignado';
           v.representacion.motivo_desasignacion = String(getVal(row, 'Respuesta', 'Motivo') || 'Sin motivo registrado');
-          v.representacion.fecha_desasignacion = formatFecha(getVal(row, 'Fecha correo', 'Fecha'));
+          v.representacion.fecha_desasignacion = fechasDesasig[0];
           cruzados++;
         }
       }
@@ -268,16 +273,19 @@ const ImportadorMasivo = () => {
           if (nombreHoja === 'Capacitaciones') tipoEvento = 'Capacitación';
           if (nombreHoja === 'Jornadas Divulgación') tipoEvento = 'Jornada de Divulgación';
 
+          const fechas = formatFechaArray(fechaVal);
+
           await eventoService.addEvento({
             tipo: tipoEvento,
             tema_titulo: String(temaVal),
-            fecha: formatFecha(fechaVal),
+            fecha: fechas[0],
+            fecha_fin: fechas[1] || '',
             lugar: String(getVal(row, 'VIRTUAL / PRESENCIAL', 'LUGAR') || 'No especificado'),
             asistentes_total: Number(getVal(row, 'NÚMERO ASISTENTES', 'VÍCTIMAS ASISTENTES') || 0),
             observaciones: String(getVal(row, 'EXPLICACIÓN', 'CONCLUSIONES', 'RESULTADOS') || ''),
             creado_por_email: currentUser?.email || 'sistema',
             fecha_creacion: new Date().toISOString()
-          });
+          } as any);
           eventosGuardados++;
         } catch (error) {}
       }
@@ -307,9 +315,12 @@ const ImportadorMasivo = () => {
       if (!fechaVal || !tipoVal) continue;
       
       try {
+        const fechas = formatFechaArray(fechaVal);
+
         await audienciaService.addAudiencia({
           macrocaso: [String(getVal(row, 'CASO', 'Caso') || 'Institucional')],
-          fecha: formatFecha(fechaVal),
+          fecha: fechas[0],
+          fecha_fin: fechas[1] || '',
           despacho: String(getVal(row, 'SALA', 'SECCIÓN', 'Despacho') || 'SRVR') as DespachoJEP,
           tipo: String(tipoVal) as TipoAudiencia,
           titulo_diligencia: String(getVal(row, 'EXPLICACIÓN', 'Explicacion') || 'Diligencia Judicial'),
@@ -317,7 +328,7 @@ const ImportadorMasivo = () => {
           profesionales_asistentes: String(getVal(row, 'JURÍDICO')) + ' - ' + String(getVal(row, 'PSICOSOCIAL')),
           creado_por_email: currentUser?.email || 'sistema',
           fecha_creacion: new Date().toISOString()
-        });
+        } as any);
         audienciasGuardadas++;
       } catch (error) {}
     }
@@ -347,9 +358,11 @@ const ImportadorMasivo = () => {
         if (!fechaVal) continue;
         
         try {
+          const fechas = formatFechaArray(fechaVal);
+
           await radicadoService.addRadicado({
             numero_radicado: String(getVal(row, 'Radicado', 'TIPO DE DOCUMENTO') || 'Sin Radicado'),
-            fecha_radicado: formatFecha(fechaVal),
+            fecha_radicado: fechas[0],
             asunto: String(getVal(row, 'Asunto', 'EXPLICACIÓN CORTA') || 'Sin asunto'),
             emisor: String(getVal(row, 'ENTIDAD', 'Entidad') || 'IIRESODH') as EmisorRadicado,
             receptor: String(getVal(row, 'Destinatario', 'QUIEN RADICA') || 'JEP / Otra Entidad'),
