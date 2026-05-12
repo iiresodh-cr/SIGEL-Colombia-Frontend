@@ -4,8 +4,6 @@ import LogoutIcon from '@mui/icons-material/Logout';
 import { Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
-const isAdminApp = import.meta.env.VITE_APP_TYPE === 'ADMIN';
-
 const MainLayout = () => {
   const { role, currentUser, logout } = useAuth();
   const navigate = useNavigate();
@@ -16,18 +14,25 @@ const MainLayout = () => {
 
       <AppBar position="static" color="primary" elevation={0}>
         <Toolbar>
+          {/* Ya no evaluamos si es la app de admin, el título es unificado */}
           <Typography variant="h6" color="inherit" sx={{ fontWeight: 700, letterSpacing: '1px', flexGrow: 1 }}>
-            SIGEL {isAdminApp ? 'ADMIN' : ''}
+            SIGEL
           </Typography>
           
           <Button color="inherit" onClick={() => navigate('/dashboard')} sx={{ mr: 2 }}>
             Panel General
           </Button>
 
-          {isAdminApp && (role === 'superadmin' || role === 'admin') && (
-            <Button color="inherit" onClick={() => navigate('/admin')}>
-              Gestión de Usuarios
-            </Button>
+          {/* MÓDULOS DE ADMINISTRACIÓN: Visibles solo si el usuario tiene el rol adecuado */}
+          {(role === 'superadmin' || role === 'admin') && (
+            <>
+              <Button color="inherit" onClick={() => navigate('/admin')}>
+                Gestión de Usuarios
+              </Button>
+              <Button color="inherit" onClick={() => navigate('/importar')}>
+                Importador Masivo
+              </Button>
+            </>
           )}
 
           {/* MÓDULOS HABILITADOS PARA TODOS (Admins, Abogados, Psicosociales) */}

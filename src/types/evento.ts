@@ -10,4 +10,4 @@ export interface Evento {
   observaciones: string;
   creado_por_email: string;
   fecha_creacion: string;
-}
+}   

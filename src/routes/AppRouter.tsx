@@ -14,8 +14,6 @@ import Audiencias from '../pages/Audiencias';
 import ImportadorMasivo from '../pages/ImportadorMasivo';
 import Radicados from '../pages/Radicados';
 
-const isAdminApp = import.meta.env.VITE_APP_TYPE === 'ADMIN';
-
 const AppRouter = () => {
   return (
     <ModalProvider>
@@ -28,28 +26,23 @@ const AppRouter = () => {
             {/* Rutas Protegidas */}
             <Route element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
               
-              {/* Dashboard común para ambos dominios */}
+              {/* Dashboard común */}
               <Route path="/dashboard" element={<Dashboard />} />
               
-              {/* RUTAS EXCLUSIVAS DEL DOMINIO ADMIN */}
-              {isAdminApp && (
-                <>
-                  <Route path="/admin" element={
-                    <RoleGuard allowedRoles={['superadmin', 'admin']}>
-                      <AdminDashboard />
-                    </RoleGuard>
-                  } />
-                  
-                  {/* El importador ahora solo existe en el build de ADMIN */}
-                  <Route path="/importar" element={
-                    <RoleGuard allowedRoles={['superadmin', 'admin']}>
-                      <ImportadorMasivo />
-                    </RoleGuard>
-                  } />
-                </>
-              )}
+              {/* RUTAS DE ADMINISTRACIÓN: Protegidas por rol (superadmin, admin) */}
+              <Route path="/admin" element={
+                <RoleGuard allowedRoles={['superadmin', 'admin']}>
+                  <AdminDashboard />
+                </RoleGuard>
+              } />
               
-              {/* RUTAS COMUNES: Visibles para AMBOS dominios (Admin y Usuarios) */}
+              <Route path="/importar" element={
+                <RoleGuard allowedRoles={['superadmin', 'admin']}>
+                  <ImportadorMasivo />
+                </RoleGuard>
+              } />
+              
+              {/* RUTAS COMUNES: Visibles para todos los usuarios autenticados */}
               <Route path="/victimas" element={<Victimas />} />
               <Route path="/victimas/:id" element={<VictimaDetalle />} />
               <Route path="/eventos" element={<Eventos />} />

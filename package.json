@@ -5,9 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build:admin": "tsc -b && vite build --mode admin --outDir dist-admin",
-    "build:principal": "tsc -b && vite build --mode principal --outDir dist-principal",
-    "build:all": "npm run build:admin && npm run build:principal",
+    "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview"
   },
