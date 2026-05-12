@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { 
-  Box, Typography, Paper, Button, Alert, CircularProgress, 
-  List, ListItem, ListItemText, Chip 
+  Box, Typography, Paper, Button, CircularProgress, 
+  List, ListItem, ListItemText, Chip, Divider 
 } from '@mui/material';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import BuildIcon from '@mui/icons-material/Build';
 import * as XLSX from 'xlsx';
-import { writeBatch, doc, collection } from 'firebase/firestore';
+import { writeBatch, doc, collection, getDocs } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { useAuth } from '../context/AuthContext';
 import { useModal } from '../context/ModalContext';
@@ -13,10 +14,12 @@ import { useModal } from '../context/ModalContext';
 import { eventoService } from '../services/eventoService';
 import { audienciaService } from '../services/audienciaService';
 import { radicadoService } from '../services/radicadoService';
+import { adminService } from '../services/adminService';
 import { TipoEvento } from '../types/evento';
 import { TipoAudiencia, DespachoJEP } from '../types/audiencia';
 import { EmisorRadicado } from '../types/radicado';
 import { Victima } from '../types/jep';
+import { Usuario } from '../types/user';
 
 const ImportadorMasivo = () => {
   const { currentUser } = useAuth();
@@ -24,6 +27,7 @@ const ImportadorMasivo = () => {
   
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
+  const [reparando, setReparando] = useState(false);
   const [logs, setLogs] = useState<{ tipo: 'success' | 'error' | 'info' | 'warning', mensaje: string }[]>([]);
 
   const addLog = (tipo: 'success' | 'error' | 'info' | 'warning', mensaje: string) => {
@@ -35,6 +39,16 @@ const ImportadorMasivo = () => {
       setFile(e.target.files[0]);
       setLogs([{ tipo: 'info', mensaje: `Archivo "${e.target.files[0].name}" cargado y listo para escaneo total.` }]);
     }
+  };
+
+  // Función auxiliar para buscar el correo a partir del nombre en Excel
+  const encontrarUsuarioPorNombre = (nombreBuscado: string, usuarios: Usuario[]) => {
+    if (!nombreBuscado || nombreBuscado.trim() === '') return null;
+    const cleanNombre = nombreBuscado.toLowerCase().trim();
+    return usuarios.find(u => 
+      (u.nombre_completo && u.nombre_completo.toLowerCase().includes(cleanNombre)) || 
+      cleanNombre.includes(u.correo.split('@')[0].toLowerCase())
+    );
   };
 
   const formatFechaArray = (val: any): string[] => {
@@ -102,7 +116,7 @@ const ImportadorMasivo = () => {
   // ==========================================
   // MOTOR 1: VÍCTIMAS Y CRUCE INTELIGENTE
   // ==========================================
-  const procesarVictimas = async (workbook: XLSX.WorkBook) => {
+  const procesarVictimas = async (workbook: XLSX.WorkBook, usuarios: Usuario[]) => {
     addLog('info', '--- INICIANDO ESCANEO DE VÍCTIMAS ---');
     const victimasMap = new Map<string, Victima>();
 
@@ -125,6 +139,13 @@ const ImportadorMasivo = () => {
 
         if (!victimasMap.has(rawId)) {
           const fechasAsignacion = formatFechaArray(getVal(row, 'FECHA ASIGNACIÓN / ASUNCIÓN', 'Fecha de asignación interna'));
+          
+          // CRUCE INTELIGENTE DE NOMBRES A CORREOS
+          const nombreAbogadoExcel = String(getVal(row, 'JURÍDICO', 'Juridico', 'Abogado')).trim();
+          const nombrePsicoExcel = String(getVal(row, 'PSICOSOCIAL', 'Psicosocial')).trim();
+          
+          const abogadoEncontrado = encontrarUsuarioPorNombre(nombreAbogadoExcel, usuarios);
+          const psicoEncontrado = encontrarUsuarioPorNombre(nombrePsicoExcel, usuarios);
 
           victimasMap.set(rawId, {
             identificacion: rawId,
@@ -148,11 +169,17 @@ const ImportadorMasivo = () => {
               caso: nombreHoja.includes('01') ? ['Caso 01'] : (nombreHoja.includes('10') ? ['Caso 10'] : []),
               bloque: [String(getVal(row, 'BLOQUE', 'Bloque'))],
               calidad_victima: String(getVal(row, 'DIRECTA O INDIRECTA', 'Calidad')),
-              juridico_asignado_id: String(getVal(row, 'JURÍDICO', 'Juridico', 'Abogado')),
-              psicosocial_asignado_id: String(getVal(row, 'PSICOSOCIAL', 'Psicosocial')),
+              
+              // Aquí asignamos tanto el ID (correo) como el Nombre para evitar errores en DB
+              juridico_asignado_id: abogadoEncontrado ? abogadoEncontrado.correo : nombreAbogadoExcel,
+              juridico_asignado_nombre: abogadoEncontrado ? (abogadoEncontrado.nombre_completo || nombreAbogadoExcel) : nombreAbogadoExcel,
+              
+              psicosocial_asignado_id: psicoEncontrado ? psicoEncontrado.correo : nombrePsicoExcel,
+              psicosocial_asignado_nombre: psicoEncontrado ? (psicoEncontrado.nombre_completo || nombrePsicoExcel) : nombrePsicoExcel,
+              
               fecha_asignacion: fechasAsignacion[0],
               estado: 'Activo',
-            },
+            } as any,
             estado_jep: {
               estado_acreditacion: String(getVal(row, 'ESTADO ACREDITACIÓN')).includes('Acreditad') ? 'Acreditada' : (String(getVal(row, 'ESTADO ACREDITACIÓN')).includes('No está') ? 'No está acreditada' : 'En trámite (despacho no ha resuelto)'),
               auto_acreditacion: String(getVal(row, 'AUTO DE ACREDITACION', 'AUTO ACREDITACIÓN')),
@@ -365,7 +392,6 @@ const ImportadorMasivo = () => {
       const sheet = workbook.Sheets[nombreHoja];
       if (!sheet) continue;
 
-      // Buscamos exactamente las palabras reveladas tras quitar el filtro
       const dataObjects: any[] = extractData(sheet, ['explicación', 'entidad', 'documentos#', 'fecha', 'víctima', 'abogadx']);
       
       for (const row of dataObjects) {
@@ -386,12 +412,10 @@ const ImportadorMasivo = () => {
           else if (emisorExcel.includes('DEFENSA')) emisorTraducido = 'Defensa';
           else if (emisorExcel.includes('SAAD') || emisorExcel.includes('REPRESENTA') || emisorExcel.includes('VICTIMA')) emisorTraducido = 'Representación de Víctimas';
 
-          // Combina el "Tipo de Documento" con la "Explicación Corta"
           const tipoDoc = String(getVal(row, 'TIPO DE DOCUMENTO', 'Auto') || '').trim();
           const expCorta = String(getVal(row, 'EXPLICACIÓN CORTA', 'Asunto') || '').trim();
           const asuntoFinal = tipoDoc ? `${tipoDoc} - ${expCorta}` : expCorta || 'Sin asunto';
 
-          // Combina Víctimas implicadas con el Abogadx
           const obsVictimas = String(getVal(row, 'VÍCTIMA', 'Victimas') || '').trim();
           const obsAbogado = String(getVal(row, 'ABOGADX', 'Responsable') || '').trim();
           const observacionesFinales = `${obsVictimas} ${obsAbogado ? ` - Abogadx: ${obsAbogado}` : ''}`.trim();
@@ -417,7 +441,78 @@ const ImportadorMasivo = () => {
   };
 
   // ==========================================
-  // DISPARADOR MAESTRO
+  // SCRIPT DE REPARACIÓN DE BASE DE DATOS
+  // ==========================================
+  const handleRepararBD = async () => {
+    showModal('¿Iniciar Reparación?', 'Esta acción escaneará la base de datos para convertir los nombres de abogados en correos electrónicos válidos basándose en los usuarios activos. ¿Deseas continuar?', 'confirm', async () => {
+      setReparando(true);
+      setLogs([]);
+      addLog('info', 'Obteniendo usuarios y víctimas actuales de la base de datos...');
+      try {
+        const usuarios = await adminService.getAllUsers();
+        const snapshot = await getDocs(collection(db, 'victimas'));
+        
+        let reparadas = 0;
+        let batch = writeBatch(db);
+        let count = 0;
+
+        snapshot.forEach(docSnap => {
+          const v = docSnap.data() as any;
+          const rep = v.representacion || {};
+          let necesitaCambio = false;
+          let updates: any = {};
+
+          // Revisar Jurídico
+          if (rep.juridico_asignado_id && !rep.juridico_asignado_id.includes('@')) {
+            const usuarioEncontrado = encontrarUsuarioPorNombre(rep.juridico_asignado_id, usuarios);
+            if (usuarioEncontrado) {
+              updates['representacion.juridico_asignado_id'] = usuarioEncontrado.correo;
+              updates['representacion.juridico_asignado_nombre'] = usuarioEncontrado.nombre_completo || rep.juridico_asignado_id;
+              necesitaCambio = true;
+            }
+          }
+
+          // Revisar Psicosocial
+          if (rep.psicosocial_asignado_id && !rep.psicosocial_asignado_id.includes('@')) {
+            const usuarioEncontrado = encontrarUsuarioPorNombre(rep.psicosocial_asignado_id, usuarios);
+            if (usuarioEncontrado) {
+              updates['representacion.psicosocial_asignado_id'] = usuarioEncontrado.correo;
+              updates['representacion.psicosocial_asignado_nombre'] = usuarioEncontrado.nombre_completo || rep.psicosocial_asignado_id;
+              necesitaCambio = true;
+            }
+          }
+
+          if (necesitaCambio) {
+            batch.update(docSnap.ref, updates);
+            reparadas++;
+            count++;
+            if (count === 490) {
+              batch.commit();
+              batch = writeBatch(db);
+              count = 0;
+            }
+          }
+        });
+
+        if (count > 0) await batch.commit();
+
+        if (reparadas > 0) {
+          addLog('success', `¡REPARACIÓN EXITOSA! Se corrigieron ${reparadas} registros de víctimas.`);
+        } else {
+          addLog('info', 'No se encontraron registros que necesitaran reparación o no hubo coincidencias con los usuarios actuales.');
+        }
+
+      } catch (error) {
+        addLog('error', 'Ocurrió un error al intentar reparar la base de datos.');
+        console.error(error);
+      } finally {
+        setReparando(false);
+      }
+    });
+  };
+
+  // ==========================================
+  // DISPARADOR MAESTRO DE IMPORTACIÓN
   // ==========================================
   const handleImportTotal = async () => {
     if (!file) return;
@@ -426,10 +521,11 @@ const ImportadorMasivo = () => {
     addLog('info', 'Iniciando lectura estructural del archivo Excel...');
 
     try {
+      const usuarios = await adminService.getAllUsers(); // Obtenemos usuarios para el cruce
       const data = await file.arrayBuffer();
       const workbook = XLSX.read(data, { type: 'array' });
 
-      await procesarVictimas(workbook);
+      await procesarVictimas(workbook, usuarios);
       await procesarEventos(workbook);
       await procesarAudiencias(workbook);
       await procesarRadicados(workbook);
@@ -447,7 +543,18 @@ const ImportadorMasivo = () => {
 
   return (
     <Box sx={{ p: 4 }}>
-      <Typography variant="h4" sx={{ fontWeight: 800, color: '#003366', mb: 1 }}>Carga Estructural de Matrices</Typography>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+        <Typography variant="h4" sx={{ fontWeight: 800, color: '#003366' }}>Carga Estructural de Matrices</Typography>
+        <Button 
+          variant="outlined" 
+          color="warning" 
+          startIcon={<BuildIcon />}
+          disabled={reparando || loading}
+          onClick={handleRepararBD}
+        >
+          {reparando ? 'Reparando...' : 'Reparar Asignaciones en BD'}
+        </Button>
+      </Box>
       <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
         Sube cualquiera de tus archivos (Insumos Consolidados o Matriz de Seguimiento). El sistema escaneará todas las hojas automáticamente y distribuirá la información a los módulos correspondientes.
       </Typography>
@@ -469,7 +576,7 @@ const ImportadorMasivo = () => {
           color="success" 
           size="large" 
           fullWidth 
-          disabled={!file || loading} 
+          disabled={!file || loading || reparando} 
           onClick={handleImportTotal}
           sx={{ py: 1.5, fontSize: '1.1rem', fontWeight: 'bold' }}
         >
