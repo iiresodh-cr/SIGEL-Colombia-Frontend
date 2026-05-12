@@ -30,17 +30,12 @@ const Victimas = () => {
     if (!currentUser?.email) return;
     try {
       setLoading(true);
-      const isAltRole = role === 'admin' || role === 'superadmin';
       
-      let data;
-      if (isAltRole) {
-        data = await jepService.getVictimas();
-      } else {
-        const rolTipo = role === 'psicosocial' ? 'psicosocial' : 'abogado';
-        data = await jepService.getVictimasAsignadas(currentUser.email, rolTipo);
-      }
-
+      // AHORA TODOS CARGAN TODAS LAS VÍCTIMAS PARA PODER BUSCAR GLOBALMENTE
+      // El dashboard seguirá mostrando solo las asignadas por su propia lógica
+      const data = await jepService.getVictimas();
       const profs = await adminService.getProfesionales();
+      
       setVictimas(data);
       setProfesionales(profs);
     } catch (error) {
