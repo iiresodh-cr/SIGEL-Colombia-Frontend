@@ -2,12 +2,13 @@ import React, { useEffect, useState } from 'react';
 import { 
   Box, Typography, Divider, Paper, Table, TableBody, TableCell, TableHead, 
   TableRow, Select, MenuItem, Button, CircularProgress, IconButton, Chip, Grid,
-  Dialog, DialogTitle, DialogContent, DialogActions, List, ListItem, ListItemText
+  Dialog, DialogTitle, DialogContent, DialogActions, List, ListItem, ListItemText, TextField, InputAdornment
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import FolderSharedIcon from '@mui/icons-material/FolderShared';
+import SearchIcon from '@mui/icons-material/Search';
 import { useNavigate } from 'react-router-dom';
 import { adminService } from '../services/adminService';
 import { AdminStats } from '../components/AdminStats';
@@ -20,6 +21,7 @@ import { Victima } from '../types/jep';
 
 const AdminDashboard = () => {
   const [users, setUsers] = useState<Usuario[]>([]);
+  const [userSearch, setUserSearch] = useState(''); // Estado para el buscador de abogados
   const [ultimasVictimas, setUltimasVictimas] = useState<Victima[]>([]);
   const [stats, setStats] = useState({ totalVictimas: 0, totalCaso01: 0, totalCaso10: 0 });
   const [loading, setLoading] = useState(true);
@@ -102,6 +104,12 @@ const AdminDashboard = () => {
     });
   };
 
+  // Filtrado de usuarios según el buscador
+  const filteredUsers = users.filter(u => 
+    u.correo.toLowerCase().includes(userSearch.toLowerCase()) ||
+    u.rol.toLowerCase().includes(userSearch.toLowerCase())
+  );
+
   if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', mt: 10 }}><CircularProgress /></Box>;
 
   return (
@@ -177,6 +185,26 @@ const AdminDashboard = () => {
 
       <Divider sx={{ my: 6 }}><Typography variant="overline" sx={{ px: 2 }}>Personal Autorizado y Control de Cargas</Typography></Divider>
       
+      {/* BUSCADOR DE PROFESIONALES */}
+      <Paper elevation={0} sx={{ p: 2, mb: 3, borderRadius: 3, border: '1px solid #e2e8f0' }}>
+        <TextField 
+          fullWidth 
+          size="small"
+          placeholder="Buscar profesional por correo o rol..." 
+          value={userSearch}
+          onChange={(e) => setUserSearch(e.target.value)}
+          slotProps={{
+            input: {
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon color="action" />
+                </InputAdornment>
+              ),
+            },
+          }}
+        />
+      </Paper>
+
       <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid #e2e8f0' }}>
         <Table>
           <TableHead sx={{ bgcolor: '#f8fafc' }}>
@@ -187,12 +215,13 @@ const AdminDashboard = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {users.map((u) => (
+            {filteredUsers.map((u) => (
               <TableRow key={u.uid} hover>
                 <TableCell>{u.correo}</TableCell>
                 <TableCell><Chip label={u.rol} size="small" /></TableCell>
                 <TableCell align="right">
                   <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
+                    {/* BOTÓN PARA VER CARGA DE TRABAJO */}
                     <IconButton 
                       color="info" 
                       title="Ver carga de trabajo"
@@ -207,7 +236,7 @@ const AdminDashboard = () => {
                           size="small" 
                           value={u.rol} 
                           onChange={(e) => handleRoleChange(u.correo, e.target.value)} 
-                          sx={{ minWidth: 175, textAlign: 'left' }} // FIX: Ancho fijo para alineación perfecta
+                          sx={{ minWidth: 175, textAlign: 'left' }}
                         >
                           <MenuItem value="admin">Administrador/a</MenuItem>
                           <MenuItem value="abogado">Abogado/a</MenuItem>
@@ -227,6 +256,7 @@ const AdminDashboard = () => {
         </Table>
       </Paper>
 
+      {/* MODAL DE CARGA DE TRABAJO */}
       <Dialog 
         open={openCargaModal} 
         onClose={() => setOpenCargaModal(false)} 
