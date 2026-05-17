@@ -9,6 +9,7 @@ interface UserManagementProps {
 
 export const UserManagement = ({ onUserAdded }: UserManagementProps) => {
   const [email, setEmail] = useState('');
+  const [nombre, setNombre] = useState('');
   const [role, setRole] = useState('abogado'); // Definido en minúscula según tipado estricto
   const { showModal } = useModal();
 
@@ -28,9 +29,10 @@ export const UserManagement = ({ onUserAdded }: UserManagementProps) => {
     }
 
     try {
-      await adminService.invitarUsuario(cleanEmail, role);
-      showModal('Autorización Exitosa', `El usuario ${cleanEmail} ha sido pre-autorizado correctamente.`, 'success');
+      await adminService.invitarUsuario(cleanEmail, role, nombre.trim());
+      showModal('Autorización Exitosa', `El usuario ${nombre || cleanEmail} ha sido pre-autorizado correctamente.`, 'success');
       setEmail('');
+      setNombre('');
       onUserAdded();
     } catch (error) {
       console.error("Error al autorizar usuario:", error);
@@ -45,6 +47,17 @@ export const UserManagement = ({ onUserAdded }: UserManagementProps) => {
       </Typography>
       <Box component="form" onSubmit={handleAddUser}>
         <Grid container spacing={2}>
+          {/* CORRECCIÓN: Se restauró a "size={{ xs: 12 }}" en todos los Grid */}
+          <Grid size={{ xs: 12 }}>
+            <TextField 
+              fullWidth 
+              label="Nombre Completo" 
+              placeholder="Ej. Andrea Solano"
+              value={nombre} 
+              onChange={(e) => setNombre(e.target.value)} 
+              required 
+            />
+          </Grid>
           <Grid size={{ xs: 12 }}>
             <TextField 
               fullWidth 

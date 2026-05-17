@@ -21,7 +21,7 @@ import { Victima } from '../types/jep';
 
 const AdminDashboard = () => {
   const [users, setUsers] = useState<Usuario[]>([]);
-  const [userSearch, setUserSearch] = useState(''); // Estado para el buscador de abogados
+  const [userSearch, setUserSearch] = useState('');
   const [ultimasVictimas, setUltimasVictimas] = useState<Victima[]>([]);
   const [stats, setStats] = useState({ totalVictimas: 0, totalCaso01: 0, totalCaso10: 0 });
   const [loading, setLoading] = useState(true);
@@ -72,19 +72,20 @@ const AdminDashboard = () => {
     }
   };
 
-  const handleVerCarga = async (email: string) => {
-    setUsuarioSupervisado(email);
-    setVictimasCarga([]); // Limpiar carga anterior
+  const handleVerCarga = async (user: Usuario) => {
+    const displayName = user.nombre_completo ? `${user.nombre_completo} (${user.correo})` : user.correo;
+    setUsuarioSupervisado(displayName);
+    setVictimasCarga([]);
     setOpenCargaModal(true);
     setLoadingCarga(true);
     try {
-      const data = await adminService.getVictimasPorProfesional(email);
+      const data = await adminService.getVictimasPorProfesional(user);
       setVictimasCarga(data);
     } catch (error) {
       console.error(error);
       showModal('Error', 'No se pudo obtener la carga de trabajo.', 'error');
     } finally {
-      setLoadingCarga(false); // Apagar el spinner siempre
+      setLoadingCarga(false);
     }
   };
 
@@ -104,10 +105,10 @@ const AdminDashboard = () => {
     });
   };
 
-  // Filtrado de usuarios según el buscador
   const filteredUsers = users.filter(u => 
     u.correo.toLowerCase().includes(userSearch.toLowerCase()) ||
-    u.rol.toLowerCase().includes(userSearch.toLowerCase())
+    u.rol.toLowerCase().includes(userSearch.toLowerCase()) ||
+    (u.nombre_completo && u.nombre_completo.toLowerCase().includes(userSearch.toLowerCase()))
   );
 
   if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', mt: 10 }}><CircularProgress /></Box>;
@@ -185,12 +186,11 @@ const AdminDashboard = () => {
 
       <Divider sx={{ my: 6 }}><Typography variant="overline" sx={{ px: 2 }}>Personal Autorizado y Control de Cargas</Typography></Divider>
       
-      {/* BUSCADOR DE PROFESIONALES */}
       <Paper elevation={0} sx={{ p: 2, mb: 3, borderRadius: 3, border: '1px solid #e2e8f0' }}>
         <TextField 
           fullWidth 
           size="small"
-          placeholder="Buscar profesional por correo o rol..." 
+          placeholder="Buscar profesional por nombre, correo o rol..." 
           value={userSearch}
           onChange={(e) => setUserSearch(e.target.value)}
           slotProps={{
@@ -209,6 +209,7 @@ const AdminDashboard = () => {
         <Table>
           <TableHead sx={{ bgcolor: '#f8fafc' }}>
             <TableRow>
+              <TableCell sx={{ fontWeight: 'bold' }}>Nombre Completo</TableCell>
               <TableCell sx={{ fontWeight: 'bold' }}>Email Institucional</TableCell>
               <TableCell sx={{ fontWeight: 'bold' }}>Rol Actual</TableCell>
               <TableCell align="right" sx={{ fontWeight: 'bold' }}>Acciones</TableCell>
@@ -217,15 +218,21 @@ const AdminDashboard = () => {
           <TableBody>
             {filteredUsers.map((u) => (
               <TableRow key={u.uid} hover>
+                <TableCell>
+                  {u.nombre_completo ? (
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>{u.nombre_completo}</Typography>
+                  ) : (
+                    <Typography variant="body2" color="text.secondary"><i>Sin nombre registrado</i></Typography>
+                  )}
+                </TableCell>
                 <TableCell>{u.correo}</TableCell>
                 <TableCell><Chip label={u.rol} size="small" /></TableCell>
                 <TableCell align="right">
                   <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
-                    {/* BOTÓN PARA VER CARGA DE TRABAJO */}
                     <IconButton 
                       color="info" 
                       title="Ver carga de trabajo"
-                      onClick={() => handleVerCarga(u.correo)}
+                      onClick={() => handleVerCarga(u)}
                     >
                       <FolderSharedIcon />
                     </IconButton>
@@ -256,7 +263,6 @@ const AdminDashboard = () => {
         </Table>
       </Paper>
 
-      {/* MODAL DE CARGA DE TRABAJO */}
       <Dialog 
         open={openCargaModal} 
         onClose={() => setOpenCargaModal(false)} 

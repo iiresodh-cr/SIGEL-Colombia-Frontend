@@ -34,11 +34,12 @@ export const adminService = {
   },
 
   // 4. Pre-autorizar un nuevo correo institucional
-  invitarUsuario: async (email: string, role: string) => {
+  invitarUsuario: async (email: string, role: string, nombre: string = '') => {
     const userRef = doc(db, 'usuarios', email.toLowerCase());
     const nuevoUsuario: Partial<Usuario> = {
       correo: email.toLowerCase(),
       rol: role.toLowerCase() as RolUsuario,
+      nombre_completo: nombre,
       estado: 'Activo',
       fecha_creacion: new Date().toISOString()
     };
@@ -148,27 +149,31 @@ export const adminService = {
   },
 
   // 9. OBTENER VÍCTIMAS POR PROFESIONAL (Versión de alto rendimiento y compatibilidad)
-  getVictimasPorProfesional: async (email: string) => {
+  getVictimasPorProfesional: async (usuario: Usuario) => {
     const victimasRef = collection(db, 'victimas');
+    const username = usuario.correo.split('@')[0];
     
-    // Ejecutamos dos consultas en paralelo para máxima velocidad y evitar errores de índices 'OR'
-    const [qJuridico, qPsico] = await Promise.all([
-      getDocs(query(victimasRef, where('representacion.juridico_asignado_id', '==', email))),
-      getDocs(query(victimasRef, where('representacion.psicosocial_asignado_id', '==', email)))
-    ]);
+    // Ejecutamos consultas en paralelo para máxima velocidad y evitar errores de índices 'OR'
+    const queries = [
+      getDocs(query(victimasRef, where('representacion.juridico_asignado_id', '==', usuario.correo))),
+      getDocs(query(victimasRef, where('representacion.psicosocial_asignado_id', '==', usuario.correo))),
+      getDocs(query(victimasRef, where('representacion.juridico_asignado_id', '==', usuario.uid))),
+      getDocs(query(victimasRef, where('representacion.psicosocial_asignado_id', '==', usuario.uid))),
+      getDocs(query(victimasRef, where('representacion.juridico_asignado_id', '==', username))),
+      getDocs(query(victimasRef, where('representacion.psicosocial_asignado_id', '==', username)))
+    ];
 
-    const resultados = new Map();
+    const resultados = await Promise.all(queries);
+    const map = new Map();
 
-    qJuridico.forEach(doc => {
-      resultados.set(doc.id, { id: doc.id, ...doc.data() } as Victima);
+    resultados.forEach(snapshot => {
+      snapshot.forEach(doc => {
+        if (!map.has(doc.id)) {
+          map.set(doc.id, { id: doc.id, ...doc.data() } as Victima);
+        }
+      });
     });
 
-    qPsico.forEach(doc => {
-      if (!resultados.has(doc.id)) {
-        resultados.set(doc.id, { id: doc.id, ...doc.data() } as Victima);
-      }
-    });
-
-    return Array.from(resultados.values());
+    return Array.from(map.values());
   }
 };
