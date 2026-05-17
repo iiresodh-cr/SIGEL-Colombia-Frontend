@@ -30,12 +30,18 @@ const Victimas = () => {
     if (!currentUser?.email) return;
     try {
       setLoading(true);
+      const isAltRole = role === 'admin' || role === 'superadmin';
       
-      // AHORA TODOS CARGAN TODAS LAS VÍCTIMAS PARA PODER BUSCAR GLOBALMENTE
-      // El dashboard seguirá mostrando solo las asignadas por su propia lógica
-      const data = await jepService.getVictimas();
+      let data;
+      if (isAltRole) {
+        data = await jepService.getVictimas();
+      } else {
+        const rolTipo = role === 'psicosocial' ? 'psicosocial' : 'abogado';
+        // Ahora pasamos el objeto currentUser completo para cruzar ID, correo y username
+        data = await jepService.getVictimasAsignadas(currentUser, rolTipo);
+      }
+
       const profs = await adminService.getProfesionales();
-      
       setVictimas(data);
       setProfesionales(profs);
     } catch (error) {
@@ -58,6 +64,28 @@ const Victimas = () => {
     } catch (error) {
       showModal('Error', 'No se pudo registrar la víctima.', 'error');
     }
+  };
+
+  // Función relacional: cruza el ID guardado en la víctima con la base de datos de usuarios
+  const getResponsableUI = (v: Victima) => {
+    const asignadoId = v.representacion?.juridico_asignado_id || v.representacion?.psicosocial_asignado_id;
+    if (!asignadoId) {
+      return <Typography variant="caption" color="text.secondary">Sin asignar</Typography>;
+    }
+
+    const prof = profesionales.abogados.find(p => p.correo === asignadoId || p.uid === asignadoId || p.correo.split('@')[0] === asignadoId) || 
+                 profesionales.psicosociales.find(p => p.correo === asignadoId || p.uid === asignadoId || p.correo.split('@')[0] === asignadoId);
+
+    if (prof) {
+      return (
+        <Box>
+          <Typography variant="body2" sx={{ fontWeight: 600 }}>{prof.nombre_completo || 'Sin nombre'}</Typography>
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>{prof.correo}</Typography>
+        </Box>
+      );
+    }
+
+    return <Typography variant="caption" color="text.secondary">{asignadoId}</Typography>;
   };
 
   const filtered = victimas.filter(v => 
@@ -120,6 +148,8 @@ const Victimas = () => {
                 <TableRow>
                   <TableCell sx={{ fontWeight: 600, color: 'text.secondary' }}>Víctima</TableCell>
                   <TableCell sx={{ fontWeight: 600, color: 'text.secondary' }}>Identificación</TableCell>
+                  {/* NUEVA COLUMNA RESPONSABLE */}
+                  <TableCell sx={{ fontWeight: 600, color: 'text.secondary' }}>Responsable (Abogado/Psicosocial)</TableCell>
                   <TableCell sx={{ fontWeight: 600, color: 'text.secondary' }}>Macrocaso</TableCell>
                   <TableCell sx={{ fontWeight: 600, color: 'text.secondary' }}>Estado JEP</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 600, color: 'text.secondary' }}>Acciones</TableCell>
@@ -130,6 +160,8 @@ const Victimas = () => {
                   <TableRow key={v.id} hover>
                     <TableCell sx={{ fontWeight: 600 }}>{v.nombre_completo}</TableCell>
                     <TableCell>{v.identificacion}</TableCell>
+                    {/* IMPRESIÓN DEL NOMBRE Y CORREO DEL RESPONSABLE */}
+                    <TableCell>{getResponsableUI(v)}</TableCell>
                     <TableCell>
                       {v.representacion.caso.map((c: string) => <Chip key={c} label={c} size="small" sx={{ mr: 0.5 }} />)}
                     </TableCell>
