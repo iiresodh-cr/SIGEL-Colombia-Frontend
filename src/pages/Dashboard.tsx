@@ -32,7 +32,7 @@ const Dashboard = () => {
   const isAdmin = role === 'admin' || role === 'superadmin';
 
   const loadData = async () => {
-    if (!currentUser?.email) return;
+    if (!currentUser) return;
     try {
       setLoading(true);
       
@@ -49,7 +49,6 @@ const Dashboard = () => {
           total: globalStats.totalVictimas,
           caso01: globalStats.totalCaso01,
           caso10: globalStats.totalCaso10,
-          // Corrección: Ahora se calcula dinámicamente filtrando el estado
           acreditadas: victimasData.filter(v => v.estado_jep?.estado_acreditacion === 'Acreditada').length 
         });
 
@@ -58,12 +57,15 @@ const Dashboard = () => {
 
       } else {
         const rolBusqueda = role === 'psicosocial' ? 'psicosocial' : 'abogado';
-        const data = await jepService.getVictimasAsignadas(currentUser.email, rolBusqueda);
+        
+        // CORRECCIÓN 1: Pasamos el objeto currentUser completo, NO solo el email, 
+        // para que jepService pueda buscar por UID, username y correo a la vez.
+        const data = await jepService.getVictimasAsignadas(currentUser, rolBusqueda);
         
         setStats({
           total: data.length,
-          caso01: data.filter(v => v.representacion.caso.includes('Caso 01')).length,
-          caso10: data.filter(v => v.representacion.caso.includes('Caso 10')).length,
+          caso01: data.filter(v => v.representacion?.caso?.includes('Caso 01')).length,
+          caso10: data.filter(v => v.representacion?.caso?.includes('Caso 10')).length,
           acreditadas: data.filter(v => v.estado_jep?.estado_acreditacion === 'Acreditada').length
         });
         setVictimasList(data);
@@ -79,9 +81,17 @@ const Dashboard = () => {
     loadData();
   }, [currentUser, role, isAdmin]);
 
+  // CORRECCIÓN 2: Función robusta para cruzar IDs idéntica a la que hicimos en Victimas.tsx
   const getNombreProfesional = (id: string) => {
     if (!id || id === "") return 'Sin asignar';
-    const prof = profesionales.find(u => u.uid.toLowerCase() === id.toLowerCase());
+    const cleanId = id.toLowerCase();
+    
+    const prof = profesionales.find(u => 
+      u.correo.toLowerCase() === cleanId || 
+      u.uid === id || 
+      u.correo.split('@')[0].toLowerCase() === cleanId
+    );
+    
     return prof ? (prof.nombre_completo || prof.correo) : id;
   };
 
@@ -105,7 +115,7 @@ const Dashboard = () => {
         </Typography>
       </Box>
 
-      {/* TARJETAS DE ESTADÍSTICAS CORREGIDAS (Diseño Institucional) */}
+      {/* TARJETAS DE ESTADÍSTICAS */}
       <Grid container spacing={3} sx={{ mb: 6 }}>
         <Grid size={{ xs: 12, md: 4 }}>
           <Paper elevation={0} sx={{ p: 3, display: 'flex', alignItems: 'center', border: '1px solid', borderColor: 'divider' }}>
@@ -187,12 +197,12 @@ const Dashboard = () => {
                     </TableCell>
                     <TableCell>
                       {isAdmin ? (
-                        <Chip label={getNombreProfesional(v.representacion.juridico_asignado_id)} size="small" variant="outlined" />
+                        <Chip label={getNombreProfesional(v.representacion?.juridico_asignado_id)} size="small" variant="outlined" />
                       ) : (
                         <Chip 
-                          label={v.estado_jep.estado_acreditacion} 
+                          label={v.estado_jep?.estado_acreditacion || 'No está acreditada'} 
                           size="small" 
-                          color={v.estado_jep.estado_acreditacion === 'Acreditada' ? 'primary' : 'default'}
+                          color={v.estado_jep?.estado_acreditacion === 'Acreditada' ? 'primary' : 'default'}
                           variant="outlined" 
                         />
                       )}
