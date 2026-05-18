@@ -43,26 +43,37 @@ const Dashboard = () => {
   const invocarCopiloto = async (total: number, pendientes: number, eventos: Evento[], nombreUsuario: string, rolUsuario: string) => {
     setLoadingAi(true);
     try {
+      // 1. Obtenemos el Carnet Criptográfico de Firebase
+      const token = await currentUser?.getIdToken();
+
       const payload = {
-        rol: isAdmin ? 'administrador' : rolUsuario,
-        nombre_profesional: nombreUsuario || 'Profesional',
-        total_victimas: total,
-        pendientes_acreditacion: pendientes,
-        eventos_semana: eventos.map(e => e.titulo)
+        rol: String(isAdmin ? 'administrador' : (rolUsuario || 'usuario')),
+        nombre_profesional: String(nombreUsuario || 'Profesional'),
+        total_victimas: Number(total || 0),
+        pendientes_acreditacion: Number(pendientes || 0),
+        eventos_semana: Array.isArray(eventos) ? eventos.map(e => String(e.titulo || 'Evento')) : []
       };
 
-      // Si no encuentra la variable de entorno, usa localhost para desarrollo
-      const apiUrl = import.meta.env.VITE_COPILOTO_API_URL || 'http://localhost:8080/api/copiloto/analizar';
+      let apiUrl = import.meta.env.VITE_COPILOTO_API_URL || 'http://localhost:8080/api/copiloto/analizar';
+      if (apiUrl.endsWith('/')) {
+        apiUrl = apiUrl.slice(0, -1);
+      }
 
+      // 2. Enviamos la petición CON el carnet de seguridad en los Headers
       const response = await fetch(apiUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}` 
+        },
         body: JSON.stringify(payload)
       });
 
       if (response.ok) {
         const data = await response.json();
         setSugerenciaAi(data.sugerencia);
+      } else if (response.status === 401 || response.status === 403) {
+        setSugerenciaAi("Acceso de IA denegado. Permisos insuficientes.");
       } else {
         setSugerenciaAi("El sistema de IA está fuera de línea por mantenimiento temporal.");
       }
