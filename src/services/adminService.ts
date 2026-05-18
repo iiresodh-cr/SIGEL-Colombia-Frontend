@@ -53,9 +53,10 @@ export const adminService = {
     
     return {
       totalVictimas: allVictimas.length,
-      totalCaso01: allVictimas.filter(v => v.representacion.caso.includes('Caso 01')).length,
-      totalCaso10: allVictimas.filter(v => v.representacion.caso.includes('Caso 10')).length,
-      ultimasVictimas: allVictimas.sort((a, b) => b.fecha_registro.localeCompare(a.fecha_registro)).slice(0, 5)
+      totalCaso01: allVictimas.filter(v => v.representacion?.caso?.includes('Caso 01')).length,
+      totalCaso10: allVictimas.filter(v => v.representacion?.caso?.includes('Caso 10')).length,
+      ultimasVictimas: [...allVictimas].sort((a, b) => b.fecha_registro.localeCompare(a.fecha_registro)).slice(0, 5),
+      allVictimas // CORRECCIÓN: Exportamos la lista completa para cruzar datos en el Dashboard
     };
   },
 
@@ -148,12 +149,11 @@ export const adminService = {
     });
   },
 
-  // 9. OBTENER VÍCTIMAS POR PROFESIONAL (Versión de alto rendimiento y compatibilidad)
+  // 9. OBTENER VÍCTIMAS POR PROFESIONAL
   getVictimasPorProfesional: async (usuario: Usuario) => {
     const victimasRef = collection(db, 'victimas');
     const username = usuario.correo.split('@')[0];
     
-    // Ejecutamos consultas en paralelo para máxima velocidad y evitar errores de índices 'OR'
     const queries = [
       getDocs(query(victimasRef, where('representacion.juridico_asignado_id', '==', usuario.correo))),
       getDocs(query(victimasRef, where('representacion.psicosocial_asignado_id', '==', usuario.correo))),

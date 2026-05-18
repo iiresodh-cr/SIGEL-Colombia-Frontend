@@ -14,6 +14,7 @@ import { adminService } from '../services/adminService';
 import { AdminStats } from '../components/AdminStats';
 import { UserManagement } from '../components/UserManagement';
 import { SustitucionMasiva } from '../components/SustitucionMasiva';
+import { MigracionLegacy } from '../components/MigracionLegacy';
 import { useModal } from '../context/ModalContext';
 import { useAuth } from '../context/AuthContext';
 import { Usuario } from '../types/user';
@@ -23,13 +24,13 @@ const AdminDashboard = () => {
   const [users, setUsers] = useState<Usuario[]>([]);
   const [userSearch, setUserSearch] = useState('');
   const [ultimasVictimas, setUltimasVictimas] = useState<Victima[]>([]);
+  const [allVictimas, setAllVictimas] = useState<Victima[]>([]);
   const [stats, setStats] = useState({ totalVictimas: 0, totalCaso01: 0, totalCaso10: 0 });
   const [loading, setLoading] = useState(true);
   const [showSustitucion, setShowSustitucion] = useState(false);
   
   const [openCargaModal, setOpenCargaModal] = useState(false);
   const [victimasCarga, setVictimasCarga] = useState<Victima[]>([]);
-  const [loadingCarga, setLoadingCarga] = useState(false);
   const [usuarioSupervisado, setUsuarioSupervisado] = useState('');
 
   const navigate = useNavigate();
@@ -46,6 +47,7 @@ const AdminDashboard = () => {
       
       setUsers(userList);
       setUltimasVictimas(statsData.ultimasVictimas);
+      setAllVictimas(statsData.allVictimas || []);
       setStats({
         totalVictimas: statsData.totalVictimas,
         totalCaso01: statsData.totalCaso01,
@@ -72,21 +74,28 @@ const AdminDashboard = () => {
     }
   };
 
-  const handleVerCarga = async (user: Usuario) => {
+  const getVictimasByUsuario = (user: Usuario) => {
+    const email = user.correo.toLowerCase().trim();
+    const username = email.split('@')[0];
+    const uid = user.uid;
+
+    return allVictimas.filter(v => {
+      if (v.representacion?.estado !== 'Activo') return false;
+      
+      const jurId = v.representacion?.juridico_asignado_id?.toLowerCase()?.trim();
+      const psiId = v.representacion?.psicosocial_asignado_id?.toLowerCase()?.trim();
+
+      return jurId === email || jurId === uid || jurId === username ||
+             psiId === email || psiId === uid || psiId === username;
+    });
+  };
+
+  const handleVerCarga = (user: Usuario) => {
     const displayName = user.nombre_completo ? `${user.nombre_completo} (${user.correo})` : user.correo;
     setUsuarioSupervisado(displayName);
-    setVictimasCarga([]);
+    const data = getVictimasByUsuario(user);
+    setVictimasCarga(data);
     setOpenCargaModal(true);
-    setLoadingCarga(true);
-    try {
-      const data = await adminService.getVictimasPorProfesional(user);
-      setVictimasCarga(data);
-    } catch (error) {
-      console.error(error);
-      showModal('Error', 'No se pudo obtener la carga de trabajo.', 'error');
-    } finally {
-      setLoadingCarga(false);
-    }
   };
 
   const handleDeleteUser = (email: string) => {
@@ -126,6 +135,8 @@ const AdminDashboard = () => {
           {showSustitucion ? 'Cerrar Sustituciones' : 'Sustitución Masiva de Casos'}
         </Button>
       </Box>
+
+      <MigracionLegacy />
 
       {showSustitucion ? (
         <SustitucionMasiva 
@@ -212,53 +223,66 @@ const AdminDashboard = () => {
               <TableCell sx={{ fontWeight: 'bold' }}>Nombre Completo</TableCell>
               <TableCell sx={{ fontWeight: 'bold' }}>Email Institucional</TableCell>
               <TableCell sx={{ fontWeight: 'bold' }}>Rol Actual</TableCell>
+              <TableCell sx={{ fontWeight: 'bold' }}>Carga de Trabajo</TableCell>
               <TableCell align="right" sx={{ fontWeight: 'bold' }}>Acciones</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
-            {filteredUsers.map((u) => (
-              <TableRow key={u.uid} hover>
-                <TableCell>
-                  {u.nombre_completo ? (
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>{u.nombre_completo}</Typography>
-                  ) : (
-                    <Typography variant="body2" color="text.secondary"><i>Sin nombre registrado</i></Typography>
-                  )}
-                </TableCell>
-                <TableCell>{u.correo}</TableCell>
-                <TableCell><Chip label={u.rol} size="small" /></TableCell>
-                <TableCell align="right">
-                  <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
-                    <IconButton 
-                      color="info" 
-                      title="Ver carga de trabajo"
-                      onClick={() => handleVerCarga(u)}
-                    >
-                      <FolderSharedIcon />
-                    </IconButton>
-
-                    {u.correo !== 'webmaster@iiresodh.org' && (
-                      <>
-                        <Select 
-                          size="small" 
-                          value={u.rol} 
-                          onChange={(e) => handleRoleChange(u.correo, e.target.value)} 
-                          sx={{ minWidth: 175, textAlign: 'left' }}
-                        >
-                          <MenuItem value="admin">Administrador/a</MenuItem>
-                          <MenuItem value="abogado">Abogado/a</MenuItem>
-                          <MenuItem value="psicosocial">Psicosocial</MenuItem>
-                          <MenuItem value="lector">Lector (Solo Lectura)</MenuItem>
-                        </Select>
-                        <IconButton color="error" onClick={() => handleDeleteUser(u.correo)}>
-                          <DeleteIcon />
-                        </IconButton>
-                      </>
+            {filteredUsers.map((u) => {
+              const victimasAsignadas = getVictimasByUsuario(u);
+              return (
+                <TableRow key={u.uid} hover>
+                  <TableCell>
+                    {u.nombre_completo ? (
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>{u.nombre_completo}</Typography>
+                    ) : (
+                      <Typography variant="body2" color="text.secondary"><i>Sin nombre registrado</i></Typography>
                     )}
-                  </Box>
-                </TableCell>
-              </TableRow>
-            ))}
+                  </TableCell>
+                  <TableCell>{u.correo}</TableCell>
+                  <TableCell><Chip label={u.rol} size="small" /></TableCell>
+                  <TableCell>
+                    <Chip 
+                      label={`${victimasAsignadas.length} asignados`} 
+                      size="small" 
+                      color={victimasAsignadas.length > 0 ? "primary" : "default"}
+                      variant="outlined"
+                      sx={{ fontWeight: 'bold' }}
+                    />
+                  </TableCell>
+                  <TableCell align="right">
+                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
+                      <IconButton 
+                        color="info" 
+                        title="Ver carga de trabajo"
+                        onClick={() => handleVerCarga(u)}
+                      >
+                        <FolderSharedIcon />
+                      </IconButton>
+
+                      {u.correo !== 'webmaster@iiresodh.org' && (
+                        <>
+                          <Select 
+                            size="small" 
+                            value={u.rol} 
+                            onChange={(e) => handleRoleChange(u.correo, e.target.value)} 
+                            sx={{ minWidth: 175, textAlign: 'left' }}
+                          >
+                            <MenuItem value="admin">Administrador/a</MenuItem>
+                            <MenuItem value="abogado">Abogado/a</MenuItem>
+                            <MenuItem value="psicosocial">Psicosocial</MenuItem>
+                            <MenuItem value="lector">Lector (Solo Lectura)</MenuItem>
+                          </Select>
+                          <IconButton color="error" onClick={() => handleDeleteUser(u.correo)}>
+                            <DeleteIcon />
+                          </IconButton>
+                        </>
+                      )}
+                    </Box>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
       </Paper>
@@ -279,9 +303,7 @@ const AdminDashboard = () => {
         </DialogTitle>
         
         <DialogContent dividers sx={{ minHeight: '300px', maxHeight: '450px' }}>
-          {loadingCarga ? (
-            <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}><CircularProgress /></Box>
-          ) : victimasCarga.length === 0 ? (
+          {victimasCarga.length === 0 ? (
             <Box sx={{ py: 6, textAlign: 'center' }}>
               <Typography variant="body1" color="text.secondary">No hay casos vinculados a este perfil.</Typography>
             </Box>
