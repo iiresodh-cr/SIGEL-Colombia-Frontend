@@ -70,8 +70,9 @@ const Login = () => {
           <Typography variant="h4" sx={{ mb: 1, fontWeight: 700, color: '#E63946' }}>
             SIGEL
           </Typography>
+          {/* CORRECCIÓN: Nombre oficial del sistema integral */}
           <Typography variant="body1" sx={{ mb: 4, color: 'text.secondary' }}>
-            Sistema de Gestión de Expedientes Legales
+            Sistema Integral de Gestión de Expedientes de Litigio
           </Typography>
           <Typography variant="body1" sx={{ mb: 4, fontWeight: 700, color: '#003366' }}>
             IIRESODH Colombia
