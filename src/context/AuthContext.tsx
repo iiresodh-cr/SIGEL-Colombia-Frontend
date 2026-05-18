@@ -21,7 +21,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [errorModal, setErrorModal] = useState({ show: false, title: '', message: '' });
 
-  const logout = () => signOut(auth);
+  // EL FIX ESTÁ AQUÍ: Forzamos la limpieza absoluta de la memoria temporal al cerrar sesión
+  const logout = async () => {
+    sessionStorage.clear(); // Borra la bandera de PIDA y cualquier caché de sesión
+    await signOut(auth);
+  };
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -47,12 +51,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             setRole('superadmin');
             setCurrentUser(user);
           } else {
-            // Cambiado a colección 'usuarios' para coincidir con Fase 1
+            // Buscamos el rol en la base de datos
             const userDocRef = doc(db, "usuarios", user.email.toLowerCase());
             const userDoc = await getDoc(userDocRef);
 
             if (userDoc.exists()) {
-              setRole(userDoc.data().rol as UserRole); // Traemos 'rol' en vez de 'role'
+              setRole(userDoc.data().rol as UserRole);
               setCurrentUser(user);
             } else {
               await signOut(auth);
