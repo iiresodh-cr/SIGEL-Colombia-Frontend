@@ -2,13 +2,15 @@ import React, { useEffect, useState } from 'react';
 import { 
   Box, Typography, Grid, Paper, CircularProgress, TextField, 
   InputAdornment, Table, TableBody, TableCell, TableHead, TableRow, 
-  Chip, Button, useTheme
+  Chip, Button, useTheme, Divider
 } from '@mui/material';
 import PeopleIcon from '@mui/icons-material/People';
 import FolderIcon from '@mui/icons-material/Folder';
 import AssignmentTurnedInIcon from '@mui/icons-material/AssignmentTurnedIn';
 import SearchIcon from '@mui/icons-material/Search';
 import VisibilityIcon from '@mui/icons-material/Visibility';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { jepService } from '../services/jepService';
@@ -57,7 +59,6 @@ const Dashboard = () => {
 
       } else {
         const rolBusqueda = role === 'psicosocial' ? 'psicosocial' : 'abogado';
-        
         const data = await jepService.getVictimasAsignadas(currentUser, rolBusqueda);
         
         setStats({
@@ -82,22 +83,26 @@ const Dashboard = () => {
   const getNombreProfesional = (id: string) => {
     if (!id || id === "") return 'Sin asignar';
     const cleanId = id.toLowerCase();
-    
     const prof = profesionales.find(u => 
       u.correo.toLowerCase() === cleanId || 
       u.uid === id || 
       u.correo.split('@')[0].toLowerCase() === cleanId
     );
-    
     return prof ? (prof.nombre_completo || prof.correo) : id;
   };
 
-  const filtered = search.trim() === '' 
+  // Listas filtradas según el rol
+  const adminFiltered = search.trim() === '' 
     ? [] 
     : victimasList.filter(v => 
         v.nombre_completo.toLowerCase().includes(search.toLowerCase()) ||
         v.identificacion.includes(search)
       );
+
+  // Para el abogado: Casos que requieren atención (No acreditadas) limitados a los primeros 5
+  const casosPendientes = victimasList
+    .filter(v => v.estado_jep?.estado_acreditacion !== 'Acreditada')
+    .slice(0, 5);
 
   if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', mt: 10 }}><CircularProgress /></Box>;
 
@@ -110,7 +115,7 @@ const Dashboard = () => {
         <Typography variant="body1" color="text.secondary">
           {isAdmin 
             ? "Gestión global de la representación IIRESODH." 
-            : `Bienvenido/a. Tienes ${stats.total} víctimas asignadas.`}
+            : `Bienvenido/a. Tienes ${stats.total} víctimas asignadas actualmente.`}
         </Typography>
       </Box>
 
@@ -152,100 +157,144 @@ const Dashboard = () => {
         </Grid>
       </Grid>
 
-      <Box>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-          <Typography variant="h5">
-            {isAdmin ? "Buscador para Reasignación" : "Listado de mis Víctimas"}
-          </Typography>
-          <TextField 
-            size="small"
-            placeholder="Buscar por nombre o ID..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            sx={{ width: 350, bgcolor: 'background.paper' }}
-            slotProps={{
-              input: {
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchIcon color="action" />
-                  </InputAdornment>
-                ),
-              },
-            }}
-          />
-        </Box>
+      {/* SECCIÓN INFERIOR DIVIDIDA POR ROL */}
+      {isAdmin ? (
+        <Box>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Typography variant="h5">Buscador Global para Reasignación</Typography>
+            <TextField 
+              size="small"
+              placeholder="Buscar por nombre o ID..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              sx={{ width: 350, bgcolor: 'background.paper' }}
+              slotProps={{
+                input: {
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon color="action" />
+                    </InputAdornment>
+                  ),
+                },
+              }}
+            />
+          </Box>
 
-        <Paper elevation={0} sx={{ border: '1px solid', borderColor: 'divider', overflow: 'hidden' }}>
-          <Table>
-            <TableHead sx={{ bgcolor: 'background.default' }}>
-              <TableRow>
-                <TableCell sx={{ fontWeight: 600, color: 'text.secondary' }}>Víctima</TableCell>
-                <TableCell sx={{ fontWeight: 600, color: 'text.secondary' }}>{isAdmin ? "Abogado/a Actual" : "Estado Acreditación"}</TableCell>
-                <TableCell align="right" sx={{ fontWeight: 600, color: 'text.secondary' }}>Acción</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {search.trim() === '' ? (
+          <Paper elevation={0} sx={{ border: '1px solid', borderColor: 'divider', overflow: 'hidden' }}>
+            <Table>
+              <TableHead sx={{ bgcolor: 'background.default' }}>
                 <TableRow>
-                  <TableCell colSpan={3} align="center" sx={{ py: 6, color: 'text.secondary' }}>
-                    <Typography variant="body1">Utiliza el buscador de arriba para encontrar un caso específico.</Typography>
-                  </TableCell>
+                  <TableCell sx={{ fontWeight: 600, color: 'text.secondary' }}>Víctima</TableCell>
+                  <TableCell sx={{ fontWeight: 600, color: 'text.secondary' }}>Abogado/a Actual</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 600, color: 'text.secondary' }}>Acción</TableCell>
                 </TableRow>
-              ) : filtered.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={3} align="center" sx={{ py: 6, color: 'text.secondary' }}>
-                    <Typography variant="body1">No hay registros que coincidan con tu búsqueda.</Typography>
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filtered.map((v) => (
-                  <TableRow key={v.id} hover>
-                    <TableCell>
-                      {/* MODIFICACIÓN: Nombre interactivo y con evento onClick para redirigir al perfil */}
-                      <Typography 
-                        variant="body1" 
-                        sx={{ 
-                          fontWeight: 600, 
-                          color: 'primary.main', 
-                          cursor: 'pointer',
-                          '&:hover': { textDecoration: 'underline' }
-                        }}
-                        onClick={() => navigate(`/victimas/${v.id}`)}
-                      >
-                        {v.nombre_completo}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">ID: {v.identificacion}</Typography>
-                    </TableCell>
-                    <TableCell>
-                      {isAdmin ? (
-                        <Chip label={getNombreProfesional(v.representacion?.juridico_asignado_id)} size="small" variant="outlined" />
-                      ) : (
-                        <Chip 
-                          label={v.estado_jep?.estado_acreditacion || 'No está acreditada'} 
-                          size="small" 
-                          color={v.estado_jep?.estado_acreditacion === 'Acreditada' ? 'primary' : 'default'}
-                          variant="outlined" 
-                        />
-                      )}
-                    </TableCell>
-                    <TableCell align="right">
-                      <Button 
-                        variant="contained" 
-                        size="small" 
-                        color={isAdmin ? "secondary" : "primary"}
-                        startIcon={<VisibilityIcon />}
-                        onClick={() => navigate(`/victimas/${v.id}`)}
-                      >
-                        {isAdmin ? "Reasignar" : "Ver Perfil"}
-                      </Button>
+              </TableHead>
+              <TableBody>
+                {search.trim() === '' ? (
+                  <TableRow>
+                    <TableCell colSpan={3} align="center" sx={{ py: 6, color: 'text.secondary' }}>
+                      <Typography variant="body1">Utiliza el buscador de arriba para localizar casos a reasignar.</Typography>
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </Paper>
-      </Box>
+                ) : adminFiltered.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={3} align="center" sx={{ py: 6, color: 'text.secondary' }}>
+                      <Typography variant="body1">No hay registros que coincidan con tu búsqueda.</Typography>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  adminFiltered.map((v) => (
+                    <TableRow key={v.id} hover>
+                      <TableCell>
+                        <Typography 
+                          variant="body1" 
+                          sx={{ fontWeight: 600, color: 'primary.main', cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}
+                          onClick={() => navigate(`/victimas/${v.id}`)}
+                        >
+                          {v.nombre_completo}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">ID: {v.identificacion}</Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Chip label={getNombreProfesional(v.representacion?.juridico_asignado_id)} size="small" variant="outlined" />
+                      </TableCell>
+                      <TableCell align="right">
+                        <Button variant="contained" size="small" color="secondary" startIcon={<VisibilityIcon />} onClick={() => navigate(`/victimas/${v.id}`)}>
+                          Reasignar
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </Paper>
+        </Box>
+      ) : (
+        <Box>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <WarningAmberIcon color="warning" />
+              <Typography variant="h5">Alertas: Pendientes de Acreditación</Typography>
+            </Box>
+            <Button 
+              variant="outlined" 
+              color="primary" 
+              endIcon={<ArrowForwardIcon />}
+              onClick={() => navigate('/victimas')}
+            >
+              Ver mi portafolio completo
+            </Button>
+          </Box>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+            Casos bajo tu representación que no han recibido el Auto de Acreditación de la JEP.
+          </Typography>
+
+          <Paper elevation={0} sx={{ border: '1px solid', borderColor: 'divider', overflow: 'hidden' }}>
+            <Table>
+              <TableHead sx={{ bgcolor: '#fffbeb' }}>
+                <TableRow>
+                  <TableCell sx={{ fontWeight: 600, color: '#92400e' }}>Víctima</TableCell>
+                  <TableCell sx={{ fontWeight: 600, color: '#92400e' }}>Estado JEP</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 600, color: '#92400e' }}>Acción</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {casosPendientes.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={3} align="center" sx={{ py: 6 }}>
+                      <Typography variant="body1" color="success.main" sx={{ fontWeight: 'bold' }}>¡Excelente! Todos tus casos están acreditados.</Typography>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  casosPendientes.map((v) => (
+                    <TableRow key={v.id} hover>
+                      <TableCell>
+                        <Typography 
+                          variant="body1" 
+                          sx={{ fontWeight: 600, color: 'primary.main', cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}
+                          onClick={() => navigate(`/victimas/${v.id}`)}
+                        >
+                          {v.nombre_completo}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">ID: {v.identificacion}</Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Chip label={v.estado_jep?.estado_acreditacion || 'No está acreditada'} size="small" color="warning" variant="filled" />
+                      </TableCell>
+                      <TableCell align="right">
+                        <Button variant="contained" size="small" color="primary" onClick={() => navigate(`/victimas/${v.id}`)}>
+                          Revisar Ficha
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </Paper>
+        </Box>
+      )}
     </Box>
   );
 };
