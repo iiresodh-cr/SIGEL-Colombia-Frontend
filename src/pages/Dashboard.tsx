@@ -92,9 +92,6 @@ const Dashboard = () => {
     return prof ? (prof.nombre_completo || prof.correo) : id;
   };
 
-  // NUEVA LÓGICA DE BÚSQUEDA:
-  // Si el buscador está vacío, devuelve un arreglo vacío para no mostrar resultados random.
-  // Si tiene texto, busca sin límite artificial de cantidad.
   const filtered = search.trim() === '' 
     ? [] 
     : victimasList.filter(v => 
@@ -204,7 +201,19 @@ const Dashboard = () => {
                 filtered.map((v) => (
                   <TableRow key={v.id} hover>
                     <TableCell>
-                      <Typography variant="body1" sx={{ fontWeight: 500 }}>{v.nombre_completo}</Typography>
+                      {/* MODIFICACIÓN: Nombre interactivo y con evento onClick para redirigir al perfil */}
+                      <Typography 
+                        variant="body1" 
+                        sx={{ 
+                          fontWeight: 600, 
+                          color: 'primary.main', 
+                          cursor: 'pointer',
+                          '&:hover': { textDecoration: 'underline' }
+                        }}
+                        onClick={() => navigate(`/victimas/${v.id}`)}
+                      >
+                        {v.nombre_completo}
+                      </Typography>
                       <Typography variant="body2" color="text.secondary">ID: {v.identificacion}</Typography>
                     </TableCell>
                     <TableCell>
