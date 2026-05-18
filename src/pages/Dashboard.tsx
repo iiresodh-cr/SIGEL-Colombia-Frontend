@@ -38,6 +38,17 @@ const Dashboard = () => {
 
   const isAdmin = role === 'admin' || role === 'superadmin';
 
+  // FILTRO ESTRICTO: Función para limpiar eventos viejos (usada por PIDA)
+  const getEventosVigentes = (eventos: Evento[]) => {
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0); 
+    return eventos.filter(e => {
+      if (!e.fecha_inicio) return false;
+      const fechaEvento = new Date(e.fecha_inicio);
+      return fechaEvento >= hoy;
+    });
+  };
+
   const invocarCopiloto = async (total: number, pendientes: number, eventos: Evento[], nombreUsuario: string, rolUsuario: string) => {
     setLoadingAi(true);
     try {
@@ -71,7 +82,7 @@ const Dashboard = () => {
       } else if (response.status === 401 || response.status === 403) {
         setSugerenciaAi("Acceso de IA denegado. Permisos de seguridad insuficientes.");
       } else {
-        setSugerenciaAi("El asistente inteligente no pudo procesar los datos en este momento.");
+        setSugerenciaAi("PIDA no pudo procesar los datos en este momento.");
       }
     } catch (error) {
       console.error("Error consultando IA:", error);
@@ -84,19 +95,9 @@ const Dashboard = () => {
   const handlePidaClick = () => {
     const nombreMostrar = currentUser?.displayName || currentUser?.email?.split('@')[0] || 'Profesional';
     const pendientesCalculadas = stats.total - stats.acreditadas;
+    const eventosVigentes = getEventosVigentes(eventosList);
     
-    // FILTRO ESTRICTO: Cortar eventos viejos antes de enviarlos a la IA
-    const hoy = new Date();
-    hoy.setHours(0, 0, 0, 0); // Empezamos a contar desde la medianoche de hoy
-
-    const eventosRealesVigentes = eventosList.filter(e => {
-      if (!e.fecha_inicio) return false;
-      // Asumiendo que fecha_inicio es un string como "2026-05-18" o similar
-      const fechaEvento = new Date(e.fecha_inicio);
-      return fechaEvento >= hoy;
-    });
-
-    invocarCopiloto(stats.total, pendientesCalculadas, eventosRealesVigentes, nombreMostrar, role || 'usuario');
+    invocarCopiloto(stats.total, pendientesCalculadas, eventosVigentes, nombreMostrar, role || 'usuario');
   };
 
   const loadData = async () => {
@@ -147,7 +148,16 @@ const Dashboard = () => {
         setVictimasList(dataVictimas);
       }
 
-      // Se eliminó la invocación automática de PIDA para ahorrar recursos
+      // EJECUCIÓN AUTOMÁTICA (Solo la primera vez en la sesión)
+      const sessionKey = `pida_has_run_${currentUser.uid}`;
+      if (!sessionStorage.getItem(sessionKey)) {
+        sessionStorage.setItem(sessionKey, 'true');
+        const nombreMostrar = currentUser.displayName || currentUser.email?.split('@')[0] || 'Profesional';
+        const eventosVigentes = getEventosVigentes(snapEventos);
+        
+        invocarCopiloto(total, pendientes, eventosVigentes, nombreMostrar, role || 'usuario');
+      }
+
     } catch (error) {
       console.error("Error Dashboard:", error);
       setSugerenciaAi("Error de seguridad: Tu perfil no tiene permisos de lectura sobre estas colecciones de datos.");
@@ -235,7 +245,7 @@ const Dashboard = () => {
         </Grid>
       </Grid>
 
-      {/* PIDA AI CARD (Manual) */}
+      {/* PIDA AI CARD */}
       <Card elevation={0} sx={{ mb: 5, background: 'linear-gradient(135deg, #f0f7ff 0%, #e0f2fe 100%)', border: '1px solid #bae6fd', borderRadius: 3, minHeight: '120px' }}>
         <CardContent sx={{ p: 3 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
@@ -246,9 +256,10 @@ const Dashboard = () => {
               </Typography>
             </Box>
             
-            {!sugerenciaAi && !loadingAi && (
+            {/* El botón siempre está disponible, excepto si está cargando */}
+            {!loadingAi && (
               <Button variant="contained" size="small" onClick={handlePidaClick} sx={{ bgcolor: '#0284c7', boxShadow: 0, '&:hover': { bgcolor: '#0369a1' } }}>
-                Consultar a PIDA
+                Actualizar Resumen
               </Button>
             )}
           </Box>
