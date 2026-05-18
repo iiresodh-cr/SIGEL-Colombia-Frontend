@@ -8,6 +8,9 @@ import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
+// IMPORTACIÓN DEL LOGO
+import logoNavbar from '../assets/logo-iire.png';
+
 const MainLayout = () => {
   const { role, currentUser, logout } = useAuth();
   const navigate = useNavigate();
@@ -38,6 +41,7 @@ const MainLayout = () => {
     fontWeight: isActive ? 700 : 500,
     mx: 0.5,
     px: 2,
+    textTransform: 'none', // Texto más serio
     '&:hover': {
       backgroundColor: 'rgba(255,255,255,0.1)',
     }
@@ -45,18 +49,27 @@ const MainLayout = () => {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+      {/* FRANJA DE COLORES INSTITUCIONAL */}
       <Box sx={{ height: '4px', width: '100%', background: 'linear-gradient(90deg, #FFCD00 33.33%, #003087 33.33%, #003087 66.66%, #E63946 66.66%)' }} />
 
       <AppBar position="static" color="primary" elevation={0} sx={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
         <Toolbar>
-          <Typography 
-            variant="h6" 
-            color="inherit" 
+          
+          {/* INTEGRACIÓN DEL LOGO EN EL NAVBAR (Clickable) */}
+          <Box 
             onClick={() => navigate('/dashboard')}
-            sx={{ fontWeight: 800, letterSpacing: '1px', flexGrow: 1, cursor: 'pointer' }}
+            sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer', flexGrow: 1, mr: 2 }}
           >
-            SIGEL
-          </Typography>
+            <img 
+              src={logoNavbar} 
+              alt="SIGEL IIRESODH" 
+              style={{ 
+                height: '40px', // Ajuste de altura para el Navbar
+                width: 'auto', // Mantiene proporción
+                display: 'block'
+              }} 
+            />
+          </Box>
           
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
             {/* BOTÓN DIRECTO: Panel General */}
@@ -79,7 +92,6 @@ const MainLayout = () => {
               anchorEl={anchorElLitigio}
               open={Boolean(anchorElLitigio)}
               onClose={handleCloseLitigio}
-              // CORRECCIÓN: Uso de slotProps en lugar de PaperProps
               slotProps={{ paper: { elevation: 3, sx: { mt: 1, minWidth: 200, borderRadius: 2 } } }}
             >
               <MenuItem onClick={() => handleNavigate('/victimas', handleCloseLitigio)}>Matriz de Víctimas</MenuItem>
@@ -116,7 +128,6 @@ const MainLayout = () => {
                   anchorEl={anchorElAdmin}
                   open={Boolean(anchorElAdmin)}
                   onClose={handleCloseAdmin}
-                  // CORRECCIÓN: Uso de slotProps en lugar de PaperProps
                   slotProps={{ paper: { elevation: 3, sx: { mt: 1, minWidth: 200, borderRadius: 2 } } }}
                 >
                   <MenuItem onClick={() => handleNavigate('/admin', handleCloseAdmin)}>Gestión de Usuarios</MenuItem>
