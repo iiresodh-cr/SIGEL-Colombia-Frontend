@@ -38,14 +38,30 @@ const Dashboard = () => {
 
   const isAdmin = role === 'admin' || role === 'superadmin';
 
-  // FILTRO ESTRICTO: Función para limpiar eventos viejos (usada por PIDA)
+  // PARSEADOR BLINDADO: Entiende cualquier formato de fecha de la base de datos
+  const parseDate = (fecha: any) => {
+    if (!fecha) return new Date(0); // Si está vacío, lo manda a 1970
+    if (fecha.toDate) return fecha.toDate(); // Si es un Timestamp nativo de Firestore
+    if (typeof fecha === 'string') {
+      if (fecha.includes('/')) {
+        // Convierte DD/MM/YYYY a YYYY-MM-DD para que el navegador lo entienda
+        const partes = fecha.split('/');
+        if (partes.length === 3 && partes[2].length === 4) {
+          return new Date(`${partes[2]}-${partes[1]}-${partes[0]}T00:00:00`);
+        }
+      }
+      return new Date(fecha);
+    }
+    return new Date(fecha);
+  };
+
+  // FILTRO ABSOLUTO: Destruye cualquier evento en el pasado
   const getEventosVigentes = (eventos: Evento[]) => {
     const hoy = new Date();
     hoy.setHours(0, 0, 0, 0); 
     return eventos.filter(e => {
-      if (!e.fecha_inicio) return false;
-      const fechaEvento = new Date(e.fecha_inicio);
-      return fechaEvento >= hoy;
+      const fechaEvento = parseDate(e.fecha_inicio);
+      return fechaEvento >= hoy; // Solo deja pasar de hoy hacia el futuro
     });
   };
 
@@ -95,17 +111,19 @@ const Dashboard = () => {
   const handlePidaClick = () => {
     const nombreMostrar = currentUser?.displayName || currentUser?.email?.split('@')[0] || 'Profesional';
     const pendientesCalculadas = stats.total - stats.acreditadas;
-    const eventosVigentes = getEventosVigentes(eventosList);
-    
-    invocarCopiloto(stats.total, pendientesCalculadas, eventosVigentes, nombreMostrar, role || 'usuario');
+    // Se le envía la lista de eventos que YA está purgada de datos viejos
+    invocarCopiloto(stats.total, pendientesCalculadas, eventosList, nombreMostrar, role || 'usuario');
   };
 
   const loadData = async () => {
     if (!currentUser) return;
     try {
       setLoading(true);
-      const snapEventos = await jepService.getEventosProximos();
-      setEventosList(snapEventos);
+      const snapEventosCrudos = await jepService.getEventosProximos();
+      
+      // PURGA INMEDIATA: Limpiamos los eventos tan pronto bajan de Firebase
+      const eventosVigentes = getEventosVigentes(snapEventosCrudos);
+      setEventosList(eventosVigentes);
       
       let dataVictimas: Victima[] = [];
       let total = 0, pendientes = 0;
@@ -126,7 +144,7 @@ const Dashboard = () => {
           caso01: globalStats.totalCaso01,
           caso10: globalStats.totalCaso10,
           acreditadas: total - pendientes,
-          eventosProximos: snapEventos.length
+          eventosProximos: eventosVigentes.length // Ahora contará 0 si no hay futuros
         });
         setVictimasList(dataVictimas);
         setProfesionales(snapUsers);
@@ -143,24 +161,23 @@ const Dashboard = () => {
           caso01: dataVictimas.filter(v => v.representacion?.caso?.includes('Caso 01')).length,
           caso10: dataVictimas.filter(v => v.representacion?.caso?.includes('Caso 10')).length,
           acreditadas: total - pendientes,
-          eventosProximos: snapEventos.length
+          eventosProximos: eventosVigentes.length // Ahora contará 0
         });
         setVictimasList(dataVictimas);
       }
 
-      // EJECUCIÓN AUTOMÁTICA (Solo la primera vez en la sesión)
+      // EJECUCIÓN AUTOMÁTICA (Solo la primera vez)
       const sessionKey = `pida_has_run_${currentUser.uid}`;
       if (!sessionStorage.getItem(sessionKey)) {
         sessionStorage.setItem(sessionKey, 'true');
         const nombreMostrar = currentUser.displayName || currentUser.email?.split('@')[0] || 'Profesional';
-        const eventosVigentes = getEventosVigentes(snapEventos);
         
         invocarCopiloto(total, pendientes, eventosVigentes, nombreMostrar, role || 'usuario');
       }
 
     } catch (error) {
       console.error("Error Dashboard:", error);
-      setSugerenciaAi("Error de seguridad: Tu perfil no tiene permisos de lectura sobre estas colecciones de datos.");
+      setSugerenciaAi("Error de seguridad: Tu perfil no tiene permisos de lectura.");
     } finally {
       setLoading(false);
     }
@@ -256,7 +273,6 @@ const Dashboard = () => {
               </Typography>
             </Box>
             
-            {/* El botón siempre está disponible, excepto si está cargando */}
             {!loadingAi && (
               <Button variant="contained" size="small" onClick={handlePidaClick} sx={{ bgcolor: '#0284c7', boxShadow: 0, '&:hover': { bgcolor: '#0369a1' } }}>
                 Actualizar Resumen
@@ -267,7 +283,7 @@ const Dashboard = () => {
           {loadingAi ? (
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 2 }}>
               <CircularProgress size={20} />
-              <Typography variant="body2" color="text.secondary">PIDA está analizando tu portafolio y agenda...</Typography>
+              <Typography variant="body2" color="text.secondary">Analizando agenda y portafolio...</Typography>
             </Box>
           ) : sugerenciaAi ? (
             <Typography variant="body1" sx={{ color: '#0f172a', lineHeight: 1.6, fontWeight: 500, mt: 1 }}>
@@ -275,7 +291,7 @@ const Dashboard = () => {
             </Typography>
           ) : (
             <Typography variant="body2" sx={{ color: '#64748b', mt: 1 }}>
-              El asistente está en reposo. Haz clic en el botón para generar un resumen estratégico de tus casos y audiencias.
+              Haz clic en el botón para generar un resumen estratégico.
             </Typography>
           )}
         </CardContent>
