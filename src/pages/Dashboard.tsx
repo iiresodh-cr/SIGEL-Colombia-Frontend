@@ -58,8 +58,6 @@ const Dashboard = () => {
       } else {
         const rolBusqueda = role === 'psicosocial' ? 'psicosocial' : 'abogado';
         
-        // CORRECCIÓN 1: Pasamos el objeto currentUser completo, NO solo el email, 
-        // para que jepService pueda buscar por UID, username y correo a la vez.
         const data = await jepService.getVictimasAsignadas(currentUser, rolBusqueda);
         
         setStats({
@@ -81,7 +79,6 @@ const Dashboard = () => {
     loadData();
   }, [currentUser, role, isAdmin]);
 
-  // CORRECCIÓN 2: Función robusta para cruzar IDs idéntica a la que hicimos en Victimas.tsx
   const getNombreProfesional = (id: string) => {
     if (!id || id === "") return 'Sin asignar';
     const cleanId = id.toLowerCase();
@@ -95,10 +92,15 @@ const Dashboard = () => {
     return prof ? (prof.nombre_completo || prof.correo) : id;
   };
 
-  const filtered = victimasList.filter(v => 
-    v.nombre_completo.toLowerCase().includes(search.toLowerCase()) ||
-    v.identificacion.includes(search)
-  ).slice(0, 15);
+  // NUEVA LÓGICA DE BÚSQUEDA:
+  // Si el buscador está vacío, devuelve un arreglo vacío para no mostrar resultados random.
+  // Si tiene texto, busca sin límite artificial de cantidad.
+  const filtered = search.trim() === '' 
+    ? [] 
+    : victimasList.filter(v => 
+        v.nombre_completo.toLowerCase().includes(search.toLowerCase()) ||
+        v.identificacion.includes(search)
+      );
 
   if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', mt: 10 }}><CircularProgress /></Box>;
 
@@ -186,8 +188,18 @@ const Dashboard = () => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {filtered.length === 0 ? (
-                <TableRow><TableCell colSpan={3} align="center" sx={{ py: 4, color: 'text.secondary' }}>No hay registros que coincidan con la búsqueda.</TableCell></TableRow>
+              {search.trim() === '' ? (
+                <TableRow>
+                  <TableCell colSpan={3} align="center" sx={{ py: 6, color: 'text.secondary' }}>
+                    <Typography variant="body1">Utiliza el buscador de arriba para encontrar un caso específico.</Typography>
+                  </TableCell>
+                </TableRow>
+              ) : filtered.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={3} align="center" sx={{ py: 6, color: 'text.secondary' }}>
+                    <Typography variant="body1">No hay registros que coincidan con tu búsqueda.</Typography>
+                  </TableCell>
+                </TableRow>
               ) : (
                 filtered.map((v) => (
                   <TableRow key={v.id} hover>
