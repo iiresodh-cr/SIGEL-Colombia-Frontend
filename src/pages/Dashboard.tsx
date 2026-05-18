@@ -224,7 +224,7 @@ const Dashboard = () => {
           {loadingAi ? (
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
               <CircularProgress size={20} />
-              <Typography variant="body2" color="text.secondary">Gemini 2.5 Flash está analizando tus prioridades...</Typography>
+              <Typography variant="body2" color="text.secondary">PIDA está analizando tus prioridades...</Typography>
             </Box>
           ) : (
             <Typography variant="body1" sx={{ color: '#0f172a', lineHeight: 1.6, fontWeight: 500 }}>
