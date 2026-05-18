@@ -29,39 +29,22 @@ export const jepService = {
   },
 
   // 2. Obtener víctimas asignadas (Búsqueda multipropósito para evitar desconexiones de ID)
-  getVictimasAsignadas: async (usuario: any, tipo: 'abogado' | 'psicosocial') => {
-    const campo = tipo === 'abogado' ? 'representacion.juridico_asignado_id' : 'representacion.psicosocial_asignado_id';
-    
-    // Obtenemos todas las posibles formas en las que se pudo haber guardado al usuario
-    const email = usuario?.email || '';
-    const uid = usuario?.uid || '';
-    const username = email ? email.split('@')[0] : '';
-
+  getVictimasAsignadas: async (currentUser: any, rolBusqueda: string): Promise<Victima[]> => {
     const victimasRef = collection(db, 'victimas');
+    
+    // Todo en minúsculas por seguridad
+    const email = currentUser.email.toLowerCase();
 
-    const queries = [
-      getDocs(query(victimasRef, where(campo, '==', email), where('representacion.estado', '==', 'Activo')))
-    ];
+    // Determinamos el campo exacto a buscar
+    const campoBusqueda = rolBusqueda === 'psicosocial' 
+      ? 'representacion.psicosocial_asignado_id' 
+      : 'representacion.juridico_asignado_id';
 
-    if (uid) {
-      queries.push(getDocs(query(victimasRef, where(campo, '==', uid), where('representacion.estado', '==', 'Activo'))));
-    }
-    if (username) {
-      queries.push(getDocs(query(victimasRef, where(campo, '==', username), where('representacion.estado', '==', 'Activo'))));
-    }
-
-    const resultados = await Promise.all(queries);
-    const map = new Map();
-
-    resultados.forEach(snapshot => {
-      snapshot.forEach(doc => {
-        if (!map.has(doc.id)) {
-          map.set(doc.id, { id: doc.id, ...doc.data() } as Victima);
-        }
-      });
-    });
-
-    return Array.from(map.values());
+    // CONSULTA LIMPIA: Coincide 100% con la regla de Firestore
+    const q = query(victimasRef, where(campoBusqueda, '==', email));
+    
+    const snap = await getDocs(q);
+    return snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Victima));
   },
 
   // 3. Obtener víctima por ID

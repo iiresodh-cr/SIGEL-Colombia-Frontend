@@ -33,17 +33,14 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   
-  // Estados para la IA
   const [sugerenciaAi, setSugerenciaAi] = useState('');
   const [loadingAi, setLoadingAi] = useState(false);
 
   const isAdmin = role === 'admin' || role === 'superadmin';
 
-  // Función para llamar a Cloud Run
   const invocarCopiloto = async (total: number, pendientes: number, eventos: Evento[], nombreUsuario: string, rolUsuario: string) => {
     setLoadingAi(true);
     try {
-      // 1. Obtenemos el Carnet Criptográfico de Firebase
       const token = await currentUser?.getIdToken();
 
       const payload = {
@@ -59,7 +56,6 @@ const Dashboard = () => {
         apiUrl = apiUrl.slice(0, -1);
       }
 
-      // 2. Enviamos la petición CON el carnet de seguridad en los Headers
       const response = await fetch(apiUrl, {
         method: 'POST',
         headers: { 
@@ -73,13 +69,13 @@ const Dashboard = () => {
         const data = await response.json();
         setSugerenciaAi(data.sugerencia);
       } else if (response.status === 401 || response.status === 403) {
-        setSugerenciaAi("Acceso de IA denegado. Permisos insuficientes.");
+        setSugerenciaAi("Acceso de IA denegado. Permisos de seguridad insuficientes.");
       } else {
-        setSugerenciaAi("El sistema de IA está fuera de línea por mantenimiento temporal.");
+        setSugerenciaAi("El asistente inteligente no pudo procesar los datos en este momento.");
       }
     } catch (error) {
       console.error("Error consultando IA:", error);
-      setSugerenciaAi("Error de conexión con el servidor Copiloto. Revisa tu consola.");
+      setSugerenciaAi("No se pudo conectar con el servidor del Copiloto Judicial.");
     } finally {
       setLoadingAi(false);
     }
@@ -133,12 +129,12 @@ const Dashboard = () => {
         setVictimasList(dataVictimas);
       }
 
-      // Una vez que tenemos los datos, disparamos la petición asíncrona a Gemini
       const nombreMostrar = currentUser.displayName || currentUser.email?.split('@')[0] || 'Profesional';
       invocarCopiloto(total, pendientes, snapEventos, nombreMostrar, role || 'usuario');
 
     } catch (error) {
       console.error("Error Dashboard:", error);
+      setSugerenciaAi("Error de seguridad: Tu perfil no tiene permisos de lectura sobre estas colecciones de datos.");
     } finally {
       setLoading(false);
     }
@@ -235,7 +231,7 @@ const Dashboard = () => {
           {loadingAi ? (
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
               <CircularProgress size={20} />
-              <Typography variant="body2" color="text.secondary">PIDA está analizando tus prioridades...</Typography>
+              <Typography variant="body2" color="text.secondary">Gemini 2.5 Flash está analizando tus prioridades...</Typography>
             </Box>
           ) : (
             <Typography variant="body1" sx={{ color: '#0f172a', lineHeight: 1.6, fontWeight: 500 }}>
