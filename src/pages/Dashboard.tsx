@@ -84,7 +84,19 @@ const Dashboard = () => {
   const handlePidaClick = () => {
     const nombreMostrar = currentUser?.displayName || currentUser?.email?.split('@')[0] || 'Profesional';
     const pendientesCalculadas = stats.total - stats.acreditadas;
-    invocarCopiloto(stats.total, pendientesCalculadas, eventosList, nombreMostrar, role || 'usuario');
+    
+    // FILTRO ESTRICTO: Cortar eventos viejos antes de enviarlos a la IA
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0); // Empezamos a contar desde la medianoche de hoy
+
+    const eventosRealesVigentes = eventosList.filter(e => {
+      if (!e.fecha_inicio) return false;
+      // Asumiendo que fecha_inicio es un string como "2026-05-18" o similar
+      const fechaEvento = new Date(e.fecha_inicio);
+      return fechaEvento >= hoy;
+    });
+
+    invocarCopiloto(stats.total, pendientesCalculadas, eventosRealesVigentes, nombreMostrar, role || 'usuario');
   };
 
   const loadData = async () => {
