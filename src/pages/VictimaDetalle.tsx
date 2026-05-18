@@ -12,11 +12,10 @@ import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import DeleteIcon from '@mui/icons-material/Delete';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
-import TimelineIcon from '@mui/icons-material/Timeline';
-import GavelIcon from '@mui/icons-material/Gavel';
-import FolderSpecialIcon from '@mui/icons-material/FolderSpecial';
 import InfoIcon from '@mui/icons-material/Info';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import GavelIcon from '@mui/icons-material/Gavel';
+import FolderSpecialIcon from '@mui/icons-material/FolderSpecial';
 
 import { jepService } from '../services/jepService';
 import { storageService, ArchivoJEP } from '../services/storageService';
@@ -60,7 +59,6 @@ const VictimaDetalle = () => {
   const [poderes, setPoderes] = useState<ArchivoJEP[]>([]);
   const [listaProfesionales, setListaProfesionales] = useState<{ abogados: Usuario[], psicosociales: Usuario[] }>({ abogados: [], psicosociales: [] });
   
-  // NUEVOS ESTADOS PARA INTEGRACIÓN 360
   const [audiencias, setAudiencias] = useState<Audiencia[]>([]);
   const [radicados, setRadicados] = useState<Radicado[]>([]);
   const [tabIndex, setTabIndex] = useState(0);
@@ -74,11 +72,10 @@ const VictimaDetalle = () => {
   const [openReasignarModal, setOpenReasignarModal] = useState(false);
   const [reasignarData, setReasignarData] = useState({ juridico_nuevo_id: '', psicosocial_nuevo_id: '', motivo: '' });
 
-  // DEFINICIÓN DE PERMISOS SEGÚN LA MINUTA
   const isAdmin = role === 'admin' || role === 'superadmin';
   const isLector = role === 'lector';
-  const canDelete = isAdmin; // Solo coordinación borra
-  const canEdit = !isLector; // Abogados, Psicosociales y Admins editan. Lectores NO.
+  const canDelete = isAdmin; 
+  const canEdit = !isLector; 
 
   const loadData = async () => {
     if (!id) return;
@@ -97,7 +94,6 @@ const VictimaDetalle = () => {
       setPoderes(archivosData);
       setListaProfesionales(profsData);
 
-      // CRUCE DE INFORMACIÓN 360
       if (victimaData) {
         const audienciasFiltradas = allAudiencias.filter(a => 
           a.observaciones.toLowerCase().includes(victimaData.nombre_completo.toLowerCase()) || 
@@ -151,6 +147,13 @@ const VictimaDetalle = () => {
       showModal('Falta Información', 'Debe justificar el motivo del cambio.', 'error');
       return;
     }
+
+    // VALIDACIÓN: Evitar desasignar ambos y dejar el caso huerfano de forma accidental
+    if (!reasignarData.juridico_nuevo_id && !reasignarData.psicosocial_nuevo_id) {
+      showModal('Operación Inválida', 'El caso debe conservar al menos un responsable técnico asignado.', 'error');
+      return;
+    }
+
     try {
       setLoading(true);
       await adminService.reasignarVictimaIndividual(id, currentUser.uid, reasignarData);
@@ -212,31 +215,24 @@ const VictimaDetalle = () => {
   };
 
   const getNombreAbo = (correoId: string) => {
-    if (!correoId) return 'Sin asignar';
+    if (!correoId || correoId === '') return 'Sin asignar';
     return listaProfesionales.abogados.find(u => u.correo.toLowerCase() === correoId.toLowerCase())?.nombre_completo || correoId;
   };
   const getNombrePsi = (correoId: string) => {
-    if (!correoId) return 'Sin asignar';
+    if (!correoId || correoId === '') return 'Sin asignar';
     return listaProfesionales.psicosociales.find(u => u.correo.toLowerCase() === correoId.toLowerCase())?.nombre_completo || correoId;
   };
 
   if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', mt: 10 }}><CircularProgress /></Box>;
   if (!victima) return <Box sx={{ p: 4 }}><Typography>Víctima no encontrada</Typography></Box>;
 
-  const sv = victima.seguimiento_vista || { 
-    primer_contacto: false, 
-    firma_poder: false, 
-    demandas_verdad: false, 
-    sol_desasignacion: false 
-  };
-
+  const sv = victima.seguimiento_vista || { primer_contacto: false, firma_poder: false, demandas_verdad: false, sol_desasignacion: false };
   const isDesasignado = victima.representacion.estado === 'Desasignado';
 
   return (
     <Box sx={{ p: 4 }}>
       <Button startIcon={<ArrowBackIcon />} onClick={() => navigate(-1)} sx={{ mb: 3 }}>Volver</Button>
 
-      {/* Alerta de Desasignación */}
       {isDesasignado && (
         <Alert severity="warning" icon={<WarningAmberIcon />} sx={{ mb: 3, borderRadius: 2 }}>
           <strong>Esta víctima se encuentra inactiva.</strong> <br/>
@@ -245,7 +241,6 @@ const VictimaDetalle = () => {
         </Alert>
       )}
 
-      {/* Pestañas de Integración */}
       <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 1 }}>
         <Tabs value={tabIndex} onChange={(e, val) => setTabIndex(val)} variant="scrollable" scrollButtons="auto">
           <Tab icon={<InfoIcon />} label="Vista General" iconPosition="start" />
@@ -254,9 +249,6 @@ const VictimaDetalle = () => {
         </Tabs>
       </Box>
 
-      {/* ==========================================
-          TAB 0: TU INTERFAZ ORIGINAL INTACTA
-      ========================================== */}
       <TabPanel value={tabIndex} index={0}>
         <Grid container spacing={4}>
           <Grid size={{ xs: 12, lg: 7 }}>
@@ -280,7 +272,6 @@ const VictimaDetalle = () => {
                 <Grid size={{ xs: 6, md: 4 }}><Typography variant="caption">Discapacidad</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{victima.datos_demograficos?.discapacidad}</Typography></Grid>
               </Grid>
 
-              {/* DATO FAMILIAR DESAPARECIDO SI EXISTE */}
               {victima.familiar_desaparecido && (
                 <Alert severity="info" sx={{ mb: 3, borderRadius: 2 }}>
                   <strong>Familiar Desaparecido:</strong> {victima.familiar_desaparecido.nombre_completo}
@@ -349,7 +340,6 @@ const VictimaDetalle = () => {
                   <ListItem key={index} sx={{ border: '1px solid #e2e8f0', borderRadius: 2, mb: 1 }}>
                     <PictureAsPdfIcon color="error" sx={{ mr: 2 }} />
                     <ListItemText primary={archivo.name} />
-                    {/* REGLA: Solo Coordinación puede borrar archivos */}
                     {canDelete && (
                       <IconButton color="error" onClick={() => handleDeleteFile(archivo.fullPath)}>
                         <DeleteIcon />
@@ -365,22 +355,10 @@ const VictimaDetalle = () => {
             <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid', borderColor: 'primary.light', bgcolor: '#f0f4f8', mb: 4 }}>
               <Typography variant="h6" sx={{ fontWeight: 700, mb: 2, color: 'primary.main' }}>Actuaciones Vista (Checklist)</Typography>
               <FormGroup>
-                <FormControlLabel 
-                  control={<Checkbox checked={sv.primer_contacto} disabled={!canEdit} onChange={(e) => handleToggleChecklist('primer_contacto', e.target.checked)} color="primary" />} 
-                  label="Primer Contacto Realizado" 
-                />
-                <FormControlLabel 
-                  control={<Checkbox checked={sv.firma_poder} disabled={!canEdit} onChange={(e) => handleToggleChecklist('firma_poder', e.target.checked)} color="primary" />} 
-                  label="Firma de Poder Recibida" 
-                />
-                <FormControlLabel 
-                  control={<Checkbox checked={sv.demandas_verdad} disabled={!canEdit} onChange={(e) => handleToggleChecklist('demandas_verdad', e.target.checked)} color="primary" />} 
-                  label="Demandas de Verdad Presentadas" 
-                />
-                <FormControlLabel 
-                  control={<Checkbox checked={sv.sol_desasignacion} disabled={!canEdit} onChange={(e) => handleToggleChecklist('sol_desasignacion', e.target.checked)} color="error" />} 
-                  label="Solicitud de Desasignación" 
-                />
+                <FormControlLabel control={<Checkbox checked={sv.primer_contacto} disabled={!canEdit} onChange={(e) => handleToggleChecklist('primer_contacto', e.target.checked)} color="primary" />} label="Primer Contacto Realizado" />
+                <FormControlLabel control={<Checkbox checked={sv.firma_poder} disabled={!canEdit} onChange={(e) => handleToggleChecklist('firma_poder', e.target.checked)} color="primary" />} label="Firma de Poder Recibida" />
+                <FormControlLabel control={<Checkbox checked={sv.demandas_verdad} disabled={!canEdit} onChange={(e) => handleToggleChecklist('demandas_verdad', e.target.checked)} color="primary" />} label="Demandas de Verdad Presentadas" />
+                <FormControlLabel control={<Checkbox checked={sv.sol_desasignacion} disabled={!canEdit} onChange={(e) => handleToggleChecklist('sol_desasignacion', e.target.checked)} color="error" />} label="Solicitud de Desasignación" />
               </FormGroup>
             </Paper>
 
@@ -414,9 +392,6 @@ const VictimaDetalle = () => {
         </Grid>
       </TabPanel>
 
-      {/* ==========================================
-          TAB 1: ACTUACIONES JUDICIALES
-      ========================================== */}
       <TabPanel value={tabIndex} index={1}>
         <Paper elevation={0} sx={{ p: 3, border: '1px solid #e2e8f0', borderRadius: 3 }}>
           <Table size="small">
@@ -444,9 +419,6 @@ const VictimaDetalle = () => {
         </Paper>
       </TabPanel>
 
-      {/* ==========================================
-          TAB 2: EXPEDIENTE DOCUMENTAL
-      ========================================== */}
       <TabPanel value={tabIndex} index={2}>
         <Paper elevation={0} sx={{ p: 3, border: '1px solid #e2e8f0', borderRadius: 3 }}>
           <Table size="small">
@@ -476,7 +448,6 @@ const VictimaDetalle = () => {
         </Paper>
       </TabPanel>
 
-      {/* MODAL PARA NOTAS */}
       <Dialog open={openNoteModal} onClose={() => setOpenNoteModal(false)} fullWidth maxWidth="sm">
         <DialogTitle sx={{ fontWeight: 'bold' }}>Registrar Interacción</DialogTitle>
         <DialogContent dividers>
@@ -491,18 +462,19 @@ const VictimaDetalle = () => {
         </DialogActions>
       </Dialog>
 
-      {/* MODAL REASIGNACIÓN (SOLO ADMIN) */}
       <Dialog open={openReasignarModal} onClose={() => setOpenReasignarModal(false)} fullWidth maxWidth="sm">
         <DialogTitle sx={{ fontWeight: 'bold' }}>Reasignar Responsables del Caso</DialogTitle>
         <DialogContent dividers>
           <Grid container spacing={2} sx={{ mt: 1 }}>
             <Grid size={{ xs: 12, sm: 6 }}>
               <TextField select fullWidth label="Nuevo Abogado" value={reasignarData.juridico_nuevo_id} onChange={(e) => setReasignarData({ ...reasignarData, juridico_nuevo_id: e.target.value })}>
+                <MenuItem value=""><em>Quitar asignación / Dejar vacío</em></MenuItem>
                 {listaProfesionales.abogados.map(u => <MenuItem key={u.uid} value={u.correo}>{u.nombre_completo || u.correo}</MenuItem>)}
               </TextField>
             </Grid>
             <Grid size={{ xs: 12, sm: 6 }}>
               <TextField select fullWidth label="Nuevo Psicosocial" value={reasignarData.psicosocial_nuevo_id} onChange={(e) => setReasignarData({ ...reasignarData, psicosocial_nuevo_id: e.target.value })}>
+                <MenuItem value=""><em>Quitar asignación / Dejar vacío</em></MenuItem>
                 {listaProfesionales.psicosociales.map(u => <MenuItem key={u.uid} value={u.correo}>{u.nombre_completo || u.correo}</MenuItem>)}
               </TextField>
             </Grid>

@@ -5,6 +5,7 @@ import {
 } from '@mui/material';
 import { Victima } from '../types/jep';
 import { Usuario } from '../types/user';
+import { useModal } from '../context/ModalContext';
 
 interface FormVictimaProps {
   onSave: (data: Omit<Victima, 'id' | 'fecha_registro'>) => void;
@@ -27,6 +28,7 @@ const DEPARTAMENTOS = ['Amazonas', 'Antioquia', 'Arauca', 'Atlántico', 'Bolíva
 
 export const FormVictima = ({ onSave, onCancel, profesionales, currentUserRole, currentUserEmail }: FormVictimaProps) => {
   const isAltRole = currentUserRole === 'admin' || currentUserRole === 'superadmin';
+  const { showModal } = useModal();
 
   const [formData, setFormData] = useState<Partial<Victima>>({
     nombre_completo: '',
@@ -71,6 +73,17 @@ export const FormVictima = ({ onSave, onCancel, profesionales, currentUserRole, 
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // VALIDACIÓN INTELIGENTE: El caso puede tener uno, el otro o ambos, pero NO puede quedar en blanco
+    if (!formData.representacion?.juridico_asignado_id && !formData.representacion?.psicosocial_asignado_id) {
+      showModal(
+        'Falta Asignación', 
+        'Para dar de alta el expediente debe asignar al menos un responsable técnico (sea en el área Jurídica o en el área Psicosocial).', 
+        'error'
+      );
+      return;
+    }
+
     onSave(formData as any);
   };
 
@@ -98,7 +111,7 @@ export const FormVictima = ({ onSave, onCancel, profesionales, currentUserRole, 
           <Grid size={{ xs: 12, md: 4 }}><TextField select fullWidth size="small" label="Departamento" value={formData.datos_contacto?.departamento} onChange={(e) => setFormData({ ...formData, datos_contacto: { ...formData.datos_contacto!, departamento: e.target.value } })}>{DEPARTAMENTOS.map(d => <MenuItem key={d} value={d}>{d}</MenuItem>)}</TextField></Grid>
           <Grid size={{ xs: 12 }}><TextField fullWidth size="small" label="Dirección de Residencia" value={formData.datos_contacto?.direccion} onChange={(e) => setFormData({ ...formData, datos_contacto: { ...formData.datos_contacto!, direccion: e.target.value } })} /></Grid>
 
-          <Grid size={{ xs: 12 }}><Divider textAlign="left"><Typography variant="subtitle2" color="text.secondary">Asignación de Responsables</Typography></Divider></Grid>
+          <Grid size={{ xs: 12 }}><Divider textAlign="left"><Typography variant="subtitle2" color="text.secondary">Asignación de Responsables (Uno, el otro o ambos)</Typography></Divider></Grid>
           <Grid size={{ xs: 12, md: 6 }}>
             <TextField 
               select fullWidth size="small" 
@@ -107,7 +120,7 @@ export const FormVictima = ({ onSave, onCancel, profesionales, currentUserRole, 
               value={formData.representacion?.juridico_asignado_id} 
               onChange={(e) => setFormData({ ...formData, representacion: { ...formData.representacion!, juridico_asignado_id: e.target.value } })}
             >
-              <MenuItem value=""><em>Sin asignar por ahora</em></MenuItem>
+              <MenuItem value=""><em>Sin asignar / Dejar vacío</em></MenuItem>
               {profesionales.abogados.map(u => <MenuItem key={u.uid} value={u.correo}>{u.nombre_completo || u.correo}</MenuItem>)}
             </TextField>
           </Grid>
@@ -119,7 +132,7 @@ export const FormVictima = ({ onSave, onCancel, profesionales, currentUserRole, 
               value={formData.representacion?.psicosocial_asignado_id} 
               onChange={(e) => setFormData({ ...formData, representacion: { ...formData.representacion!, psicosocial_asignado_id: e.target.value } })}
             >
-              <MenuItem value=""><em>Sin asignar por ahora</em></MenuItem>
+              <MenuItem value=""><em>Sin asignar / Dejar vacío</em></MenuItem>
               {profesionales.psicosociales.map(u => <MenuItem key={u.uid} value={u.correo}>{u.nombre_completo || u.correo}</MenuItem>)}
             </TextField>
           </Grid>
