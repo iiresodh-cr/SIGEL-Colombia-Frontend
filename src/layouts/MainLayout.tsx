@@ -9,7 +9,7 @@ import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 // IMPORTACIÓN DEL LOGO
-import logoNavbar from '../assets/logo-iire.png';
+import logoNavbar from '../assets/logo-iire-white.png';
 
 const MainLayout = () => {
   const { role, currentUser, logout } = useAuth();
