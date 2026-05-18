@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { 
   Box, Typography, Grid, Paper, CircularProgress, TextField, 
   InputAdornment, Table, TableBody, TableCell, TableHead, TableRow, 
-  Chip, Button, useTheme, Divider, Card, CardContent
+  Chip, Button, useTheme, Card, CardContent
 } from '@mui/material';
 import PeopleIcon from '@mui/icons-material/People';
 import FolderIcon from '@mui/icons-material/Folder';
@@ -10,7 +10,6 @@ import AssignmentTurnedInIcon from '@mui/icons-material/AssignmentTurnedIn';
 import SearchIcon from '@mui/icons-material/Search';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
-import EventNoteIcon from '@mui/icons-material/EventNote';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import { useNavigate } from 'react-router-dom';
@@ -33,18 +32,58 @@ const Dashboard = () => {
   const [profesionales, setProfesionales] = useState<Usuario[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  
+  // Estados para la IA
+  const [sugerenciaAi, setSugerenciaAi] = useState('');
+  const [loadingAi, setLoadingAi] = useState(false);
 
   const isAdmin = role === 'admin' || role === 'superadmin';
+
+  // Función para llamar a Cloud Run
+  const invocarCopiloto = async (total: number, pendientes: number, eventos: Evento[], nombreUsuario: string, rolUsuario: string) => {
+    setLoadingAi(true);
+    try {
+      const payload = {
+        rol: isAdmin ? 'administrador' : rolUsuario,
+        nombre_profesional: nombreUsuario || 'Profesional',
+        total_victimas: total,
+        pendientes_acreditacion: pendientes,
+        eventos_semana: eventos.map(e => e.titulo)
+      };
+
+      // Si no encuentra la variable de entorno, usa localhost para desarrollo
+      const apiUrl = import.meta.env.VITE_COPILOTO_API_URL || 'http://localhost:8080/api/copiloto/analizar';
+
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setSugerenciaAi(data.sugerencia);
+      } else {
+        setSugerenciaAi("El sistema de IA está fuera de línea por mantenimiento temporal.");
+      }
+    } catch (error) {
+      console.error("Error consultando IA:", error);
+      setSugerenciaAi("Error de conexión con el servidor Copiloto. Revisa tu consola.");
+    } finally {
+      setLoadingAi(false);
+    }
+  };
 
   const loadData = async () => {
     if (!currentUser) return;
     try {
       setLoading(true);
-      
-      // Cargamos los eventos institucionales compartidos para ambos roles
       const snapEventos = await jepService.getEventosProximos();
       setEventosList(snapEventos);
       
+      let dataVictimas: Victima[] = [];
+      let total = 0, pendientes = 0;
+
       if (isAdmin) {
         const [globalStats, snapVictimas, snapUsers] = await Promise.all([
           adminService.getGlobalStats(),
@@ -52,32 +91,41 @@ const Dashboard = () => {
           adminService.getAllUsers()
         ]);
 
-        const victimasData = snapVictimas.docs.map(doc => ({ id: doc.id, ...doc.data() } as Victima));
+        dataVictimas = snapVictimas.docs.map(doc => ({ id: doc.id, ...doc.data() } as Victima));
+        total = globalStats.totalVictimas;
+        pendientes = dataVictimas.filter(v => v.estado_jep?.estado_acreditacion !== 'Acreditada').length;
 
         setStats({
-          total: globalStats.totalVictimas,
+          total,
           caso01: globalStats.totalCaso01,
           caso10: globalStats.totalCaso10,
-          acreditadas: victimasData.filter(v => v.estado_jep?.estado_acreditacion === 'Acreditada').length,
+          acreditadas: total - pendientes,
           eventosProximos: snapEventos.length
         });
-
-        setVictimasList(victimasData);
+        setVictimasList(dataVictimas);
         setProfesionales(snapUsers);
 
       } else {
         const rolBusqueda = role === 'psicosocial' ? 'psicosocial' : 'abogado';
-        const data = await jepService.getVictimasAsignadas(currentUser, rolBusqueda);
+        dataVictimas = await jepService.getVictimasAsignadas(currentUser, rolBusqueda);
         
+        total = dataVictimas.length;
+        pendientes = dataVictimas.filter(v => v.estado_jep?.estado_acreditacion !== 'Acreditada').length;
+
         setStats({
-          total: data.length,
-          caso01: data.filter(v => v.representacion?.caso?.includes('Caso 01')).length,
-          caso10: data.filter(v => v.representacion?.caso?.includes('Caso 10')).length,
-          acreditadas: data.filter(v => v.estado_jep?.estado_acreditacion === 'Acreditada').length,
+          total,
+          caso01: dataVictimas.filter(v => v.representacion?.caso?.includes('Caso 01')).length,
+          caso10: dataVictimas.filter(v => v.representacion?.caso?.includes('Caso 10')).length,
+          acreditadas: total - pendientes,
           eventosProximos: snapEventos.length
         });
-        setVictimasList(data);
+        setVictimasList(dataVictimas);
       }
+
+      // Una vez que tenemos los datos, disparamos la petición asíncrona a Gemini
+      const nombreMostrar = currentUser.displayName || currentUser.email?.split('@')[0] || 'Profesional';
+      invocarCopiloto(total, pendientes, snapEventos, nombreMostrar, role || 'usuario');
+
     } catch (error) {
       console.error("Error Dashboard:", error);
     } finally {
@@ -98,22 +146,6 @@ const Dashboard = () => {
       u.correo.split('@')[0].toLowerCase() === cleanId
     );
     return prof ? (prof.nombre_completo || prof.correo) : id;
-  };
-
-  // Función analítica simulada de lo que Gemini computa al cruzar portafolio + agenda
-  const generarSugerenciaGemini = () => {
-    if (isAdmin) {
-      return "Control global activo. Se detectan 24 solicitudes de acreditación pendientes en el despacho de la JEP del Caso 01. Se sugiere realizar una reasignación masiva de carga técnica optimizada.";
-    }
-    
-    const pendientesPoder = victimasList.filter(v => !v.estado_jep?.estado_reconocimiento_pj?.includes('Con PJ')).length;
-    const proximasAudiencias = eventosList.filter(e => e.tipo === 'Audiencia').length;
-
-    if (stats.total === 0) {
-      return "Aún no tienes casos asignados en tu portafolio operativo. Una vez que la administración central te vincule expedientes, analizaré tus plazos judiciales aquí.";
-    }
-
-    return `Hola. Detecto que tienes ${proximasAudiencias} audiencias programadas en la JEP esta semana. Cruzando tus datos, veo que tienes ${pendientesPoder} víctimas sin radicar el poder de representación formal. Te sugiero priorizar hoy las llamadas de estas carpetas antes de las diligencias de la JEP.`;
   };
 
   const adminFiltered = search.trim() === '' 
@@ -181,17 +213,24 @@ const Dashboard = () => {
       </Grid>
 
       {/* COPILOTO INTELIGENTE GEMINI AI */}
-      <Card elevation={0} sx={{ mb: 5, background: 'linear-gradient(135deg, #f0f7ff 0%, #e0f2fe 100%)', border: '1px solid #bae6fd', borderRadius: 3 }}>
+      <Card elevation={0} sx={{ mb: 5, background: 'linear-gradient(135deg, #f0f7ff 0%, #e0f2fe 100%)', border: '1px solid #bae6fd', borderRadius: 3, minHeight: '120px' }}>
         <CardContent sx={{ p: 3 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
             <AutoAwesomeIcon sx={{ color: '#0284c7', fontSize: 28 }} />
             <Typography variant="h6" sx={{ fontWeight: 800, color: '#0369a1' }}>
-              Copiloto Judicial Inteligente (Gemini AI)
+              Copiloto Judicial Inteligente
             </Typography>
           </Box>
-          <Typography variant="body1" sx={{ color: '#0f172a', lineHeight: 1.6, fontWeight: 500 }}>
-            {generarSugerenciaGemini()}
-          </Typography>
+          {loadingAi ? (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <CircularProgress size={20} />
+              <Typography variant="body2" color="text.secondary">Gemini 2.5 Flash está analizando tus prioridades...</Typography>
+            </Box>
+          ) : (
+            <Typography variant="body1" sx={{ color: '#0f172a', lineHeight: 1.6, fontWeight: 500 }}>
+              {sugerenciaAi}
+            </Typography>
+          )}
         </CardContent>
       </Card>
 
@@ -270,7 +309,6 @@ const Dashboard = () => {
         </Box>
       ) : (
         <Grid container spacing={4}>
-          {/* COLUMNA IZQUIERDA: ALERTAS DE ACREDITACIÓN */}
           <Grid size={{ xs: 12, lg: 6 }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -319,7 +357,6 @@ const Dashboard = () => {
             </Paper>
           </Grid>
 
-          {/* COLUMNA DERECHA: AGENDA OPERATIVA (AUDIENCIAS Y EVENTOS) */}
           <Grid size={{ xs: 12, lg: 6 }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
