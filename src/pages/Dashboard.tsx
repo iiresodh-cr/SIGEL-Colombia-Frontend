@@ -75,10 +75,16 @@ const Dashboard = () => {
       }
     } catch (error) {
       console.error("Error consultando IA:", error);
-      setSugerenciaAi("No se pudo conectar con el servidor del Copiloto Judicial.");
+      setSugerenciaAi("No se pudo conectar con el servidor de PIDA.");
     } finally {
       setLoadingAi(false);
     }
+  };
+
+  const handlePidaClick = () => {
+    const nombreMostrar = currentUser?.displayName || currentUser?.email?.split('@')[0] || 'Profesional';
+    const pendientesCalculadas = stats.total - stats.acreditadas;
+    invocarCopiloto(stats.total, pendientesCalculadas, eventosList, nombreMostrar, role || 'usuario');
   };
 
   const loadData = async () => {
@@ -129,9 +135,7 @@ const Dashboard = () => {
         setVictimasList(dataVictimas);
       }
 
-      const nombreMostrar = currentUser.displayName || currentUser.email?.split('@')[0] || 'Profesional';
-      invocarCopiloto(total, pendientes, snapEventos, nombreMostrar, role || 'usuario');
-
+      // Se eliminó la invocación automática de PIDA para ahorrar recursos
     } catch (error) {
       console.error("Error Dashboard:", error);
       setSugerenciaAi("Error de seguridad: Tu perfil no tiene permisos de lectura sobre estas colecciones de datos.");
@@ -219,23 +223,36 @@ const Dashboard = () => {
         </Grid>
       </Grid>
 
-      {/* COPILOTO INTELIGENTE GEMINI AI */}
+      {/* PIDA AI CARD (Manual) */}
       <Card elevation={0} sx={{ mb: 5, background: 'linear-gradient(135deg, #f0f7ff 0%, #e0f2fe 100%)', border: '1px solid #bae6fd', borderRadius: 3, minHeight: '120px' }}>
         <CardContent sx={{ p: 3 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
-            <AutoAwesomeIcon sx={{ color: '#0284c7', fontSize: 28 }} />
-            <Typography variant="h6" sx={{ fontWeight: 800, color: '#0369a1' }}>
-              Copiloto Judicial Inteligente
-            </Typography>
-          </Box>
-          {loadingAi ? (
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <CircularProgress size={20} />
-              <Typography variant="body2" color="text.secondary">Gemini 2.5 Flash está analizando tus prioridades...</Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <AutoAwesomeIcon sx={{ color: '#0284c7', fontSize: 28 }} />
+              <Typography variant="h6" sx={{ fontWeight: 800, color: '#0369a1' }}>
+                PIDA - Tu Asistente Inteligente
+              </Typography>
             </Box>
-          ) : (
-            <Typography variant="body1" sx={{ color: '#0f172a', lineHeight: 1.6, fontWeight: 500 }}>
+            
+            {!sugerenciaAi && !loadingAi && (
+              <Button variant="contained" size="small" onClick={handlePidaClick} sx={{ bgcolor: '#0284c7', boxShadow: 0, '&:hover': { bgcolor: '#0369a1' } }}>
+                Consultar a PIDA
+              </Button>
+            )}
+          </Box>
+          
+          {loadingAi ? (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 2 }}>
+              <CircularProgress size={20} />
+              <Typography variant="body2" color="text.secondary">PIDA está analizando tu portafolio y agenda...</Typography>
+            </Box>
+          ) : sugerenciaAi ? (
+            <Typography variant="body1" sx={{ color: '#0f172a', lineHeight: 1.6, fontWeight: 500, mt: 1 }}>
               {sugerenciaAi}
+            </Typography>
+          ) : (
+            <Typography variant="body2" sx={{ color: '#64748b', mt: 1 }}>
+              El asistente está en reposo. Haz clic en el botón para generar un resumen estratégico de tus casos y audiencias.
             </Typography>
           )}
         </CardContent>
