@@ -3,12 +3,17 @@ import { Button, CircularProgress, Typography, Box } from '@mui/material';
 import { collection, getDocs, doc, writeBatch } from 'firebase/firestore';
 import { db } from '../config/firebase';
 
+// Diccionario para arreglar errores de dedo severos en la base de datos vieja
+const MAPPING_MANUAL: Record<string, string> = {
+  "tatiaja ojeda": "tojeda@iiresodh.org"
+};
+
 export const MigracionLegacy = () => {
   const [loading, setLoading] = useState(false);
   const [log, setLog] = useState<string[]>([]);
 
   const ejecutarMigracion = async () => {
-    if (!window.confirm("¿Ejecutar migración dinámica para TODOS los abogados y psicosociales?")) return;
+    if (!window.confirm("¿Ejecutar migración dinámica avanzada para Abogados y Psicosociales?")) return;
     setLoading(true);
     setLog(["1. Obteniendo lista oficial de Personal Autorizado..."]);
 
@@ -17,18 +22,39 @@ export const MigracionLegacy = () => {
       const usuariosSnapshot = await getDocs(collection(db, 'usuarios'));
       const usuariosOficiales = usuariosSnapshot.docs.map(doc => doc.data());
       
-      setLog(prev => [...prev, `✅ Se encontraron ${usuariosOficiales.length} perfiles oficiales. Escaneando 3000 víctimas...`]);
+      setLog(prev => [...prev, `✅ Se encontraron ${usuariosOficiales.length} perfiles oficiales. Escaneando víctimas...`]);
 
-      // 2. Motor para buscar el correo oficial basado en el texto viejo
+      // Función para normalizar texto (quitar tildes y pasar a minúsculas)
+      const normalizar = (texto: string) => {
+        return texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+      };
+
+      // 2. Motor avanzado para buscar el correo oficial
       const encontrarCorreoOficial = (textoViejo: string) => {
-        if (!textoViejo || textoViejo.includes('@')) return null; // Si está vacío o ya es correo, está bien
+        if (!textoViejo || textoViejo.includes('@')) return null; 
         
-        const textoLimpio = textoViejo.toLowerCase().trim();
+        const textoLimpio = normalizar(textoViejo);
+
+        // Revisar si es un error de tipeo conocido (Ej. Tatiaja)
+        if (MAPPING_MANUAL[textoLimpio]) {
+            return MAPPING_MANUAL[textoLimpio];
+        }
+
+        const palabrasViejas = textoLimpio.split(/\s+/);
+
         const coincidencia = usuariosOficiales.find(u => {
-            const nombreOficial = (u.nombre_completo || '').toLowerCase().trim();
+            const nombreOficial = normalizar(u.nombre_completo || '');
             if (!nombreOficial) return false;
-            // Busca si el nombre viejo está dentro del oficial (ej. "Alejandra" en "Alejandra Solano Gallardo") o viceversa
-            return nombreOficial.includes(textoLimpio) || textoLimpio.includes(nombreOficial);
+            
+            const palabrasOficiales = nombreOficial.split(/\s+/);
+
+            // Verifica que TODAS las palabras del nombre viejo existan en el nombre oficial
+            const match = palabrasViejas.every(palabraVieja => 
+                palabrasOficiales.some(palabraOficial => 
+                    palabraOficial.includes(palabraVieja) || palabraVieja.includes(palabraOficial)
+                )
+            );
+            return match;
         });
 
         return coincidencia ? coincidencia.correo : null;
@@ -58,7 +84,7 @@ export const MigracionLegacy = () => {
                 updates['representacion.juridico_asignado_id'] = correoNuevo;
                 necesitaActualizar = true;
             } else {
-                noEncontrados.add(`Abogado viejo sin perfíl oficial: ${jurViejo}`);
+                noEncontrados.add(`Abogado: ${jurViejo}`);
             }
         }
 
@@ -69,7 +95,7 @@ export const MigracionLegacy = () => {
                 updates['representacion.psicosocial_asignado_id'] = correoNuevo;
                 necesitaActualizar = true;
             } else {
-                noEncontrados.add(`Psicosocial viejo sin perfíl oficial: ${psiViejo}`);
+                noEncontrados.add(`Psicosocial: ${psiViejo}`);
             }
         }
 
@@ -94,10 +120,10 @@ export const MigracionLegacy = () => {
         await batch.commit();
       }
 
-      setLog(prev => [...prev, `🎉 ¡Migración completada! ${actualizados} víctimas fueron normalizadas.`]);
+      setLog(prev => [...prev, `🎉 ¡Migración exitosa! ${actualizados} víctimas fueron conectadas a su perfil oficial.`]);
       
       if (noEncontrados.size > 0) {
-          setLog(prev => [...prev, `⚠️ Ojo: No se pudo arreglar a las siguientes personas porque no están en tu tabla de "Personal Autorizado" (Créalos ahí primero y vuelve a darle a este botón):`, ...Array.from(noEncontrados)]);
+          setLog(prev => [...prev, `⚠️ Los siguientes nombres NO existen en tu lista de usuarios oficiales (crea sus perfiles y vuelve a correr el script):`, ...Array.from(noEncontrados)]);
       }
 
     } catch (error) {
@@ -112,7 +138,7 @@ export const MigracionLegacy = () => {
      <Box sx={{ p: 3, mb: 4, bgcolor: '#fee2e2', border: '2px dashed #ef4444', borderRadius: 2 }}>
         <Typography variant="h6" color="error" sx={{ fontWeight: 'bold' }}>⚠️ Motor de Normalización de Base de Datos</Typography>
         <Typography variant="body2" sx={{ mb: 2 }}>
-          Este script vinculará dinámicamente todos los textos viejos (Abogados y Psicosociales) a sus correos oficiales verificando los nombres.
+          Este script vinculará dinámicamente todos los textos viejos a sus correos oficiales (Inmune a segundos nombres y tildes).
         </Typography>
         <Button variant="contained" color="error" onClick={ejecutarMigracion} disabled={loading}>
           {loading ? <CircularProgress size={24} color="inherit" /> : "Iniciar Migración Total"}
