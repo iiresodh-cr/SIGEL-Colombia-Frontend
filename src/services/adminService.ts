@@ -49,17 +49,14 @@ export const adminService = {
     await setDoc(userRef, nuevoUsuario, { merge: true });
   },
 
-  // 5. OBTENER ESTADÍSTICAS GLOBALES (OPTIMIZADO: AGREGACIONES EN SERVIDOR)
+  // 5. Obtener estadísticas globales de la organización (Agregaciones en servidor)
   getGlobalStats: async () => {
     const victimasRef = collection(db, 'victimas');
     
-    // Configuración de queries de conteo (No descargan documentos, solo retornan un entero)
     const qTotal = query(victimasRef);
     const qCaso01 = query(victimasRef, where('representacion.caso', 'array-contains', 'Caso 01'));
     const qCaso10 = query(victimasRef, where('representacion.caso', 'array-contains', 'Caso 10'));
     const qAcreditadas = query(victimasRef, where('estado_jep.estado_acreditacion', '==', 'Acreditada'));
-    
-    // Única consulta de descarga restringida a un límite estricto de 5 documentos
     const qUltimas = query(victimasRef, orderBy('fecha_registro', 'desc'), limit(5));
 
     const [snapTotal, snapCaso01, snapCaso10, snapAcreditadas, snapUltimas] = await Promise.all([
@@ -128,14 +125,15 @@ export const adminService = {
     return totalModificados;
   },
 
-  // 7. Listar profesionales operativos
+  // 7. LISTAR PROFESIONALES OPERATIVOS
   getProfesionales: async () => {
     const q = query(collection(db, 'usuarios'));
     const snapshot = await getDocs(q);
     const todos = snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as Usuario));
     return {
       abogados: todos.filter(u => u.rol === 'abogado' || u.rol === 'admin' || u.rol === 'superadmin'),
-      psicosociales: todos.filter(u => u.rol === 'psicosocial')
+      // CORRECCIÓN: Los roles directivos ahora también indexan como referencia psicosocial válida
+      psicosociales: todos.filter(u => u.rol === 'psicosocial' || u.rol === 'admin' || u.rol === 'superadmin')
     };
   },
 
@@ -143,7 +141,7 @@ export const adminService = {
   reasignarVictimaIndividual: async (
     victimaId: string,
     adminResponsableId: string,
-    cambios: {
+    changes: {
       juridico_nuevo_id: string;
       psicosocial_nuevo_id: string;
       motivo: string;
@@ -152,8 +150,8 @@ export const adminService = {
     const victimaRef = doc(db, 'victimas', victimaId);
     const fechaCompleta = new Date().toISOString();
     const updates: any = {};
-    updates['representacion.juridico_asignado_id'] = cambios.juridico_nuevo_id;
-    updates['representacion.psicosocial_asignado_id'] = cambios.psicosocial_nuevo_id;
+    updates['representacion.juridico_asignado_id'] = changes.juridico_nuevo_id;
+    updates['representacion.psicosocial_asignado_id'] = changes.psicosocial_nuevo_id;
     updates['representacion.fecha_asignacion'] = fechaCompleta.split('T')[0];
 
     await updateDoc(victimaRef, updates);
@@ -161,9 +159,9 @@ export const adminService = {
     const historialRef = doc(collection(db, `victimas/${victimaId}/historial_asignaciones`));
     await setDoc(historialRef, {
       fecha_sustitucion: fechaCompleta,
-      juridico_nuevo_id: cambios.juridico_nuevo_id,
-      psicosocial_nuevo_id: cambios.psicosocial_nuevo_id,
-      motivo: cambios.motivo,
+      juridico_nuevo_id: changes.juridico_nuevo_id,
+      psicosocial_nuevo_id: changes.psicosocial_nuevo_id,
+      motivo: changes.motivo,
       sustitucion_realizada_por_id: adminResponsableId
     });
   },
