@@ -24,7 +24,6 @@ import { Victima } from '../types/jep';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../config/firebase';
 
-// IMPORTACIÓN DEL MOTOR DE EXCEL
 import * as XLSX from 'xlsx';
 
 const AdminDashboard = () => {
@@ -41,7 +40,6 @@ const AdminDashboard = () => {
   const [victimasCarga, setVictimasCarga] = useState<Victima[]>([]);
   const [usuarioSupervisado, setUsuarioSupervisado] = useState('');
 
-  // ESTADOS NUEVOS: MÓDULO ESTADÍSTICO DE TABLAS DINÁMICAS (BAJO DEMANDA)
   const [showPivotModule, setShowPivotModule] = useState(false);
   const [loadingPivot, setLoadingPivot] = useState(false);
   const [matrizMacrocasoAcreditacion, setMatrizMacrocasoAcreditacion] = useState<any>(null);
@@ -89,7 +87,6 @@ const AdminDashboard = () => {
     loadDashboardData();
   }, []);
 
-  // MOTOR DE CÓMPUTO DE TABLAS DINÁMICAS (PIVOT TABLES) EN MEMORIA DEL CLIENTE
   const cargarYGenerarTablasDinamicas = async () => {
     if (showPivotModule) {
       setShowPivotModule(false);
@@ -104,14 +101,13 @@ const AdminDashboard = () => {
       const docs = snap.docs.map(d => ({ id: d.id, ...d.data() } as Victima));
       setUniversoCompletoVictimas(docs);
 
-      // --- TABLA DINÁMICA 1: MACROCASO VS ESTADO ACREDITACIÓN ---
+      // CORRECCIÓN: Inicialización de claves usando los literales del esquema de tipos oficiales
       const pivot1: Record<string, Record<string, number>> = {
-        "Caso 01": { "Acreditada": 0, "En trámite": 0, "No está acreditada": 0 },
-        "Caso 10": { "Acreditada": 0, "En trámite": 0, "No está acreditada": 0 },
-        "Sin vincular": { "Acreditada": 0, "En trámite": 0, "No está acreditada": 0 }
+        "Caso 01": { "Acreditada": 0, "En trámite (despacho no ha resuelto)": 0, "No está acreditada": 0 },
+        "Caso 10": { "Acreditada": 0, "En trámite (despacho no ha resuelto)": 0, "No está acreditada": 0 },
+        "Sin vincular": { "Acreditada": 0, "En trámite (despacho no ha resuelto)": 0, "No está acreditada": 0 }
       };
 
-      // --- TABLA DINÁMICA 2: BLOQUE JEP VS GÉNERO ---
       const bloquesValidos = ['BNOR', 'BSUR', 'BORI', 'BCAR', 'BCC', 'BMM', 'BOCC'];
       const pivot2: Record<string, Record<string, number>> = {};
       bloquesValidos.forEach(b => {
@@ -119,13 +115,10 @@ const AdminDashboard = () => {
       });
       pivot2["Sin Bloque"] = { "Mujer": 0, "Hombre": 0, "Otro/No registra": 0 };
 
-      // Algoritmo de agregación cruzada
       docs.forEach(v => {
-        // Pivot 1
         const casos = v.representacion?.caso || [];
-        let estado = v.estado_jep?.estado_acreditacion || "No está acreditada";
-        if (estado.includes("trámite")) estado = "En trámite";
-        if (estado.includes("No está")) estado = "No está acreditada";
+        // CORRECCIÓN: Lectura e indexación directa y segura conforme a la unión de tipos de la app
+        const estado = v.estado_jep?.estado_acreditacion || "No está acreditada";
 
         if (casos.length === 0) {
           if (pivot1["Sin vincular"][estado] !== undefined) pivot1["Sin vincular"][estado]++;
@@ -135,7 +128,6 @@ const AdminDashboard = () => {
           });
         }
 
-        // Pivot 2
         const bloques = v.representacion?.bloque || [];
         let gen = v.datos_demograficos?.genero || "Otro/No registra";
         if (gen !== "Mujer" && gen !== "Hombre") gen = "Otro/No registra";
@@ -164,7 +156,6 @@ const AdminDashboard = () => {
     }
   };
 
-  // FUNCIÓN: PERMITE AL ADMINISTRADOR EXPORTAR LA MATRIZ DE 2,900 VÍCTIMAS
   const descargarMatrizConsolidadaCompleta = () => {
     if (universoCompletoVictimas.length === 0) return;
 
@@ -273,9 +264,6 @@ const AdminDashboard = () => {
         </Box>
       </Box>
 
-      {/* =====================================================================
-          NUEVO MÓDULO AVANZADO: TABLAS DINÁMICAS INTERACTIVAS (BAJO DEMANDA)
-          ===================================================================== */}
       {showPivotModule && (
         <Paper elevation={0} sx={{ p: 4, borderRadius: 3, border: '2px solid #3b82f6', bgcolor: '#f0f9ff', mb: 4 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
@@ -308,7 +296,6 @@ const AdminDashboard = () => {
             </Box>
           ) : (
             <Grid container spacing={4}>
-              {/* TABLA DINÁMICA 1: MACROCASO VS ACREDITACIÓN */}
               <Grid size={{ xs: 12, lg: 6 }}>
                 <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#1e3a8a', mb: 1 }}>
                   Tabla Dinámica 1: Cobertura de Macrocasos vs. Estado de Acreditación JEP
@@ -327,7 +314,8 @@ const AdminDashboard = () => {
                       <TableRow key={caso} hover>
                         <TableCell sx={{ fontWeight: 700 }}>{caso}</TableCell>
                         <TableCell align="center" sx={{ fontWeight: 600 }}>{matrizMacrocasoAcreditacion[caso]["Acreditada"]}</TableCell>
-                        <TableCell align="center" sx={{ fontWeight: 600 }}>{matrizMacrocasoAcreditacion[caso]["En trámite"]}</TableCell>
+                        {/* CORRECCIÓN: Indexación acoplada de forma idéntica a los tipos estrictos del backend */}
+                        <TableCell align="center" sx={{ fontWeight: 600 }}>{matrizMacrocasoAcreditacion[caso]["En trámite (despacho no ha resuelto)"]}</TableCell>
                         <TableCell align="center" sx={{ fontWeight: 600 }}>{matrizMacrocasoAcreditacion[caso]["No está acreditada"]}</TableCell>
                       </TableRow>
                     ))}
@@ -335,7 +323,6 @@ const AdminDashboard = () => {
                 </Table>
               </Grid>
 
-              {/* TABLA DINÁMICA 2: BLOQUE JEP VS GÉNERO */}
               <Grid size={{ xs: 12, lg: 6 }}>
                 <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#1e3a8a', mb: 1 }}>
                   Tabla Dinámica 2: Despliegue de Bloques Territoriales vs. Identidad de Género
@@ -366,7 +353,6 @@ const AdminDashboard = () => {
         </Paper>
       )}
 
-      {/* BUZÓN DE CASOS ESPECIALES / EX-EMPLEADOS */}
       {casosExEmpleados.length > 0 && (
         <Paper elevation={0} sx={{ p: 4, borderRadius: 3, border: '2px solid #ef4444', bgcolor: '#fef2f2', mb: 4 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
