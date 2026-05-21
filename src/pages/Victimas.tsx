@@ -30,17 +30,11 @@ const Victimas = () => {
     if (!currentUser?.email) return;
     try {
       setLoading(true);
-      const isAltRole = role === 'admin' || role === 'superadmin';
       
-      let data;
-      if (isAltRole) {
-        data = await jepService.getVictimas();
-      } else {
-        const rolTipo = role === 'psicosocial' ? 'psicosocial' : 'abogado';
-        data = await jepService.getVictimasAsignadas(currentUser, rolTipo);
-      }
-
+      // REGLA DE NEGOCIO: En la matriz global, todos los profesionales ven el universo completo de víctimas
+      const data = await jepService.getVictimas();
       const profs = await adminService.getProfesionales();
+      
       setVictimas(data);
       setProfesionales(profs);
     } catch (error) {
@@ -153,7 +147,6 @@ const Victimas = () => {
               </TableHead>
               <TableBody>
                 {loading ? (
-                  // PLACEHOLDERS INTELIGENTES: Skeletons fluidos adaptados a la forma de la tabla
                   Array.from(new Array(5)).map((_, index) => (
                     <TableRow key={index}>
                       <TableCell><Skeleton variant="text" width="70%" height={24} /></TableCell>
