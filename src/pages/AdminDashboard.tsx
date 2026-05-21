@@ -20,6 +20,240 @@ import { useAuth } from '../context/AuthContext';
 import { Usuario } from '../types/user';
 import { Victima } from '../types/jep';
 
+// IMPORTS ADICIONALES REQUERIDOS PARA EL NUEVO MOTOR DE UNIFICACIÓN
+import { collection, getDocs, doc, writeBatch } from 'firebase/firestore';
+import { db } from '../config/firebase';
+
+// =========================================================================
+// COMPONENTE: MIGRACIÓN Y UNIFICACIÓN ESTRICTA (FASE 1)
+// =========================================================================
+const MigracionUnificacion = () => {
+  const [loading, setLoading] = useState(false);
+  const [logs, setLogs] = useState<string[]>([]);
+  const TARGET_COLLECTION = 'victimas'; // Apuntado directamente a producción
+
+  const normalizar = (texto: string) => {
+    return texto ? texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim() : "";
+  };
+
+  const ejecutarUnificacion = async () => {
+    const msgConfirm = `⚠️ ¿Estás completamente seguro de unificar los identificadores de ~2,900 registros directamente en la colección de producción [${TARGET_COLLECTION}]?`;
+    if (!window.confirm(msgConfirm)) return;
+
+    setLoading(true);
+    setLogs(["🚀 Iniciando motor asíncrono de unificación masiva..."]);
+
+    try {
+      // 1. Descargar la lista de usuarios oficiales autorizados
+      const usuariosSnapshot = await getDocs(collection(db, 'usuarios'));
+      const listaUsuarios = usuariosSnapshot.docs.map(d => ({ uid: d.id, ...d.data() } as any));
+      
+      setLogs(prev => [...prev, `ℹ️ Se cargaron ${listaUsuarios.length} perfiles oficiales de referencia.`]);
+
+      // 2. Construir diccionarios de indexación rápida O(1) en memoria
+      const mapPorUid = new Map<string, any>();
+      const mapPorCorreo = new Map<string, any>();
+      const mapPorUsername = new Map<string, any>();
+      const mapPorNombreNormalizado = new Map<string, any>();
+
+      listaUsuarios.forEach(u => {
+        const correo = u.correo ? u.correo.toLowerCase().trim() : "";
+        const uidReal = u.uid ? u.uid.trim() : "";
+        const username = correo.split('@')[0];
+        const nombreNorm = normalizar(u.nombre_completo || "");
+
+        if (uidReal) mapPorUid.set(uidReal, u);
+        if (correo) mapPorCorreo.set(correo, u);
+        if (username) mapPorUsername.set(username, u);
+        if (nombreNorm) mapPorNombreNormalizado.set(nombreNorm, u);
+      });
+
+      // 3. Descargar las víctimas de producción
+      setLogs(prev => [...prev, `🔍 Descargando universo de datos desde '${TARGET_COLLECTION}' (esto puede tomar unos segundos)...`]);
+      const victimasSnapshot = await getDocs(collection(db, TARGET_COLLECTION));
+      
+      setLogs(prev => [...prev, `✅ Conexión establecida. Analizando ${victimasSnapshot.size} documentos...`]);
+
+      let actualizados = 0;
+      let totalAnalizados = 0;
+      let alertasUnmatched = new Set<string>();
+      
+      let batch = writeBatch(db);
+      let operacionesBatch = 0;
+
+      // 4. Función de resolución inteligente de Identificadores Irregulares
+      const resolverIdentificador = (idCrudo: string): { correo: string | null; nombre: string | null } => {
+        if (!idCrudo || idCrudo.trim() === "") return { correo: "", nombre: "" };
+
+        const stringLimpio = idCrudo.trim();
+        const stringMinuscula = stringLimpio.toLowerCase();
+
+        // Caso A: Ya es un correo electrónico completo oficial
+        if (mapPorCorreo.has(stringMinuscula)) {
+          const user = mapPorCorreo.get(stringMinuscula);
+          return { correo: user.correo, nombre: user.nombre_completo || "" };
+        }
+
+        // Caso B: Es un UID alfanumérico de Firebase Auth
+        if (mapPorUid.has(stringLimpio)) {
+          const user = mapPorUid.get(stringLimpio);
+          return { correo: user.correo, nombre: user.nombre_completo || "" };
+        }
+
+        // Caso C: Es el username corto (ej: 'jmerchan')
+        if (mapPorUsername.has(stringMinuscula)) {
+          const user = mapPorUsername.get(stringMinuscula);
+          return { correo: user.correo, nombre: user.nombre_completo || "" };
+        }
+
+        // Caso D: Es el nombre de pila plano con errores de tildes o espacios
+        const nombreNorm = normalizar(stringLimpio);
+        if (mapPorNombreNormalizado.has(nombreNorm)) {
+          const user = mapPorNombreNormalizado.get(nombreNorm);
+          return { correo: user.correo, nombre: user.nombre_completo || "" };
+        }
+
+        // Caso E: Búsqueda cruzada de coincidencia parcial de palabras
+        if (nombreNorm.length > 2) {
+          const palabras = nombreNorm.split(/\s+/);
+          const coincidenciaFuzzy = listaUsuarios.find(u => {
+            const nOficial = normalizar(u.nombre_completo || "");
+            return palabras.every(p => nOficial.includes(p));
+          });
+          if (coincidenciaFuzzy) {
+            return { correo: coincidenciaFuzzy.correo, nombre: coincidenciaFuzzy.nombre_completo || "" };
+          }
+        }
+
+        return { correo: null, nombre: null };
+      };
+
+      // 5. Ciclo For...Of Asíncrono Secuencial (Resistente a volúmenes masivos de datos)
+      for (const victimaDoc of victimasSnapshot.docs) {
+        totalAnalizados++;
+        const data = victimaDoc.data();
+        const representacion = data.representacion || {};
+
+        const jurActual = representacion.juridico_asignado_id;
+        const psiActual = representacion.psicosocial_asignado_id;
+
+        let necesitaUpdate = false;
+        let camposUpdate: any = {};
+
+        // Validar y unificar campo Jurídico
+        if (jurActual) {
+          const resJur = resolverIdentificador(jurActual);
+          if (resJur.correo !== null) {
+            if (jurActual !== resJur.correo || representacion.juridico_asignado_nombre !== resJur.nombre) {
+              camposUpdate['representacion.juridico_asignado_id'] = resJur.correo;
+              camposUpdate['representacion.juridico_asignado_nombre'] = resJur.nombre;
+              necesitaUpdate = true;
+            }
+          } else {
+            alertasUnmatched.add(`Jurídico no resuelto: "${jurActual}" (Víctima: ${data.nombre_completo})`);
+          }
+        }
+
+        // Validar y unificar campo Psicosocial
+        if (psiActual) {
+          const resPsi = resolverIdentificador(psiActual);
+          if (resPsi.correo !== null) {
+            if (psiActual !== resPsi.correo || representacion.psicosocial_asignado_nombre !== resPsi.nombre) {
+              camposUpdate['representacion.psicosocial_asignado_id'] = resPsi.correo;
+              camposUpdate['representacion.psicosocial_asignado_nombre'] = resPsi.nombre;
+              necesitaUpdate = true;
+            }
+          } else {
+            alertasUnmatched.add(`Psicosocial no resuelto: "${psiActual}" (Víctima: ${data.nombre_completo})`);
+          }
+        }
+
+        if (necesitaUpdate) {
+          const refDoc = doc(db, TARGET_COLLECTION, victimaDoc.id);
+          batch.update(refDoc, camposUpdate);
+          actualizados++;
+          operacionesBatch++;
+        }
+
+        // Si alcanzamos el límite de lote, esperamos secuencialmente su confirmación en el servidor
+        if (operacionesBatch >= 450) {
+          setLogs(prev => [...prev, `⏳ Comprometiendo lote de escrituras en base de datos...`]);
+          await batch.commit();
+          batch = writeBatch(db);
+          operacionesBatch = 0;
+        }
+      }
+
+      // Procesar remanentes finales
+      if (operacionesBatch > 0) {
+        await batch.commit();
+      }
+
+      setLogs(prev => [
+        ...prev, 
+        `🎉 ¡PROCESO DE UNIFICACIÓN COMPLETADO CON ÉXITO!`,
+        `📊 Total de expedientes evaluados en producción: ${totalAnalizados}.`,
+        `✅ Total de asignaciones corregidas y unificadas bajo formato de Correo Único: ${actualizados}.`
+      ]);
+
+      if (alertasUnmatched.size > 0) {
+        setLogs(prev => [
+          ...prev, 
+          `⚠️ ADVERTENCIA: Los siguientes nombres no pudieron mapearse porque no están autorizados formalmente en la colección 'usuarios':`,
+          ...Array.from(alertasUnmatched)
+        ]);
+      }
+
+    } catch (error) {
+      console.error(error);
+      setLogs(prev => [...prev, "❌ Error crítico durante la unificación. Revisa la consola del navegador."]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Paper elevation={0} sx={{ p: 3, mb: 4, bgcolor: '#eff6ff', border: '2px dashed #3b82f6', borderRadius: 2 }}>
+      <Typography variant="h6" color="primary" sx={{ fontWeight: 'bold', mb: 1 }}>
+        Fase 1: Unificador Estricto de Identificadores (Correo Único)
+      </Typography>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+        Este script escaneará el universo de datos y reemplazará automáticamente cualquier formato inconsistente (UID, nombre plano o username) por el **correo electrónico institucional homologado**.
+      </Typography>
+
+      <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mb: 2 }}>
+        <Button variant="contained" color="primary" onClick={ejecutarUnificacion} disabled={loading}>
+          {loading ? <CircularProgress size={24} color="inherit" /> : "Ejecutar Unificación en Producción"}
+        </Button>
+        <Typography variant="subtitle2">
+          Colección Objetivo Actual: <Chip label={TARGET_COLLECTION} color="error" size="small" sx={{ fontWeight: 'bold' }} />
+        </Typography>
+      </Box>
+
+      <Box sx={{ mt: 2, maxHeight: 220, overflowY: 'auto', bgcolor: '#1e293b', p: 2, borderRadius: 1 }}>
+        {logs.map((log, i) => (
+          <Typography 
+            key={i} 
+            variant="caption" 
+            sx={{ 
+              display: 'block', 
+              fontFamily: 'monospace', 
+              color: log.includes('❌') || log.includes('⚠️') ? '#f87171' : (log.includes('🎉') || log.includes('✅') ? '#4ade80' : '#f8fafc'),
+              mt: 0.5 
+            }}
+          >
+            {log}
+          </Typography>
+        ))}
+      </Box>
+    </Paper>
+  );
+};
+
+
+// =========================================================================
+// COMPONENTE PRINCIPAL: ADMIN DASHBOARD
+// =========================================================================
 const AdminDashboard = () => {
   const [users, setUsers] = useState<Usuario[]>([]);
   const [userSearch, setUserSearch] = useState('');
@@ -136,7 +370,9 @@ const AdminDashboard = () => {
         </Button>
       </Box>
 
+      {/* RENDERIZADO DE AMBOS COMPONENTES DE MIGRACIÓN */}
       <MigracionLegacy />
+      <MigracionUnificacion />
 
       {showSustitucion ? (
         <SustitucionMasiva 
@@ -261,7 +497,7 @@ const AdminDashboard = () => {
                       </IconButton>
 
                       {u.correo !== 'webmaster@iiresodh.org' && (
-                        <>
+                        <Box sx={{ display: 'flex', gap: 1 }}>
                           <Select 
                             size="small" 
                             value={u.rol} 
@@ -276,7 +512,7 @@ const AdminDashboard = () => {
                           <IconButton color="error" onClick={() => handleDeleteUser(u.correo)}>
                             <DeleteIcon />
                           </IconButton>
-                        </>
+                        </Box>
                       )}
                     </Box>
                   </TableCell>
