@@ -19,6 +19,8 @@ import { useModal } from '../context/ModalContext';
 import { useAuth } from '../context/AuthContext';
 import { Usuario } from '../types/user';
 import { Victima } from '../types/jep';
+
+// IMPORTS REQUERIDOS PARA EL NUEVO MOTOR DE UNIFICACIÓN MASIVA
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../config/firebase';
 
@@ -56,8 +58,8 @@ const AdminDashboard = () => {
         totalCaso10: statsData.totalCaso10
       });
 
-      // CARGA ESTRICTA DEL BUZÓN DE EX-EMPLEADOS USANDO PREFIJOS EN SERVIDOR (~52 docs en lugar de 2,900)
-      const victimasRef = collection(db, 'with_victimas', 'victimas');
+      // CORRECCIÓN: Referencia corregida a un segmento impar ('victimas')
+      const victimasRef = collection(db, 'victimas');
       const qExJur = query(victimasRef, where('representacion.juridico_asignado_id', '>=', 'ex_empleado-'), where('representacion.juridico_asignado_id', '<=', 'ex_empleado-' + '\uf8ff'));
       const qExPsi = query(victimasRef, where('representacion.psicosocial_asignado_id', '>=', 'ex_empleado-'), where('representacion.psicosocial_asignado_id', '<=', 'ex_empleado-' + '\uf8ff'));
 
@@ -88,7 +90,6 @@ const AdminDashboard = () => {
     }
   };
 
-  // CONSULTA MASIVA EN VIVO (BAJO DEMANDA: Solo descarga si haces clic en el botón)
   const handleVerCarga = async (user: Usuario) => {
     const displayName = user.nombre_completo ? `${user.nombre_completo} (${user.correo})` : user.correo;
     setUsuarioSupervisado(displayName);
@@ -96,7 +97,7 @@ const AdminDashboard = () => {
       setLoadingModal(true);
       setOpenCargaModal(true);
       const data = await adminService.getVictimasPorProfesional(user);
-      setVictimasCarga(data.filter(v => v.representacion?.estado === 'Activo'));
+      setVictimasCarga(data.filter(v => v.representacion?.estado === 'Active' || v.representacion?.estado === 'Activo'));
     } catch (error) {
       console.error(error);
     } finally {
@@ -142,7 +143,7 @@ const AdminDashboard = () => {
         </Button>
       </Box>
 
-      {/* PANEL INTELIGENTE: BUZÓN DE CASOS ESPECIALES / EX-EMPLEADOS */}
+      {/* BUZÓN DE CASOS ESPECIALES / EX-EMPLEADOS */}
       {casosExEmpleados.length > 0 && (
         <Paper elevation={0} sx={{ p: 4, borderRadius: 3, border: '2px solid #ef4444', bgcolor: '#fef2f2', mb: 4 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
@@ -357,7 +358,7 @@ const AdminDashboard = () => {
         
         <DialogContent dividers sx={{ minHeight: '300px', maxHeight: '450px' }}>
           {loadingModal ? (
-            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 6, gap: 2 }}>
+            <Box sx={{ py: 6, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, textAlign: 'center' }}>
               <CircularProgress size={30} />
               <Typography variant="body2" color="text.secondary">Consultando expedientes asignados en servidor...</Typography>
             </Box>
