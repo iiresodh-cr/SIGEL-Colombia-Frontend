@@ -12,6 +12,8 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
+import CloudDownloadIcon from '@mui/icons-material/CloudDownload';
+import ReactMarkdown from 'react-markdown';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { jepService } from '../services/jepService';
@@ -20,7 +22,9 @@ import { collection, query, getDocs, limit, startAfter, endBefore, limitToLast, 
 import { db } from '../config/firebase';
 import { Victima, Evento } from '../types/jep';
 import { Usuario } from '../types/user';
-import ReactMarkdown from 'react-markdown';
+
+// IMPORTACIÓN DEL MOTOR DE EXCEL
+import * as XLSX from 'xlsx';
 
 const PAGE_SIZE = 10;
 
@@ -36,7 +40,6 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   
-  // Estados para Paginación de Servidor (Admin)
   const [firstVisible, setFirstVisible] = useState<any>(null);
   const [lastVisible, setLastVisible] = useState<any>(null);
   const [page, setPage] = useState(1);
@@ -71,7 +74,6 @@ const Dashboard = () => {
     });
   };
 
-  // MOTOR DE PAGINACIÓN Y BÚSQUEDA FLUIDA EN SERVIDOR
   const fetchAdminVictimas = async (direction?: 'next' | 'prev', forcedSearch?: string) => {
     try {
       const targetSearch = forcedSearch !== undefined ? forcedSearch : search;
@@ -80,10 +82,8 @@ const Dashboard = () => {
       if (targetSearch.trim() !== '') {
         const cleanTerm = targetSearch.trim();
         if (!isNaN(Number(cleanTerm))) {
-          // Búsqueda exacta e instantánea por número de cédula
           q = query(collection(db, 'victimas'), where('identificacion', '==', cleanTerm), limit(PAGE_SIZE));
         } else {
-          // Búsqueda escalable por prefijo alfabético de nombre
           q = query(
             collection(db, 'victimas'),
             where('nombre_completo', '>=', cleanTerm),
@@ -92,7 +92,6 @@ const Dashboard = () => {
           );
         }
       } else {
-        // Modo Exploración: Paginación convencional sin búsquedas activas
         if (direction === 'next' && lastVisible) {
           q = query(collection(db, 'victimas'), orderBy('nombre_completo', 'asc'), startAfter(lastVisible), limit(PAGE_SIZE));
         } else if (direction === 'prev' && firstVisible) {
@@ -135,6 +134,35 @@ const Dashboard = () => {
     setFirstVisible(null);
     setLastVisible(null);
     fetchAdminVictimas(undefined, val);
+  };
+
+  // FUNCIÓN: PERMITE AL PROFESIONAL DESCARGAR SU PORTAFOLIO EN EXCEL
+  const descargarExcelProfesional = () => {
+    if (victimasList.length === 0) return;
+    
+    // Mapeo semántico de campos planos estructurados
+    const filasFormateadas = victimasList.map(v => ({
+      "Nombre Completo": v.nombre_completo,
+      "Documento": `${v.tipo_documento || 'CC'} ${v.identificacion}`,
+      "Género": v.datos_demograficos?.genero || 'No registra',
+      "Grupo Étnico": v.datos_demograficos?.grupo_etnico || 'Ninguno',
+      "Ciclo Vital": v.datos_demograficos?.etareo || 'Adulto',
+      "Teléfono": v.datos_contacto?.telefono || 'No registra',
+      "Correo Electrónico": v.datos_contacto?.correo || 'No registra',
+      "Ubicación": `${v.datos_contacto?.departamento || ''} - ${v.datos_contacto?.direccion || ''}`,
+      "Macrocaso(s) JEP": v.representacion?.caso?.join(', ') || 'Sin vincular',
+      "Bloque(s)": v.representacion?.bloque?.join(', ') || 'No registra',
+      "Calidad de Víctima": v.representacion?.calidad_victima || 'No registra',
+      "Estado Acreditación JEP": v.estado_jep?.estado_acreditacion || 'No está acreditada',
+      "Auto de Acreditación": v.estado_jep?.auto_acreditacion || 'N/A'
+    }));
+
+    const hoja = XLSX.utils.json_to_sheet(filasFormateadas);
+    const libro = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(libro, hoja, "Mis Víctimas Asignadas");
+    
+    const fecha = new Date().toISOString().split('T')[0];
+    XLSX.writeFile(libro, `Mi_Portafolio_SIGEL_${fecha}.xlsx`);
   };
 
   const invocarCopiloto = async (total: number, pendientes: number, eventos: Evento[], nombreUsuario: string, rolUsuario: string) => {
@@ -202,7 +230,7 @@ const Dashboard = () => {
           eventosProximos: eventosVigentes.length
         });
         setProfesionales(snapUsers);
-        await fetchAdminVictimas(undefined, ''); // Inicializa la primera página
+        await fetchAdminVictimas(undefined, '');
 
       } else {
         const rolBusqueda = role === 'psicosocial' ? 'psicosocial' : 'abogado';
@@ -254,15 +282,30 @@ const Dashboard = () => {
 
   return (
     <Box sx={{ p: 4 }}>
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" sx={{ mb: 1, fontWeight: 800, color: '#003366' }}>
-          {isAdmin ? "Control Maestro de Casos" : "Mi Panel de Trabajo"}
-        </Typography>
-        <Typography variant="body1" color="text.secondary">
-          {isAdmin 
-            ? "Gestión global de la representación técnica e institucional IIRESODH." 
-            : `Bienvenido/a. Tienes ${stats.total} víctimas activas bajo tu responsabilidad.`}
-        </Typography>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 4 }}>
+        <Box>
+          <Typography variant="h4" sx={{ mb: 1, fontWeight: 800, color: '#003366' }}>
+            {isAdmin ? "Control Maestro de Casos" : "Mi Panel de Trabajo"}
+          </Typography>
+          <Typography variant="body1" color="text.secondary">
+            {isAdmin 
+              ? "Gestión global de la representación técnica e institucional IIRESODH." 
+              : `Bienvenido/a. Tienes ${stats.total} víctimas activas bajo tu responsabilidad.`}
+          </Typography>
+        </Box>
+        
+        {/* BOTÓN OPERACIONAL EXCEL PROFESIONALES */}
+        {!isAdmin && victimasList.length > 0 && (
+          <Button 
+            variant="contained" 
+            color="success" 
+            startIcon={<CloudDownloadIcon />} 
+            onClick={descargarExcelProfesional}
+            sx={{ fontWeight: 'bold' }}
+          >
+            Descargar Mi Portafolio (Excel)
+          </Button>
+        )}
       </Box>
 
       <Grid container spacing={3} sx={{ mb: 4 }}>
@@ -330,7 +373,7 @@ const Dashboard = () => {
                 '& p': { variant: 'body1', lineHeight: 1.6, fontWeight: 500, mb: 1.5 },
                 '& ul, & ol': { pl: 3, mb: 1.5 },
                 '& li': { variant: 'body1', lineHeight: 1.5, mb: 0.5 },
-                '& strong': { color: '#0369a1', fontWeight: 700 }
+                '& strong': { color: '#0284c7', fontWeight: 700 }
               }}
             >
               <ReactMarkdown>{sugerenciaAi}</ReactMarkdown>
@@ -405,7 +448,6 @@ const Dashboard = () => {
             </Table>
           </Paper>
 
-          {/* CONTROLES DE PAGINACIÓN FLUIDA EN SERVIDOR */}
           {search.trim() === '' && (
             <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 2, mt: 3 }}>
               <Button variant="outlined" size="small" disabled={page === 1} onClick={() => handlePageChange('prev')}>Anterior</Button>
