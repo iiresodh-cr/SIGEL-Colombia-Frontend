@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Box, Typography, Paper, Button, Table, TableBody, TableCell, 
-  TableHead, TableRow, CircularProgress, Chip, IconButton,
+  TableHead, TableRow, Chip, IconButton,
   Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem, Grid,
-  FormControl, InputLabel, Select, OutlinedInput
+  FormControl, InputLabel, Select, OutlinedInput, Skeleton
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -107,8 +107,6 @@ const Audiencias = () => {
     });
   };
 
-  if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', mt: 10 }}><CircularProgress /></Box>;
-
   return (
     <Box sx={{ p: 4 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
@@ -138,7 +136,22 @@ const Audiencias = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {audiencias.length === 0 ? (
+            {loading ? (
+              // PLACEHOLDERS INTELIGENTES: Skeletons fluidos adaptados a las columnas del litigio
+              Array.from(new Array(4)).map((_, index) => (
+                <TableRow key={index}>
+                  <TableCell><Skeleton variant="text" width="60%" height={24} /></TableCell>
+                  <TableCell><Skeleton variant="rectangular" width={60} height={24} sx={{ borderRadius: 1 }} /></TableCell>
+                  <TableCell>
+                    <Skeleton variant="text" width="70%" height={20} />
+                    <Skeleton variant="text" width="40%" height={16} />
+                  </TableCell>
+                  <TableCell><Skeleton variant="text" width="85%" height={24} /></TableCell>
+                  <TableCell><Skeleton variant="text" width="65%" height={24} /></TableCell>
+                  <TableCell align="right"><Skeleton variant="circular" width={32} height={32} sx={{ display: 'inline-block' }} /></TableCell>
+                </TableRow>
+              ))
+            ) : audiencias.length === 0 ? (
               <TableRow><TableCell colSpan={6} align="center" sx={{ py: 3 }}>No hay actuaciones judiciales registradas.</TableCell></TableRow>
             ) : (
               audiencias.map((aud) => (

@@ -20,6 +20,7 @@ import { collection, query, getDocs, limit, startAfter, endBefore, limitToLast, 
 import { db } from '../config/firebase';
 import { Victima, Evento } from '../types/jep';
 import { Usuario } from '../types/user';
+import ReactMarkdown from 'react-markdown';
 
 const PAGE_SIZE = 10;
 
@@ -322,7 +323,18 @@ const Dashboard = () => {
               <Typography variant="body2" color="text.secondary">Analizando agenda y portafolio...</Typography>
             </Box>
           ) : sugerenciaAi ? (
-            <Typography variant="body1" sx={{ color: '#0f172a', lineHeight: 1.6, fontWeight: 500, mt: 1 }}>{sugerenciaAi}</Typography>
+            <Box 
+              sx={{ 
+                color: '#0f172a', 
+                mt: 1,
+                '& p': { variant: 'body1', lineHeight: 1.6, fontWeight: 500, mb: 1.5 },
+                '& ul, & ol': { pl: 3, mb: 1.5 },
+                '& li': { variant: 'body1', lineHeight: 1.5, mb: 0.5 },
+                '& strong': { color: '#0369a1', fontWeight: 700 }
+              }}
+            >
+              <ReactMarkdown>{sugerenciaAi}</ReactMarkdown>
+            </Box>
           ) : (
             <Typography variant="body2" sx={{ color: '#64748b', mt: 1 }}>Haz clic en el botón para generar un resumen estratégico.</Typography>
           )}

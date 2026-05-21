@@ -20,6 +20,7 @@
     "papaparse": "^5.5.3",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
+    "react-markdown": "^10.1.0",
     "react-router-dom": "^7.14.2",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.2/xlsx-0.20.2.tgz"
   },

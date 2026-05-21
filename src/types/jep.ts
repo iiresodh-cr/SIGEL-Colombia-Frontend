@@ -137,28 +137,3 @@ export interface HistorialAsignacion {
   sustitucion_realizada_por_id: string; 
   radicado_sustitucion_jep?: string;
 }
-
-// ==========================================
-// TIPOS LEGACY / DEPRECADOS (Compatibilidad UI Fase 3)
-// ==========================================
-export interface ExpedienteJEP {
-  id?: string;
-  codigoExpediente: string;
-  macrocaso: 'Caso 01' | 'Caso 10';
-  estadoProcesal: string;
-  resumenHechos: string;
-  fechaRegistro: string;
-}
-
-export interface VictimaJEP {
-  id?: string;
-  expedienteId: string;
-  nombreCompleto: string;
-  documentoIdentidad: string;
-  telefono: string;
-  direccion: string;
-  municipio: string;
-  departamento: string;
-  estadoAcreditacion: 'Acreditada' | 'En proceso' | 'No acreditada';
-  observacionesContacto: string;
-}

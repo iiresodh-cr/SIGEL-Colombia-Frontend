@@ -362,8 +362,11 @@ const AdminDashboard = () => {
               <Typography variant="body2" color="text.secondary">Consultando expedientes asignados en servidor...</Typography>
             </Box>
           ) : victimasCarga.length === 0 ? (
-            <Box sx={{ py: 6, textAlign: 'center' }}>
-              <Typography variant="body1" color="text.secondary">No hay casos activos vinculados a este perfil.</Typography>
+            <Box sx={{ py: 6, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, textAlign: 'center' }}>
+              <FolderSharedIcon sx={{ fontSize: 70, color: 'text.secondary', opacity: 0.25 }} />
+              <Typography variant="body1" color="text.secondary" sx={{ fontWeight: 500 }}>
+                No hay casos activos vinculados a este perfil.
+              </Typography>
             </Box>
           ) : (
             <List disablePadding>

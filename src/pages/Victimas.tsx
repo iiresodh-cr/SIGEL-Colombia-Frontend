@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { 
   Box, Typography, Paper, Table, TableBody, TableCell, TableHead, 
-  TableRow, TextField, InputAdornment, Button, CircularProgress, Chip, IconButton 
+  TableRow, TextField, InputAdornment, Button, Chip, IconButton, Skeleton
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import AddIcon from '@mui/icons-material/Add';
@@ -37,7 +37,6 @@ const Victimas = () => {
         data = await jepService.getVictimas();
       } else {
         const rolTipo = role === 'psicosocial' ? 'psicosocial' : 'abogado';
-        // Ahora pasamos el objeto currentUser completo para cruzar ID, correo y username
         data = await jepService.getVictimasAsignadas(currentUser, rolTipo);
       }
 
@@ -66,14 +65,13 @@ const Victimas = () => {
     }
   };
 
-  // Función relacional: cruza el correo oficial guardado con los perfiles del sistema
+  // Función relacional optimizada: cruza directamente por string de correo homologado
   const getResponsableUI = (v: Victima) => {
     const asignadoId = v.representacion?.juridico_asignado_id || v.representacion?.psicosocial_asignado_id;
     if (!asignadoId) {
       return <Typography variant="caption" color="text.secondary">Sin asignar</Typography>;
     }
 
-    // Comparación directa de string de correo O(n) eficiente
     const prof = profesionales.abogados.find(p => p.correo === asignadoId) || 
                  profesionales.psicosociales.find(p => p.correo === asignadoId);
 
@@ -93,8 +91,6 @@ const Victimas = () => {
     v.nombre_completo.toLowerCase().includes(search.toLowerCase()) ||
     v.identificacion.includes(search)
   );
-
-  if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', p: 10 }}><CircularProgress /></Box>;
 
   return (
     <Box sx={{ p: 4 }}>
@@ -149,7 +145,6 @@ const Victimas = () => {
                 <TableRow>
                   <TableCell sx={{ fontWeight: 600, color: 'text.secondary' }}>Víctima</TableCell>
                   <TableCell sx={{ fontWeight: 600, color: 'text.secondary' }}>Identificación</TableCell>
-                  {/* NUEVA COLUMNA RESPONSABLE */}
                   <TableCell sx={{ fontWeight: 600, color: 'text.secondary' }}>Responsable (Abogado/Psicosocial)</TableCell>
                   <TableCell sx={{ fontWeight: 600, color: 'text.secondary' }}>Macrocaso</TableCell>
                   <TableCell sx={{ fontWeight: 600, color: 'text.secondary' }}>Estado JEP</TableCell>
@@ -157,25 +152,44 @@ const Victimas = () => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {filtered.map((v) => (
-                  <TableRow key={v.id} hover>
-                    <TableCell sx={{ fontWeight: 600 }}>{v.nombre_completo}</TableCell>
-                    <TableCell>{v.identificacion}</TableCell>
-                    {/* IMPRESIÓN DEL NOMBRE Y CORREO DEL RESPONSABLE */}
-                    <TableCell>{getResponsableUI(v)}</TableCell>
-                    <TableCell>
-                      {v.representacion.caso.map((c: string) => <Chip key={c} label={c} size="small" sx={{ mr: 0.5 }} />)}
-                    </TableCell>
-                    <TableCell>
-                      <Chip label={v.estado_jep.estado_acreditacion} size="small" variant="outlined" color="primary" />
-                    </TableCell>
-                    <TableCell align="right">
-                      <IconButton color="primary" onClick={() => navigate(`/victimas/${v.id}`)}>
-                        <VisibilityIcon />
-                      </IconButton>
+                {loading ? (
+                  // PLACEHOLDERS INTELIGENTES: Skeletons fluidos adaptados a la forma de la tabla
+                  Array.from(new Array(5)).map((_, index) => (
+                    <TableRow key={index}>
+                      <TableCell><Skeleton variant="text" width="70%" height={24} /></TableCell>
+                      <TableCell><Skeleton variant="text" width="50%" height={24} /></TableCell>
+                      <TableCell><Skeleton variant="text" width="60%" height={24} /></TableCell>
+                      <TableCell><Skeleton variant="rectangular" width={60} height={24} sx={{ borderRadius: 1 }} /></TableCell>
+                      <TableCell><Skeleton variant="rectangular" width={80} height={24} sx={{ borderRadius: 1 }} /></TableCell>
+                      <TableCell align="right"><Skeleton variant="circular" width={32} height={32} sx={{ display: 'inline-block' }} /></TableCell>
+                    </TableRow>
+                  ))
+                ) : filtered.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} align="center" sx={{ py: 4, color: 'text.secondary' }}>
+                      No se encontraron víctimas con los criterios de búsqueda.
                     </TableCell>
                   </TableRow>
-                ))}
+                ) : (
+                  filtered.map((v) => (
+                    <TableRow key={v.id} hover>
+                      <TableCell sx={{ fontWeight: 600 }}>{v.nombre_completo}</TableCell>
+                      <TableCell>{v.identificacion}</TableCell>
+                      <TableCell>{getResponsableUI(v)}</TableCell>
+                      <TableCell>
+                        {v.representacion.caso.map((c: string) => <Chip key={c} label={c} size="small" sx={{ mr: 0.5 }} />)}
+                      </TableCell>
+                      <TableCell>
+                        <Chip label={v.estado_jep.estado_acreditacion} size="small" variant="outlined" color="primary" />
+                      </TableCell>
+                      <TableCell align="right">
+                        <IconButton color="primary" onClick={() => navigate(`/victimas/${v.id}`)}>
+                          <VisibilityIcon />
+                        </IconButton>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </Paper>
