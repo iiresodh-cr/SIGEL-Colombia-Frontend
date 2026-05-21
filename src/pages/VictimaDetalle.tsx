@@ -4,7 +4,8 @@ import {
   Box, Typography, Paper, Grid, Divider, Button, CircularProgress, 
   Chip, List, ListItem, Dialog, DialogTitle, FormGroup, FormControlLabel, Checkbox,
   DialogContent, DialogActions, TextField, MenuItem, IconButton, ListItemText,
-  Tabs, Tab, Table, TableHead, TableRow, TableCell, TableBody, Alert
+  Tabs, Tab, Table, TableHead, TableRow, TableCell, TableBody, Alert,
+  FormControl, InputLabel, Select, OutlinedInput
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import AddCommentIcon from '@mui/icons-material/AddComment';
@@ -16,6 +17,7 @@ import InfoIcon from '@mui/icons-material/Info';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import GavelIcon from '@mui/icons-material/Gavel';
 import FolderSpecialIcon from '@mui/icons-material/FolderSpecial';
+import EditIcon from '@mui/icons-material/Edit';
 
 import { jepService } from '../services/jepService';
 import { storageService, ArchivoJEP } from '../services/storageService';
@@ -32,6 +34,18 @@ import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 
 const TIPOS_INTERACCION = ['Llamada de sentido del proceso', 'Asesoría jurídica', 'Acompañamiento psicosocial', 'Gestión de acreditación', 'Otra'];
+
+// COHESIÓN ESTÉTICA: Listas de selección idénticas a las del formulario de registro
+const CASOS_JEP = ['Caso 01', 'Caso 10'];
+const BLOQUES_JEP = ['BNOR', 'BSUR', 'BORI', 'BCAR', 'BCC', 'BMM', 'BOCC']; 
+const CALIDADES = ['Directa', 'Indirecta', 'Directa (Vocera)', 'Indirecta (Vocera)', 'Indirecta (No Vocera)', 'Ambas'];
+const HECHOS = ['Desaparición', 'Desplazamiento', 'Homicidio', 'Secuestro', 'Ataque contra la población civil', 'Violencia Sexual', 'Otro'];
+const GENEROS = ['Mujer', 'Hombre', 'No binario', 'Otro', 'Prefiero no decirlo'];
+const ORIENTACIONES = ['Heterosexual', 'Lesbiana', 'Gay', 'Bisexual', 'Pansexual', 'Otro'];
+const ETNICOS = ['Ninguno', 'Indígena', 'Afrodescendiente/Negro/Mulato', 'Rrom/Gitano', 'Palenquero', 'Raizal'];
+const ETAREOS = ['Infancia (0-11)', 'Adolescencia (12-18)', 'Joven (18-28)', 'Adulto (28-60)', 'Adulto Mayor (60+)'];
+const DISCAPACIDADES = ['Ninguna', 'Física', 'Auditiva', 'Visual', 'Sordoceguera', 'Intelectual', 'Psicosocial (Mental)', 'Múltiple'];
+const DEPARTAMENTOS = ['Amazonas', 'Antioquia', 'Arauca', 'Atlántico', 'Bolívar', 'Boyacá', 'Caldas', 'Caquetá', 'Casanare', 'Cauca', 'Cesar', 'Chocó', 'Córdoba', 'Cundinamarca', 'Guainía', 'Guaviare', 'Huila', 'La Guajira', 'Magdalena', 'Meta', 'Nariño', 'Norte de Santander', 'Putumayo', 'Quindío', 'Risaralda', 'San Andrés y Providencia', 'Santander', 'Sucre', 'Tolima', 'Valle del Cauca', 'Vaupés', 'Vichada', 'Bogotá D.C.'];
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -66,16 +80,22 @@ const VictimaDetalle = () => {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
 
+  // Estados para el Modal de Seguimiento de Notas
   const [openNoteModal, setOpenNoteModal] = useState(false);
   const [newNote, setNewNote] = useState<Partial<Interaccion>>({ tipo: 'Llamada de sentido del proceso', estado_contacto: 'Contactado', observaciones: '', compromisos: '' });
 
+  // Estados para el Modal de Reasignación de Administración
   const [openReasignarModal, setOpenReasignarModal] = useState(false);
   const [reasignarData, setReasignarData] = useState({ juridico_nuevo_id: '', psicosocial_nuevo_id: '', motivo: '' });
+
+  // NUEVOS ESTADOS: Edición de la ficha completa de la víctima
+  const [openEditModal, setOpenEditModal] = useState(false);
+  const [editFormData, setEditFormData] = useState<any>(null);
 
   const isAdmin = role === 'admin' || role === 'superadmin';
   const isLector = role === 'lector';
   const canDelete = isAdmin; 
-  const canEdit = !isLector; 
+  const canEdit = !isLector; // Cualquier rol operativo (abogado o psicosocial) puede editar la ficha
 
   const loadData = async () => {
     if (!id) return;
@@ -119,6 +139,59 @@ const VictimaDetalle = () => {
 
   useEffect(() => { loadData(); }, [id]);
 
+  // INICIALIZADOR COMPLETO DEL DICCIONARIO DE EDICIÓN REACTIVO
+  const handleOpenEdit = () => {
+    if (!victima) return;
+    setEditFormData({
+      nombre_completo: victima.nombre_completo || '',
+      tipo_documento: victima.tipo_documento || 'CC',
+      identificacion: victima.identificacion || '',
+      datos_demograficos: {
+        genero: victima.datos_demograficos?.genero || '',
+        orientacion_sexual: victima.datos_demograficos?.orientacion_sexual || '',
+        grupo_etnico: victima.datos_demograficos?.grupo_etnico || 'Ninguno',
+        etareo: victima.datos_demograficos?.etareo || 'Adulto',
+        discapacidad: victima.datos_demograficos?.discapacidad || 'Ninguna'
+      },
+      datos_contacto: {
+        telefono: victima.datos_contacto?.telefono || '',
+        correo: victima.datos_contacto?.correo || '',
+        direccion: victima.datos_contacto?.direccion || '',
+        departamento: victima.datos_contacto?.departamento || ''
+      },
+      representacion: {
+        ...victima.representacion,
+        caso: victima.representacion?.caso || [],
+        bloque: victima.representacion?.bloque || [],
+        hechos_victimizantes: victima.representacion?.hechos_victimizantes || [],
+        calidad_victima: victima.representacion?.calidad_victima || ''
+      },
+      estado_jep: {
+        estado_acreditacion: victima.estado_jep?.estado_acreditacion || 'No está acreditada',
+        estado_reconocimiento_pj: victima.estado_jep?.estado_reconocimiento_pj || 'Sin PJ (no se ha recibido poder)',
+        auto_acreditacion: victima.estado_jep?.auto_acreditacion || '',
+        auto_reconocimiento: victima.estado_jep?.auto_reconocimiento || ''
+      }
+    });
+    setOpenEditModal(true);
+  };
+
+  // PERSISTENCIA DE CAMBIOS DE LA FICHA EN SERVIDOR (CUMPLIENDO REGLAS DE FIRESTORE)
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!id || !canEdit) return;
+    try {
+      const docRef = doc(db, 'victimas', id);
+      await updateDoc(docRef, editFormData);
+      showModal('Éxito', 'Ficha de la víctima actualizada correctamente en el sistema.', 'success');
+      setOpenEditModal(false);
+      await loadData();
+    } catch (error) {
+      console.error(error);
+      showModal('Error', 'No se pudieron guardar los cambios en la ficha.', 'error');
+    }
+  };
+
   const handleSaveNote = async () => {
     if (!id || !currentUser || !newNote.observaciones || !canEdit) return;
     try {
@@ -147,13 +220,10 @@ const VictimaDetalle = () => {
       showModal('Falta Información', 'Debe justificar el motivo del cambio.', 'error');
       return;
     }
-
-    // VALIDACIÓN: Evitar desasignar ambos y dejar el caso huerfano de forma accidental
     if (!reasignarData.juridico_nuevo_id && !reasignarData.psicosocial_nuevo_id) {
       showModal('Operación Inválida', 'El caso debe conservar al menos un responsable técnico asignado.', 'error');
       return;
     }
-
     try {
       setLoading(true);
       await adminService.reasignarVictimaIndividual(id, currentUser.uid, reasignarData);
@@ -231,7 +301,20 @@ const VictimaDetalle = () => {
 
   return (
     <Box sx={{ p: 4 }}>
-      <Button startIcon={<ArrowBackIcon />} onClick={() => navigate(-1)} sx={{ mb: 3 }}>Volver</Button>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+        <Button startIcon={<ArrowBackIcon />} onClick={() => navigate(-1)}>Volver</Button>
+        {canEdit && (
+          <Button 
+            variant="contained" 
+            color="primary" 
+            startIcon={<EditIcon />} 
+            onClick={handleOpenEdit}
+            sx={{ fontWeight: 'bold' }}
+          >
+            Editar Ficha Completa
+          </Button>
+        )}
+      </Box>
 
       {isDesasignado && (
         <Alert severity="warning" icon={<WarningAmberIcon />} sx={{ mb: 3, borderRadius: 2 }}>
@@ -329,8 +412,8 @@ const VictimaDetalle = () => {
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                 <Typography variant="subtitle1" sx={{ fontWeight: 700, color: 'primary.main' }}>Documentación y Poderes</Typography>
                 {canEdit && (
-                  <Button component="label" variant="outlined" startIcon={<CloudUploadIcon />}>
-                    Subir PDF
+                  <Button component="label" variant="outlined" startIcon={<CloudUploadIcon />} disabled={uploading}>
+                    {uploading ? 'Subiendo...' : 'Subir PDF'}
                     <input type="file" hidden accept=".pdf" onChange={handleFileUpload} />
                   </Button>
                 )}
@@ -447,6 +530,92 @@ const VictimaDetalle = () => {
           </Table>
         </Paper>
       </TabPanel>
+
+      {/* =====================================================================
+          DIALOG: MODAL MAESTRO DE EDICIÓN DE LA FICHA DE LA VÍCTIMA
+          ===================================================================== */}
+      <Dialog open={openEditModal} onClose={() => setOpenEditModal(false)} maxWidth="md" fullWidth>
+        <DialogTitle sx={{ fontWeight: 'bold', color: 'primary.main' }}>Editar Ficha de la Víctima</DialogTitle>
+        <Box component="form" onSubmit={handleSaveEdit}>
+          <DialogContent dividers>
+            <Grid container spacing={2}>
+              <Grid size={{ xs: 12 }}><Divider textAlign="left"><Typography variant="subtitle2" color="text.secondary">Identificación</Typography></Divider></Grid>
+              <Grid size={{ xs: 12, md: 6 }}><TextField fullWidth size="small" label="Nombre Completo" required value={editFormData?.nombre_completo || ''} onChange={(e) => setEditFormData({ ...editFormData, nombre_completo: e.target.value })} /></Grid>
+              <Grid size={{ xs: 12, md: 3 }}><TextField select fullWidth size="small" label="Tipo Doc." value={editFormData?.tipo_documento || 'CC'} onChange={(e) => setEditFormData({ ...editFormData, tipo_documento: e.target.value })}><MenuItem value="CC">CC</MenuItem><MenuItem value="TI">TI</MenuItem><MenuItem value="CE">CE</MenuItem></TextField></Grid>
+              <Grid size={{ xs: 12, md: 3 }}><TextField fullWidth size="small" label="Número de Identificación" required value={editFormData?.identificacion || ''} onChange={(e) => setEditFormData({ ...editFormData, identificacion: e.target.value })} /></Grid>
+
+              <Grid size={{ xs: 12 }}><Divider textAlign="left"><Typography variant="subtitle2" color="text.secondary">Datos Demográficos</Typography></Divider></Grid>
+              <Grid size={{ xs: 12, md: 4 }}><TextField select fullWidth size="small" label="Género" required value={editFormData?.datos_demograficos?.genero || ''} onChange={(e) => setEditFormData({ ...editFormData, datos_demograficos: { ...editFormData.datos_demograficos, genero: e.target.value } })}>{GENEROS.map(o => <MenuItem key={o} value={o}>{o}</MenuItem>)}</TextField></Grid>
+              <Grid size={{ xs: 12, md: 4 }}><TextField select fullWidth size="small" label="Orientación Sexual" value={editFormData?.datos_demograficos?.orientacion_sexual || ''} onChange={(e) => setEditFormData({ ...editFormData, datos_demograficos: { ...editFormData.datos_demograficos, orientacion_sexual: e.target.value } })}>{ORIENTACIONES.map(o => <MenuItem key={o} value={o}>{o}</MenuItem>)}</TextField></Grid>
+              <Grid size={{ xs: 12, md: 4 }}><TextField select fullWidth size="small" label="Grupo Étnico" value={editFormData?.datos_demograficos?.grupo_etnico || 'Ninguno'} onChange={(e) => setEditFormData({ ...editFormData, datos_demograficos: { ...editFormData.datos_demograficos, grupo_etnico: e.target.value } })}>{ETNICOS.map(o => <MenuItem key={o} value={o}>{o}</MenuItem>)}</TextField></Grid>
+              <Grid size={{ xs: 12, md: 6 }}><TextField select fullWidth size="small" label="Ciclo Vital" value={editFormData?.datos_demograficos?.etareo || 'Adulto'} onChange={(e) => setEditFormData({ ...editFormData, datos_demograficos: { ...editFormData.datos_demograficos, etareo: e.target.value } })}>{ETAREOS.map(o => <MenuItem key={o} value={o}>{o}</MenuItem>)}</TextField></Grid>
+              <Grid size={{ xs: 12, md: 6 }}><TextField select fullWidth size="small" label="Discapacidad" value={editFormData?.datos_demograficos?.discapacidad || 'Ninguna'} onChange={(e) => setEditFormData({ ...editFormData, datos_demograficos: { ...editFormData.datos_demograficos, discapacidad: e.target.value } })}>{DISCAPACIDADES.map(o => <MenuItem key={o} value={o}>{o}</MenuItem>)}</TextField></Grid>
+
+              <Grid size={{ xs: 12 }}><Divider textAlign="left"><Typography variant="subtitle2" color="text.secondary">Información de Contacto</Typography></Divider></Grid>
+              <Grid size={{ xs: 12, md: 4 }}><TextField fullWidth size="small" label="Teléfono" value={editFormData?.datos_contacto?.telefono || ''} onChange={(e) => setEditFormData({ ...editFormData, datos_contacto: { ...editFormData.datos_contacto, telefono: e.target.value } })} /></Grid>
+              <Grid size={{ xs: 12, md: 4 }}><TextField fullWidth size="small" label="Correo Electrónico" value={editFormData?.datos_contacto?.correo || ''} onChange={(e) => setEditFormData({ ...editFormData, datos_contacto: { ...editFormData.datos_contacto, correo: e.target.value } })} /></Grid>
+              <Grid size={{ xs: 12, md: 4 }}><TextField select fullWidth size="small" label="Departamento" value={editFormData?.datos_contacto?.departamento || ''} onChange={(e) => setEditFormData({ ...editFormData, datos_contacto: { ...editFormData.datos_contacto, departamento: e.target.value } })}>{DEPARTAMENTOS.map(d => <MenuItem key={d} value={d}>{d}</MenuItem>)}</TextField></Grid>
+              <Grid size={{ xs: 12 }}><TextField fullWidth size="small" label="Dirección de Residencia" value={editFormData?.datos_contacto?.direccion || ''} onChange={(e) => setEditFormData({ ...editFormData, datos_contacto: { ...editFormData.datos_contacto, direccion: e.target.value } })} /></Grid>
+
+              <Grid size={{ xs: 12 }}><Divider textAlign="left"><Typography variant="subtitle2" color="text.secondary">Proceso y Cobertura JEP</Typography></Divider></Grid>
+              <Grid size={{ xs: 12, md: 4 }}>
+                <FormControl fullWidth size="small">
+                  <InputLabel>Macrocaso(s)</InputLabel>
+                  <Select 
+                    multiple value={editFormData?.representacion?.caso || []} input={<OutlinedInput label="Macrocaso(s)" />} 
+                    onChange={(e) => setEditFormData({ ...editFormData, representacion: { ...editFormData.representacion, caso: typeof e.target.value === 'string' ? e.target.value.split(',') : e.target.value } })} 
+                    renderValue={(selected) => <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>{(selected as string[]).map((val) => <Chip key={val} label={val} size="small" color="primary" />)}</Box>}
+                  >
+                    {CASOS_JEP.map(caso => <MenuItem key={caso} value={caso}>{caso}</MenuItem>)}
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid size={{ xs: 12, md: 4 }}>
+                <FormControl fullWidth size="small">
+                  <InputLabel>Bloque(s)</InputLabel>
+                  <Select 
+                    multiple value={editFormData?.representacion?.bloque || []} input={<OutlinedInput label="Bloque(s)" />} 
+                    onChange={(e) => setEditFormData({ ...editFormData, representacion: { ...editFormData.representacion, bloque: typeof e.target.value === 'string' ? e.target.value.split(',') : e.target.value } })} 
+                    renderValue={(selected) => <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>{(selected as string[]).map((val) => <Chip key={val} label={val} size="small" variant="outlined" />)}</Box>}
+                  >
+                    {BLOQUES_JEP.map(bloque => <MenuItem key={bloque} value={bloque}>{bloque}</MenuItem>)}
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid size={{ xs: 12, md: 4 }}>
+                <FormControl fullWidth size="small">
+                  <InputLabel>Delitos (Hechos)</InputLabel>
+                  <Select 
+                    multiple value={editFormData?.representacion?.hechos_victimizantes || []} input={<OutlinedInput label="Delitos (Hechos)" />} 
+                    onChange={(e) => setEditFormData({ ...editFormData, representacion: { ...editFormData.representacion, hechos_victimizantes: typeof e.target.value === 'string' ? e.target.value.split(',') : e.target.value } })} 
+                    renderValue={(selected) => <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>{(selected as string[]).map((val) => <Chip key={val} label={val} size="small" />)}</Box>}
+                  >
+                    {HECHOS.map(hecho => <MenuItem key={hecho} value={hecho}>{hecho}</MenuItem>)}
+                  </Select>
+                </FormControl>
+              </Grid>
+              
+              <Grid size={{ xs: 12, md: 6 }}>
+                <TextField select fullWidth size="small" label="Calidad de Víctima" required value={editFormData?.representacion?.calidad_victima || ''} onChange={(e) => setEditFormData({ ...editFormData, representacion: { ...editFormData.representacion, calidad_victima: e.target.value } })}>{CALIDADES.map(c => <MenuItem key={c} value={c}>{c}</MenuItem>)}</TextField>
+              </Grid>
+              <Grid size={{ xs: 12, md: 6 }}>
+                <TextField select fullWidth size="small" label="Estado Acreditación" value={editFormData?.estado_jep?.estado_acreditacion || 'No está acreditada'} onChange={(e) => setEditFormData({ ...editFormData, estado_jep: { ...editFormData.estado_jep, estado_acreditacion: e.target.value } })}><MenuItem value="No está acreditada">No está acreditada</MenuItem><MenuItem value="Acreditada">Acreditada</MenuItem><MenuItem value="En trámite (despacho no ha resuelto)">En trámite (despacho no ha resuelto)</MenuItem></TextField>
+              </Grid>
+              <Grid size={{ xs: 12, md: 4 }}>
+                <TextField select fullWidth size="small" label="Reconocimiento PJ" value={editFormData?.estado_jep?.estado_reconocimiento_pj || 'Sin PJ (no se ha recibido poder)'} onChange={(e) => setEditFormData({ ...editFormData, estado_jep: { ...editFormData.estado_jep, estado_reconocimiento_pj: e.target.value } })}><MenuItem value="Sin PJ (no se ha recibido poder)">Sin PJ</MenuItem><MenuItem value="Con PJ (poder recibido)">Con PJ</MenuItem></TextField>
+              </Grid>
+              <Grid size={{ xs: 12, md: 4 }}>
+                <TextField fullWidth size="small" label="Auto de Acreditación" value={editFormData?.estado_jep?.auto_acreditacion || ''} onChange={(e) => setEditFormData({ ...editFormData, estado_jep: { ...editFormData.estado_jep, auto_acreditacion: e.target.value } })} /></Grid>
+              <Grid size={{ xs: 12, md: 4 }}>
+                <TextField fullWidth size="small" label="Auto de Reconocimiento" value={editFormData?.estado_jep?.auto_reconocimiento || ''} onChange={(e) => setEditFormData({ ...editFormData, estado_jep: { ...editFormData.estado_jep, auto_reconocimiento: e.target.value } })} /></Grid>
+            </Grid>
+          </DialogContent>
+          <DialogActions sx={{ p: 2 }}>
+            <Button onClick={() => setOpenEditModal(false)} color="secondary">Cancelar</Button>
+            <Button type="submit" variant="contained" color="primary">Guardar Cambios</Button>
+          </DialogActions>
+        </Box>
+      </Dialog>
 
       <Dialog open={openNoteModal} onClose={() => setOpenNoteModal(false)} fullWidth maxWidth="sm">
         <DialogTitle sx={{ fontWeight: 'bold' }}>Registrar Interacción</DialogTitle>
