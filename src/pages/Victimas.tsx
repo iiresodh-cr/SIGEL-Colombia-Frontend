@@ -31,7 +31,7 @@ const Victimas = () => {
     try {
       setLoading(true);
       
-      // REGLA DE NEGOCIO: En la matriz global, todos los profesionales ven el universo completo de víctimas
+      // Todos los profesionales ven el universo completo de víctimas en la matriz global
       const data = await jepService.getVictimas();
       const profs = await adminService.getProfesionales();
       
@@ -59,15 +59,14 @@ const Victimas = () => {
     }
   };
 
-  // Función relacional optimizada: cruza directamente por string de correo homologado
-  const getResponsableUI = (v: Victima) => {
-    const asignadoId = v.representacion?.juridico_asignado_id || v.representacion?.psicosocial_asignado_id;
-    if (!asignadoId) {
-      return <Typography variant="caption" color="text.secondary">Sin asignar</Typography>;
+  // FUNCIÓN RELACIONAL PARTICIONADA: Resuelve el nombre cruzando el correo y el tipo de rol
+  const getProfesionalUI = (correoId: string, tipo: 'abogado' | 'psicosocial') => {
+    if (!correoId || correoId.trim() === '') {
+      return <Typography variant="caption" color="text.secondary"><i>Sin asignar</i></Typography>;
     }
 
-    const prof = profesionales.abogados.find(p => p.correo === asignadoId) || 
-                 profesionales.psicosociales.find(p => p.correo === asignadoId);
+    const lista = tipo === 'abogado' ? profesionales.abogados : profesionales.psicosociales;
+    const prof = lista.find(p => p.correo.toLowerCase() === correoId.toLowerCase());
 
     if (prof) {
       return (
@@ -78,7 +77,15 @@ const Victimas = () => {
       );
     }
 
-    return <Typography variant="caption" color="text.secondary">{asignadoId}</Typography>;
+    // Fallback por si es un ex-empleado o correo histórico
+    return (
+      <Box>
+        <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+          {correoId.includes('ex_empleado') ? correoId.split('ex_empleado-')[1].split('@')[0].replace(/_/g, ' ') : correoId}
+        </Typography>
+        <Typography variant="caption" color="text.disabled" sx={{ display: 'block' }}>{correoId}</Typography>
+      </Box>
+    );
   };
 
   const filtered = victimas.filter(v => 
@@ -139,7 +146,9 @@ const Victimas = () => {
                 <TableRow>
                   <TableCell sx={{ fontWeight: 600, color: 'text.secondary' }}>Víctima</TableCell>
                   <TableCell sx={{ fontWeight: 600, color: 'text.secondary' }}>Identificación</TableCell>
-                  <TableCell sx={{ fontWeight: 600, color: 'text.secondary' }}>Responsable (Abogado/Psicosocial)</TableCell>
+                  {/* COHESIÓN: Columnas particionadas e independientes */}
+                  <TableCell sx={{ fontWeight: 600, color: 'text.secondary' }}>Abogado/a Responsable</TableCell>
+                  <TableCell sx={{ fontWeight: 600, color: 'text.secondary' }}>Psicosocial Responsable</TableCell>
                   <TableCell sx={{ fontWeight: 600, color: 'text.secondary' }}>Macrocaso</TableCell>
                   <TableCell sx={{ fontWeight: 600, color: 'text.secondary' }}>Estado JEP</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 600, color: 'text.secondary' }}>Acciones</TableCell>
@@ -147,19 +156,21 @@ const Victimas = () => {
               </TableHead>
               <TableBody>
                 {loading ? (
+                  // SIMETRÍA VISUAL: Skeletons adaptados a las 7 columnas reales de la tabla
                   Array.from(new Array(5)).map((_, index) => (
                     <TableRow key={index}>
+                      <TableCell><Skeleton variant="text" width="75%" height={24} /></TableCell>
+                      <TableCell><Skeleton variant="text" width="55%" height={24} /></TableCell>
                       <TableCell><Skeleton variant="text" width="70%" height={24} /></TableCell>
-                      <TableCell><Skeleton variant="text" width="50%" height={24} /></TableCell>
-                      <TableCell><Skeleton variant="text" width="60%" height={24} /></TableCell>
+                      <TableCell><Skeleton variant="text" width="70%" height={24} /></TableCell>
                       <TableCell><Skeleton variant="rectangular" width={60} height={24} sx={{ borderRadius: 1 }} /></TableCell>
-                      <TableCell><Skeleton variant="rectangular" width={80} height={24} sx={{ borderRadius: 1 }} /></TableCell>
+                      <TableCell><Skeleton variant="rectangular" width={85} height={24} sx={{ borderRadius: 1 }} /></TableCell>
                       <TableCell align="right"><Skeleton variant="circular" width={32} height={32} sx={{ display: 'inline-block' }} /></TableCell>
                     </TableRow>
                   ))
                 ) : filtered.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} align="center" sx={{ py: 4, color: 'text.secondary' }}>
+                    <TableCell colSpan={7} align="center" sx={{ py: 4, color: 'text.secondary' }}>
                       No se encontraron víctimas con los criterios de búsqueda.
                     </TableCell>
                   </TableRow>
@@ -168,7 +179,9 @@ const Victimas = () => {
                     <TableRow key={v.id} hover>
                       <TableCell sx={{ fontWeight: 600 }}>{v.nombre_completo}</TableCell>
                       <TableCell>{v.identificacion}</TableCell>
-                      <TableCell>{getResponsableUI(v)}</TableCell>
+                      {/* Renderizado independiente por rol técnico */}
+                      <TableCell>{getProfesionalUI(v.representacion?.juridico_asignado_id, 'abogado')}</TableCell>
+                      <TableCell>{getProfesionalUI(v.representacion?.psicosocial_asignado_id, 'psicosocial')}</TableCell>
                       <TableCell>
                         {v.representacion.caso.map((c: string) => <Chip key={c} label={c} size="small" sx={{ mr: 0.5 }} />)}
                       </TableCell>
