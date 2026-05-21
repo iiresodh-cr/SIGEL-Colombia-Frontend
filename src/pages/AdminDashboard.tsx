@@ -101,7 +101,6 @@ const AdminDashboard = () => {
       const docs = snap.docs.map(d => ({ id: d.id, ...d.data() } as Victima));
       setUniversoCompletoVictimas(docs);
 
-      // CORRECCIÓN: Inicialización de claves usando los literales del esquema de tipos oficiales
       const pivot1: Record<string, Record<string, number>> = {
         "Caso 01": { "Acreditada": 0, "En trámite (despacho no ha resuelto)": 0, "No está acreditada": 0 },
         "Caso 10": { "Acreditada": 0, "En trámite (despacho no ha resuelto)": 0, "No está acreditada": 0 },
@@ -117,7 +116,6 @@ const AdminDashboard = () => {
 
       docs.forEach(v => {
         const casos = v.representacion?.caso || [];
-        // CORRECCIÓN: Lectura e indexación directa y segura conforme a la unión de tipos de la app
         const estado = v.estado_jep?.estado_acreditacion || "No está acreditada";
 
         if (casos.length === 0) {
@@ -314,7 +312,6 @@ const AdminDashboard = () => {
                       <TableRow key={caso} hover>
                         <TableCell sx={{ fontWeight: 700 }}>{caso}</TableCell>
                         <TableCell align="center" sx={{ fontWeight: 600 }}>{matrizMacrocasoAcreditacion[caso]["Acreditada"]}</TableCell>
-                        {/* CORRECCIÓN: Indexación acoplada de forma idéntica a los tipos estrictos del backend */}
                         <TableCell align="center" sx={{ fontWeight: 600 }}>{matrizMacrocasoAcreditacion[caso]["En trámite (despacho no ha resuelto)"]}</TableCell>
                         <TableCell align="center" sx={{ fontWeight: 600 }}>{matrizMacrocasoAcreditacion[caso]["No está acreditada"]}</TableCell>
                       </TableRow>
