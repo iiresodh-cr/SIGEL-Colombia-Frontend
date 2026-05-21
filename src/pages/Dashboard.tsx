@@ -16,10 +16,12 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { jepService } from '../services/jepService';
 import { adminService } from '../services/adminService';
-import { collection, query, getDocs } from 'firebase/firestore';
+import { collection, query, getDocs, limit, startAfter, endBefore, limitToLast, orderBy, where } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { Victima, Evento } from '../types/jep';
 import { Usuario } from '../types/user';
+
+const PAGE_SIZE = 10;
 
 const Dashboard = () => {
   const { currentUser, role } = useAuth();
@@ -33,18 +35,22 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   
+  // Estados para Paginación de Servidor (Admin)
+  const [firstVisible, setFirstVisible] = useState<any>(null);
+  const [lastVisible, setLastVisible] = useState<any>(null);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+
   const [sugerenciaAi, setSugerenciaAi] = useState('');
   const [loadingAi, setLoadingAi] = useState(false);
 
   const isAdmin = role === 'admin' || role === 'superadmin';
 
-  // PARSEADOR BLINDADO: Entiende cualquier formato de fecha de la base de datos
   const parseDate = (fecha: any) => {
-    if (!fecha) return new Date(0); // Si está vacío, lo manda a 1970
-    if (fecha.toDate) return fecha.toDate(); // Si es un Timestamp nativo de Firestore
+    if (!fecha) return new Date(0);
+    if (fecha.toDate) return fecha.toDate();
     if (typeof fecha === 'string') {
       if (fecha.includes('/')) {
-        // Convierte DD/MM/YYYY a YYYY-MM-DD para que el navegador lo entienda
         const partes = fecha.split('/');
         if (partes.length === 3 && partes[2].length === 4) {
           return new Date(`${partes[2]}-${partes[1]}-${partes[0]}T00:00:00`);
@@ -55,21 +61,85 @@ const Dashboard = () => {
     return new Date(fecha);
   };
 
-  // FILTRO ABSOLUTO: Destruye cualquier evento en el pasado
   const getEventosVigentes = (eventos: Evento[]) => {
     const hoy = new Date();
     hoy.setHours(0, 0, 0, 0); 
     return eventos.filter(e => {
       const fechaEvento = parseDate(e.fecha_inicio);
-      return fechaEvento >= hoy; // Solo deja pasar de hoy hacia el futuro
+      return fechaEvento >= hoy;
     });
+  };
+
+  // MOTOR DE PAGINACIÓN Y BÚSQUEDA FLUIDA EN SERVIDOR
+  const fetchAdminVictimas = async (direction?: 'next' | 'prev', forcedSearch?: string) => {
+    try {
+      const targetSearch = forcedSearch !== undefined ? forcedSearch : search;
+      let q;
+
+      if (targetSearch.trim() !== '') {
+        const cleanTerm = targetSearch.trim();
+        if (!isNaN(Number(cleanTerm))) {
+          // Búsqueda exacta e instantánea por número de cédula
+          q = query(collection(db, 'victimas'), where('identificacion', '==', cleanTerm), limit(PAGE_SIZE));
+        } else {
+          // Búsqueda escalable por prefijo alfabético de nombre
+          q = query(
+            collection(db, 'victimas'),
+            where('nombre_completo', '>=', cleanTerm),
+            where('nombre_completo', '<=', cleanTerm + '\uf8ff'),
+            limit(PAGE_SIZE)
+          );
+        }
+      } else {
+        // Modo Exploración: Paginación convencional sin búsquedas activas
+        if (direction === 'next' && lastVisible) {
+          q = query(collection(db, 'victimas'), orderBy('nombre_completo', 'asc'), startAfter(lastVisible), limit(PAGE_SIZE));
+        } else if (direction === 'prev' && firstVisible) {
+          q = query(collection(db, 'victimas'), orderBy('nombre_completo', 'asc'), endBefore(firstVisible), limitToLast(PAGE_SIZE));
+        } else {
+          q = query(collection(db, 'victimas'), orderBy('nombre_completo', 'asc'), limit(PAGE_SIZE));
+        }
+      }
+
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Victima));
+        setVictimasList(data);
+        setFirstVisible(snap.docs[0]);
+        setLastVisible(snap.docs[snap.docs.length - 1]);
+        setHasMore(snap.docs.length === PAGE_SIZE);
+      } else {
+        setVictimasList([]);
+        setHasMore(false);
+      }
+    } catch (error) {
+      console.error("Error paginando portafolio:", error);
+    }
+  };
+
+  const handlePageChange = (direction: 'next' | 'prev') => {
+    if (direction === 'next') {
+      setPage(prev => prev + 1);
+      fetchAdminVictimas('next');
+    } else {
+      setPage(prev => Math.max(1, prev - 1));
+      fetchAdminVictimas('prev');
+    }
+  };
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setSearch(val);
+    setPage(1);
+    setFirstVisible(null);
+    setLastVisible(null);
+    fetchAdminVictimas(undefined, val);
   };
 
   const invocarCopiloto = async (total: number, pendientes: number, eventos: Evento[], nombreUsuario: string, rolUsuario: string) => {
     setLoadingAi(true);
     try {
       const token = await currentUser?.getIdToken();
-
       const payload = {
         rol: String(isAdmin ? 'administrador' : (rolUsuario || 'usuario')),
         nombre_profesional: String(nombreUsuario || 'Profesional'),
@@ -79,29 +149,22 @@ const Dashboard = () => {
       };
 
       let apiUrl = import.meta.env.VITE_COPILOTO_API_URL || 'http://localhost:8080/api/copiloto/analizar';
-      if (apiUrl.endsWith('/')) {
-        apiUrl = apiUrl.slice(0, -1);
-      }
+      if (apiUrl.endsWith('/')) apiUrl = apiUrl.slice(0, -1);
 
       const response = await fetch(apiUrl, {
         method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}` 
-        },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify(payload)
       });
 
       if (response.ok) {
         const data = await response.json();
         setSugerenciaAi(data.sugerencia);
-      } else if (response.status === 401 || response.status === 403) {
-        setSugerenciaAi("Acceso de IA denegado. Permisos de seguridad insuficientes.");
       } else {
         setSugerenciaAi("PIDA no pudo procesar los datos en este momento.");
       }
     } catch (error) {
-      console.error("Error consultando IA:", error);
+      console.error("Error Copiloto:", error);
       setSugerenciaAi("No se pudo conectar con el servidor de PIDA.");
     } finally {
       setLoadingAi(false);
@@ -110,9 +173,7 @@ const Dashboard = () => {
 
   const handlePidaClick = () => {
     const nombreMostrar = currentUser?.displayName || currentUser?.email?.split('@')[0] || 'Profesional';
-    const pendientesCalculadas = stats.total - stats.acreditadas;
-    // Se le envía la lista de eventos que YA está purgada de datos viejos
-    invocarCopiloto(stats.total, pendientesCalculadas, eventosList, nombreMostrar, role || 'usuario');
+    invocarCopiloto(stats.total, stats.total - stats.acreditadas, eventosList, nombreMostrar, role || 'usuario');
   };
 
   const loadData = async () => {
@@ -120,38 +181,31 @@ const Dashboard = () => {
     try {
       setLoading(true);
       const snapEventosCrudos = await jepService.getEventosProximos();
-      
-      // PURGA INMEDIATA: Limpiamos los eventos tan pronto bajan de Firebase
       const eventosVigentes = getEventosVigentes(snapEventosCrudos);
       setEventosList(eventosVigentes);
       
-      let dataVictimas: Victima[] = [];
       let total = 0, pendientes = 0;
 
       if (isAdmin) {
-        const [globalStats, snapVictimas, snapUsers] = await Promise.all([
+        const [globalStats, snapUsers] = await Promise.all([
           adminService.getGlobalStats(),
-          getDocs(query(collection(db, 'victimas'))),
           adminService.getAllUsers()
         ]);
 
-        dataVictimas = snapVictimas.docs.map(doc => ({ id: doc.id, ...doc.data() } as Victima));
         total = globalStats.totalVictimas;
-        pendientes = dataVictimas.filter(v => v.estado_jep?.estado_acreditacion !== 'Acreditada').length;
-
         setStats({
           total,
           caso01: globalStats.totalCaso01,
           caso10: globalStats.totalCaso10,
-          acreditadas: total - pendientes,
-          eventosProximos: eventosVigentes.length // Ahora contará 0 si no hay futuros
+          acreditadas: globalStats.totalAcreditadas,
+          eventosProximos: eventosVigentes.length
         });
-        setVictimasList(dataVictimas);
         setProfesionales(snapUsers);
+        await fetchAdminVictimas(undefined, ''); // Inicializa la primera página
 
       } else {
         const rolBusqueda = role === 'psicosocial' ? 'psicosocial' : 'abogado';
-        dataVictimas = await jepService.getVictimasAsignadas(currentUser, rolBusqueda);
+        const dataVictimas = await jepService.getVictimasAsignadas(currentUser, rolBusqueda);
         
         total = dataVictimas.length;
         pendientes = dataVictimas.filter(v => v.estado_jep?.estado_acreditacion !== 'Acreditada').length;
@@ -161,23 +215,20 @@ const Dashboard = () => {
           caso01: dataVictimas.filter(v => v.representacion?.caso?.includes('Caso 01')).length,
           caso10: dataVictimas.filter(v => v.representacion?.caso?.includes('Caso 10')).length,
           acreditadas: total - pendientes,
-          eventosProximos: eventosVigentes.length // Ahora contará 0
+          eventosProximos: eventosVigentes.length
         });
         setVictimasList(dataVictimas);
       }
 
-      // EJECUCIÓN AUTOMÁTICA (Solo la primera vez)
       const sessionKey = `pida_has_run_${currentUser.uid}`;
       if (!sessionStorage.getItem(sessionKey)) {
         sessionStorage.setItem(sessionKey, 'true');
         const nombreMostrar = currentUser.displayName || currentUser.email?.split('@')[0] || 'Profesional';
-        
-        invocarCopiloto(total, pendientes, eventosVigentes, nombreMostrar, role || 'usuario');
+        invocarCopiloto(total, total - stats.acreditadas, eventosVigentes, nombreMostrar, role || 'usuario');
       }
 
     } catch (error) {
       console.error("Error Dashboard:", error);
-      setSugerenciaAi("Error de seguridad: Tu perfil no tiene permisos de lectura.");
     } finally {
       setLoading(false);
     }
@@ -190,18 +241,9 @@ const Dashboard = () => {
   const getNombreProfesional = (id: string) => {
     if (!id || id === "") return 'Sin asignar';
     const cleanId = id.toLowerCase().trim();
-    
-    // Búsqueda directa por correo homologado
     const prof = profesionales.find(u => u.correo.toLowerCase() === cleanId);
     return prof ? (prof.nombre_completo || prof.correo) : id;
   };
-
-  const adminFiltered = search.trim() === '' 
-    ? [] 
-    : victimasList.filter(v => 
-        v.nombre_completo.toLowerCase().includes(search.toLowerCase()) ||
-        v.identificacion.includes(search)
-      );
 
   const casosAlertas = victimasList
     .filter(v => v.estado_jep?.estado_acreditacion !== 'Acreditada')
@@ -222,7 +264,6 @@ const Dashboard = () => {
         </Typography>
       </Box>
 
-      {/* TARJETAS DE ESTADÍSTICAS */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
         <Grid size={{ xs: 12, md: 4 }}>
           <Paper elevation={0} sx={{ p: 3, display: 'flex', alignItems: 'center', border: '1px solid', borderColor: 'divider' }}>
@@ -260,7 +301,6 @@ const Dashboard = () => {
         </Grid>
       </Grid>
 
-      {/* PIDA AI CARD */}
       <Card elevation={0} sx={{ mb: 5, background: 'linear-gradient(135deg, #f0f7ff 0%, #e0f2fe 100%)', border: '1px solid #bae6fd', borderRadius: 3, minHeight: '120px' }}>
         <CardContent sx={{ p: 3 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
@@ -270,48 +310,39 @@ const Dashboard = () => {
                 PIDA - Tu Asistente Inteligente
               </Typography>
             </Box>
-            
             {!loadingAi && (
               <Button variant="contained" size="small" onClick={handlePidaClick} sx={{ bgcolor: '#0284c7', boxShadow: 0, '&:hover': { bgcolor: '#0369a1' } }}>
                 Actualizar Resumen
               </Button>
             )}
           </Box>
-          
           {loadingAi ? (
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 2 }}>
               <CircularProgress size={20} />
               <Typography variant="body2" color="text.secondary">Analizando agenda y portafolio...</Typography>
             </Box>
           ) : sugerenciaAi ? (
-            <Typography variant="body1" sx={{ color: '#0f172a', lineHeight: 1.6, fontWeight: 500, mt: 1 }}>
-              {sugerenciaAi}
-            </Typography>
+            <Typography variant="body1" sx={{ color: '#0f172a', lineHeight: 1.6, fontWeight: 500, mt: 1 }}>{sugerenciaAi}</Typography>
           ) : (
-            <Typography variant="body2" sx={{ color: '#64748b', mt: 1 }}>
-              Haz clic en el botón para generar un resumen estratégico.
-            </Typography>
+            <Typography variant="body2" sx={{ color: '#64748b', mt: 1 }}>Haz clic en el botón para generar un resumen estratégico.</Typography>
           )}
         </CardContent>
       </Card>
 
-      {/* DISTRIBUCIÓN INFERIOR POR ROL */}
       {isAdmin ? (
         <Box>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-            <Typography variant="h5" sx={{ fontWeight: 700 }}>Buscador de Reasignación</Typography>
+            <Typography variant="h5" sx={{ fontWeight: 700 }}>Explorador y Buscador Paginado</Typography>
             <TextField 
               size="small"
-              placeholder="Buscar caso por nombre o ID..."
+              placeholder="Buscar por cédula o prefijo de nombre..."
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={handleSearchChange}
               sx={{ width: 350, bgcolor: 'background.paper' }}
               slotProps={{
                 input: {
                   startAdornment: (
-                    <InputAdornment position="start">
-                      <SearchIcon color="action" />
-                    </InputAdornment>
+                    <InputAdornment position="start"><SearchIcon color="action" /></InputAdornment>
                   ),
                 },
               }}
@@ -328,20 +359,14 @@ const Dashboard = () => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {search.trim() === '' ? (
+                {victimasList.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={3} align="center" sx={{ py: 6, color: 'text.secondary' }}>
-                      Utiliza el buscador para localizar expedientes y gestionar traslados masivos o individuales.
-                    </TableCell>
-                  </TableRow>
-                ) : adminFiltered.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={3} align="center" sx={{ py: 6, color: 'text.secondary' }}>
-                      No se encontraron víctimas que coincidan con los parámetros introducidos.
+                      No se encontraron víctimas que coincidan con los criterios.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  adminFiltered.map((v) => (
+                  victimasList.map((v) => (
                     <TableRow key={v.id} hover>
                       <TableCell>
                         <Typography 
@@ -358,7 +383,7 @@ const Dashboard = () => {
                       </TableCell>
                       <TableCell align="right">
                         <Button variant="contained" size="small" color="secondary" startIcon={<VisibilityIcon />} onClick={() => navigate(`/victimas/${v.id}`)}>
-                          Reasignar
+                          Gestionar
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -367,6 +392,15 @@ const Dashboard = () => {
               </TableBody>
             </Table>
           </Paper>
+
+          {/* CONTROLES DE PAGINACIÓN FLUIDA EN SERVIDOR */}
+          {search.trim() === '' && (
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 2, mt: 3 }}>
+              <Button variant="outlined" size="small" disabled={page === 1} onClick={() => handlePageChange('prev')}>Anterior</Button>
+              <Typography variant="body2" sx={{ fontWeight: 600 }}>Página {page}</Typography>
+              <Button variant="outlined" size="small" disabled={!hasMore} onClick={() => handlePageChange('next')}>Siguiente</Button>
+            </Box>
+          )}
         </Box>
       ) : (
         <Grid container spacing={4}>
@@ -378,7 +412,6 @@ const Dashboard = () => {
               </Box>
               <Button size="small" variant="outlined" onClick={() => navigate('/victimas')}>Ver mi Portafolio</Button>
             </Box>
-            
             <Paper elevation={0} sx={{ border: '1px solid', borderColor: 'divider', overflow: 'hidden', borderRadius: 3 }}>
               <Table size="small">
                 <TableHead sx={{ bgcolor: '#fffbeb' }}>
@@ -391,25 +424,17 @@ const Dashboard = () => {
                   {casosAlertas.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={2} align="center" sx={{ py: 6, color: 'success.main', fontWeight: 'bold' }}>
-                        ¡Felicidades! Todos tus casos activos se encuentran plenamente acreditados.
+                        ¡Felicidades! Todos tus casos activos se encuentran acreditados.
                       </TableCell>
                     </TableRow>
                   ) : (
                     casosAlertas.map((v) => (
                       <TableRow key={v.id} hover>
                         <TableCell sx={{ py: 1.5 }}>
-                          <Typography 
-                            variant="body2" 
-                            sx={{ fontWeight: 600, color: 'primary.main', cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}
-                            onClick={() => navigate(`/victimas/${v.id}`)}
-                          >
-                            {v.nombre_completo}
-                          </Typography>
+                          <Typography variant="body2" sx={{ fontWeight: 600, color: 'primary.main', cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }} onClick={() => navigate(`/victimas/${v.id}`)}>{v.nombre_completo}</Typography>
                           <Typography variant="caption" color="text.secondary">ID: {v.identificacion}</Typography>
                         </TableCell>
-                        <TableCell>
-                          <Chip label={v.estado_jep?.estado_acreditacion} size="small" color="warning" variant="outlined" />
-                        </TableCell>
+                        <TableCell><Chip label={v.estado_jep?.estado_acreditacion} size="small" color="warning" variant="outlined" /></TableCell>
                       </TableRow>
                     ))
                   )}
@@ -426,7 +451,6 @@ const Dashboard = () => {
               </Box>
               <Button size="small" variant="outlined" onClick={() => navigate('/eventos')}>Ir al Calendario</Button>
             </Box>
-
             <Paper elevation={0} sx={{ border: '1px solid', borderColor: 'divider', overflow: 'hidden', borderRadius: 3 }}>
               <Table size="small">
                 <TableHead sx={{ bgcolor: '#f0fdf4' }}>
@@ -437,18 +461,12 @@ const Dashboard = () => {
                 </TableHead>
                 <TableBody>
                   {eventosList.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={2} align="center" sx={{ py: 6, color: 'text.secondary' }}>
-                        No hay audiencias o talleres programados en el calendario próximo.
-                      </TableCell>
-                    </TableRow>
+                    <TableRow><TableCell colSpan={2} align="center" sx={{ py: 6, color: 'text.secondary' }}>No hay audiencias o talleres programados próximamente.</TableCell></TableRow>
                   ) : (
                     eventosList.slice(0, 5).map((e) => (
                       <TableRow key={e.id} hover>
                         <TableCell sx={{ py: 1.5 }}>
-                          <Typography variant="body2" sx={{ fontWeight: 700, color: '#1e293b' }}>
-                            {e.titulo}
-                          </Typography>
+                          <Typography variant="body2" sx={{ fontWeight: 700, color: '#1e293b' }}>{e.titulo}</Typography>
                           <Box sx={{ mt: 0.5, display: 'flex', gap: 0.5 }}>
                             <Chip label={e.tipo} size="small" color={e.tipo === 'Audiencia' ? 'error' : 'success'} sx={{ fontSize: '0.65rem', height: 18 }} />
                             {e.casos?.map(c => <Chip key={c} label={c} size="small" variant="outlined" sx={{ fontSize: '0.65rem', height: 18 }} />)}

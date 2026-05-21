@@ -7,7 +7,10 @@ import {
   writeBatch, 
   setDoc, 
   deleteDoc,
-  updateDoc
+  updateDoc,
+  getCountFromServer,
+  orderBy,
+  limit
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { Victima } from '../types/jep';
@@ -46,17 +49,33 @@ export const adminService = {
     await setDoc(userRef, nuevoUsuario, { merge: true });
   },
 
-  // 5. Obtener estadísticas globales de la organización
+  // 5. OBTENER ESTADÍSTICAS GLOBALES (OPTIMIZADO: AGREGACIONES EN SERVIDOR)
   getGlobalStats: async () => {
-    const snapshot = await getDocs(collection(db, 'victimas'));
-    const allVictimas = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Victima));
+    const victimasRef = collection(db, 'victimas');
+    
+    // Configuración de queries de conteo (No descargan documentos, solo retornan un entero)
+    const qTotal = query(victimasRef);
+    const qCaso01 = query(victimasRef, where('representacion.caso', 'array-contains', 'Caso 01'));
+    const qCaso10 = query(victimasRef, where('representacion.caso', 'array-contains', 'Caso 10'));
+    const qAcreditadas = query(victimasRef, where('estado_jep.estado_acreditacion', '==', 'Acreditada'));
+    
+    // Única consulta de descarga restringida a un límite estricto de 5 documentos
+    const qUltimas = query(victimasRef, orderBy('fecha_registro', 'desc'), limit(5));
+
+    const [snapTotal, snapCaso01, snapCaso10, snapAcreditadas, snapUltimas] = await Promise.all([
+      getCountFromServer(qTotal),
+      getCountFromServer(qCaso01),
+      getCountFromServer(qCaso10),
+      getCountFromServer(qAcreditadas),
+      getDocs(qUltimas)
+    ]);
     
     return {
-      totalVictimas: allVictimas.length,
-      totalCaso01: allVictimas.filter(v => v.representacion?.caso?.includes('Caso 01')).length,
-      totalCaso10: allVictimas.filter(v => v.representacion?.caso?.includes('Caso 10')).length,
-      ultimasVictimas: [...allVictimas].sort((a, b) => b.fecha_registro.localeCompare(a.fecha_registro)).slice(0, 5),
-      allVictimas // CORRECCIÓN: Exportamos la lista completa para cruzar datos en el Dashboard
+      totalVictimas: snapTotal.data().count,
+      totalCaso01: snapCaso01.data().count,
+      totalCaso10: snapCaso10.data().count,
+      totalAcreditadas: snapAcreditadas.data().count,
+      ultimasVictimas: snapUltimas.docs.map(doc => ({ id: doc.id, ...doc.data() } as Victima))
     };
   },
 
@@ -150,12 +169,10 @@ export const adminService = {
   },
 
   // 9. OBTENER VÍCTIMAS POR PROFESIONAL
-  // 9. OBTENER VÍCTIMAS POR PROFESIONAL (OPTIMIZADO: CORREO ÚNICO)
   getVictimasPorProfesional: async (usuario: Usuario) => {
     const victimasRef = collection(db, 'victimas');
     const correoOficial = usuario.correo.toLowerCase().trim();
     
-    // Solo dos consultas: una por cada rol técnico, buscando estrictamente por correo
     const queries = [
       getDocs(query(victimasRef, where('representacion.juridico_asignado_id', '==', correoOficial))),
       getDocs(query(victimasRef, where('representacion.psicosocial_asignado_id', '==', correoOficial)))
