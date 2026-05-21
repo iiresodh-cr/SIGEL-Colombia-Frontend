@@ -150,17 +150,15 @@ export const adminService = {
   },
 
   // 9. OBTENER VÍCTIMAS POR PROFESIONAL
+  // 9. OBTENER VÍCTIMAS POR PROFESIONAL (OPTIMIZADO: CORREO ÚNICO)
   getVictimasPorProfesional: async (usuario: Usuario) => {
     const victimasRef = collection(db, 'victimas');
-    const username = usuario.correo.split('@')[0];
+    const correoOficial = usuario.correo.toLowerCase().trim();
     
+    // Solo dos consultas: una por cada rol técnico, buscando estrictamente por correo
     const queries = [
-      getDocs(query(victimasRef, where('representacion.juridico_asignado_id', '==', usuario.correo))),
-      getDocs(query(victimasRef, where('representacion.psicosocial_asignado_id', '==', usuario.correo))),
-      getDocs(query(victimasRef, where('representacion.juridico_asignado_id', '==', usuario.uid))),
-      getDocs(query(victimasRef, where('representacion.psicosocial_asignado_id', '==', usuario.uid))),
-      getDocs(query(victimasRef, where('representacion.juridico_asignado_id', '==', username))),
-      getDocs(query(victimasRef, where('representacion.psicosocial_asignado_id', '==', username)))
+      getDocs(query(victimasRef, where('representacion.juridico_asignado_id', '==', correoOficial))),
+      getDocs(query(victimasRef, where('representacion.psicosocial_asignado_id', '==', correoOficial)))
     ];
 
     const resultados = await Promise.all(queries);

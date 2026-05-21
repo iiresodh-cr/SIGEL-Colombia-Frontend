@@ -189,12 +189,10 @@ const Dashboard = () => {
 
   const getNombreProfesional = (id: string) => {
     if (!id || id === "") return 'Sin asignar';
-    const cleanId = id.toLowerCase();
-    const prof = profesionales.find(u => 
-      u.correo.toLowerCase() === cleanId || 
-      u.uid === id || 
-      u.correo.split('@')[0].toLowerCase() === cleanId
-    );
+    const cleanId = id.toLowerCase().trim();
+    
+    // Búsqueda directa por correo homologado
+    const prof = profesionales.find(u => u.correo.toLowerCase() === cleanId);
     return prof ? (prof.nombre_completo || prof.correo) : id;
   };
 

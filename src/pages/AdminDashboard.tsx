@@ -326,10 +326,9 @@ const AdminDashboard = () => {
     }
   };
 
+  // 1. Reemplaza la función de filtrado por esta versión limpia:
   const getVictimasByUsuario = (user: Usuario) => {
-    const email = user.correo.toLowerCase().trim();
-    const username = email.split('@')[0];
-    const uid = user.uid;
+    const emailOficial = user.correo.toLowerCase().trim();
 
     return allVictimas.filter(v => {
       if (v.representacion?.estado !== 'Activo') return false;
@@ -337,8 +336,8 @@ const AdminDashboard = () => {
       const jurId = v.representacion?.juridico_asignado_id?.toLowerCase()?.trim();
       const psiId = v.representacion?.psicosocial_asignado_id?.toLowerCase()?.trim();
 
-      return jurId === email || jurId === uid || jurId === username ||
-             psiId === email || psiId === uid || psiId === username;
+      // Comparación directa estricta por correo homologado
+      return jurId === emailOficial || psiId === emailOficial;
     });
   };
 
@@ -394,9 +393,9 @@ const AdminDashboard = () => {
         </Button>
       </Box>
 
-      {/* RENDERIZADO SECUENCIAL DE AMBOS COMPONENTES DE MIGRACIÓN */}
+      {/* RENDERIZADO SECUENCIAL DE AMBOS COMPONENTES DE MIGRACIÓN 
       <MigracionLegacy />
-      <MigracionUnificacion />
+      <MigracionUnificacion /> */}
 
       {/* NUEVO PANEL: BUZÓN DE CASOS ESPECIALES / EX-EMPLEADOS */}
       {casosExEmpleados.length > 0 && (

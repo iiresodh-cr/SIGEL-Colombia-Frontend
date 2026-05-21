@@ -66,15 +66,16 @@ const Victimas = () => {
     }
   };
 
-  // Función relacional: cruza el ID guardado en la víctima con la base de datos de usuarios
+  // Función relacional: cruza el correo oficial guardado con los perfiles del sistema
   const getResponsableUI = (v: Victima) => {
     const asignadoId = v.representacion?.juridico_asignado_id || v.representacion?.psicosocial_asignado_id;
     if (!asignadoId) {
       return <Typography variant="caption" color="text.secondary">Sin asignar</Typography>;
     }
 
-    const prof = profesionales.abogados.find(p => p.correo === asignadoId || p.uid === asignadoId || p.correo.split('@')[0] === asignadoId) || 
-                 profesionales.psicosociales.find(p => p.correo === asignadoId || p.uid === asignadoId || p.correo.split('@')[0] === asignadoId);
+    // Comparación directa de string de correo O(n) eficiente
+    const prof = profesionales.abogados.find(p => p.correo === asignadoId) || 
+                 profesionales.psicosociales.find(p => p.correo === asignadoId);
 
     if (prof) {
       return (
