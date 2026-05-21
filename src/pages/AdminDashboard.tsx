@@ -12,6 +12,9 @@ import SearchIcon from '@mui/icons-material/Search';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import BarChartIcon from '@mui/icons-material/BarChart';
 import CloudDownloadIcon from '@mui/icons-material/CloudDownload';
+import AnalyticsIcon from '@mui/icons-material/Analytics';
+import GavelIcon from '@mui/icons-material/Gavel';
+import PublicIcon from '@mui/icons-material/Public';
 import { useNavigate } from 'react-router-dom';
 import { adminService } from '../services/adminService';
 import { AdminStats } from '../components/AdminStats';
@@ -40,11 +43,16 @@ const AdminDashboard = () => {
   const [victimasCarga, setVictimasCarga] = useState<Victima[]>([]);
   const [usuarioSupervisado, setUsuarioSupervisado] = useState('');
 
+  // ESTADOS AVANZADOS DE INTELIGENCIA DE DATOS
   const [showPivotModule, setShowPivotModule] = useState(false);
   const [loadingPivot, setLoadingPivot] = useState(false);
-  const [matrizMacrocasoAcreditacion, setMatrizMacrocasoAcreditacion] = useState<any>(null);
-  const [matrizBloqueGenero, setMatrizBloqueGenero] = useState<any>(null);
   const [universoCompletoVictimas, setUniversoCompletoVictimas] = useState<Victima[]>([]);
+  
+  // Matrices multidimensionales calculadas
+  const [pivotMacrocasoAcreditacion, setPivotMacrocasoAcreditacion] = useState<any>(null);
+  const [pivotBloqueGenero, setPivotBloqueGenero] = useState<any>(null);
+  const [pivotInterseccional, setPivotInterseccional] = useState<any>(null);
+  const [pivotGeografico, setPivotGeografico] = useState<any>(null);
 
   const navigate = useNavigate();
   const { showModal } = useModal();
@@ -87,6 +95,7 @@ const AdminDashboard = () => {
     loadDashboardData();
   }, []);
 
+  // MOTOR MULTIDIMENSIONAL DE ESTADÍSTICAS INSTITUCIONALES
   const cargarYGenerarTablasDinamicas = async () => {
     if (showPivotModule) {
       setShowPivotModule(false);
@@ -101,90 +110,166 @@ const AdminDashboard = () => {
       const docs = snap.docs.map(d => ({ id: d.id, ...d.data() } as Victima));
       setUniversoCompletoVictimas(docs);
 
-      const pivot1: Record<string, Record<string, number>> = {
+      // 1. MACROCASO VS ACREDITACIÓN
+      const m1: Record<string, Record<string, number>> = {
         "Caso 01": { "Acreditada": 0, "En trámite (despacho no ha resuelto)": 0, "No está acreditada": 0 },
         "Caso 10": { "Acreditada": 0, "En trámite (despacho no ha resuelto)": 0, "No está acreditada": 0 },
-        "Sin vincular": { "Acreditada": 0, "En trámite (despacho no ha resuelto)": 0, "No está acreditada": 0 }
+        "Sin Macrocaso": { "Acreditada": 0, "En trámite (despacho no ha resuelto)": 0, "No está acreditada": 0 }
       };
 
-      const bloquesValidos = ['BNOR', 'BSUR', 'BORI', 'BCAR', 'BCC', 'BMM', 'BOCC'];
-      const pivot2: Record<string, Record<string, number>> = {};
-      bloquesValidos.forEach(b => {
-        pivot2[b] = { "Mujer": 0, "Hombre": 0, "Otro/No registra": 0 };
-      });
-      pivot2["Sin Bloque"] = { "Mujer": 0, "Hombre": 0, "Otro/No registra": 0 };
+      // 2. FRENTE/BLOQUE VS GÉNERO
+      const bloquesValidos = ['BNOR', 'BSUR', 'BORI', 'BCAR', 'BCC', 'BMM', 'BOCC', 'Sin Bloque'];
+      const m2: Record<string, Record<string, number>> = {};
+      bloquesValidos.forEach(b => { m2[b] = { "Mujer": 0, "Hombre": 0, "Otros": 0 }; });
+
+      // 3. ENFOQUE INTERSECCIONAL: ENFOQUE DIFERENCIAL (ÉTNICO/DISCAPACIDAD) VS ACREDITACIÓN
+      const m3: Record<string, Record<string, number>> = {
+        "Población Étnica (Afro/Indígena)": { "Acreditada": 0, "Resto Estados": 0 },
+        "Víctimas con Discapacidad": { "Acreditada": 0, "Resto Estados": 0 },
+        "Adulto Mayor (60+)": { "Acreditada": 0, "Resto Estados": 0 },
+        "Sin Criterio Diferencial": { "Acreditada": 0, "Resto Estados": 0 }
+      };
+
+      // 4. CONCENTRACIÓN TERRITORIAL CRÍTICA (TOP DEPARTAMENTOS VS MACROCASO)
+      const m4: Record<string, Record<string, number>> = {};
 
       docs.forEach(v => {
+        const estAcreditacion = v.estado_jep?.estado_acreditacion || "No está acreditada";
+        const genero = v.datos_demograficos?.genero || 'Otro';
+        const depto = v.datos_contacto?.departamento || 'No especificado';
         const casos = v.representacion?.caso || [];
-        const estado = v.estado_jep?.estado_acreditacion || "No está acreditada";
+        const bloques = v.representacion?.bloque || [];
 
+        // Procesamiento Pivot 1 (Macrocasos)
         if (casos.length === 0) {
-          if (pivot1["Sin vincular"][estado] !== undefined) pivot1["Sin vincular"][estado]++;
+          if (m1["Sin Macrocaso"][estAcreditacion] !== undefined) m1["Sin Macrocaso"][estAcreditacion]++;
         } else {
-          casos.forEach(c => {
-            if (pivot1[c] && pivot1[c][estado] !== undefined) pivot1[c][estado]++;
-          });
+          casos.forEach(c => { if (m1[c] && m1[c][estAcreditacion] !== undefined) m1[c][estAcreditacion]++; });
         }
 
-        const bloques = v.representacion?.bloque || [];
-        let gen = v.datos_demograficos?.genero || "Otro/No registra";
-        if (gen !== "Mujer" && gen !== "Hombre") gen = "Otro/No registra";
-
+        // Procesamiento Pivot 2 (Bloques)
+        let genKey = (genero === 'Mujer' || genero === 'Hombre') ? genero : 'Otros';
         if (bloques.length === 0) {
-          pivot2["Sin Bloque"][gen]++;
+          m2["Sin Bloque"][genKey]++;
         } else {
           bloques.forEach(b => {
             const bClean = String(b).trim().toUpperCase();
-            if (pivot2[bClean]) {
-              pivot2[bClean][gen]++;
-            } else {
-              pivot2["Sin Bloque"][gen]++;
-            }
+            if (m2[bClean]) m2[bClean][genKey]++;
+            else m2["Sin Bloque"][genKey]++;
           });
         }
+
+        // Procesamiento Pivot 3 (Interseccionalidad)
+        let tieneDiferencial = false;
+        const etnia = v.datos_demograficos?.grupo_etnico || 'Ninguno';
+        const disc = v.datos_demograficos?.discapacidad || 'Ninguna';
+        const edad = v.datos_demograficos?.etareo || 'Adulto';
+
+        const estKey = estAcreditacion === 'Acreditada' ? 'Acreditada' : 'Resto Estados';
+
+        if (etnia !== 'Ninguno' && etnia !== '') { m3["Población Étnica (Afro/Indígena)"][estKey]++; tieneDiferencial = true; }
+        if (disc !== 'Ninguna' && disc !== '') { m3["Víctimas con Discapacidad"][estKey]++; tieneDiferencial = true; }
+        if (edad.includes('60+')) { m3["Adulto Mayor (60+)"][estKey]++; tieneDiferencial = true; }
+        if (!tieneDiferencial) { m3["Sin Criterio Diferencial"][estKey]++; }
+
+        // Procesamiento Pivot 4 (Territorial)
+        if (!m4[depto]) { m4[depto] = { "Caso 01": 0, "Caso 10": 0, "Otros": 0 }; }
+        if (casos.length === 0) { m4[depto]["Otros"]++; }
+        else { casos.forEach(c => { if (m4[depto][c] !== undefined) m4[depto][c]++; }); }
       });
 
-      setMatrizMacrocasoAcreditacion(pivot1);
-      setMatrizBloqueGenero(pivot2);
+      setPivotMacrocasoAcreditacion(m1);
+      setPivotBloqueGenero(m2);
+      setPivotInterseccional(m3);
+      setPivotGeografico(m4);
 
     } catch (error) {
       console.error("Error computando analíticas:", error);
-    } finally {
+    } finally { // CORRECCIÓN 1: 'file' reemplazado por 'finally' correcto
       setLoadingPivot(false);
     }
   };
 
-  const descargarMatrizConsolidadaCompleta = () => {
+  // GENERADOR DEL LIBRO CORPORATIVO MULTIPESTAÑA (3 TABLAS INDEPENDIENTES)
+  const descargarLibroCorporativoExcel = () => {
     if (universoCompletoVictimas.length === 0) return;
 
-    const filasConsolidadas = universoCompletoVictimas.map(v => ({
-      "ID Documento": v.id,
-      "Nombre Completo": v.nombre_completo,
-      "Cédula / Identificación": `${v.tipo_documento || 'CC'} ${v.identificacion}`,
-      "Género": v.datos_demograficos?.genero || 'No registra',
-      "Grupo Étnico": v.datos_demograficos?.grupo_etnico || 'Ninguno',
-      "Ciclo Vital": v.datos_demograficos?.etareo || 'Adulto',
-      "Teléfono": v.datos_contacto?.telefono || 'No registra',
-      "Correo Electrónico": v.datos_contacto?.correo || 'No registra',
-      "Departamento": v.datos_contacto?.departamento || 'No registra',
-      "Dirección": v.datos_contacto?.direccion || 'No registra',
-      "Macrocasos": v.representacion?.caso?.join(', ') || 'Sin vincular',
-      "Bloques": v.representacion?.bloque?.join(', ') || 'No registra',
-      "Delitos / Hechos": v.representacion?.hechos_victimizantes?.join(', ') || 'No registra',
-      "Abogado Responsable (ID)": v.representacion?.juridico_asignado_id || 'Sin asignar',
-      "Psicosocial Responsable (ID)": v.representacion?.psicosocial_asignado_id || 'Sin asignar',
-      "Estado Acreditación": v.estado_jep?.estado_acreditacion || 'No está acreditada',
-      "Auto Acreditación": v.estado_jep?.auto_acreditacion || '',
-      "Reconocimiento PJ": v.estado_jep?.estado_reconocimiento_pj || 'Sin PJ',
-      "Auto Reconocimiento": v.estado_jep?.auto_reconocimiento || ''
-    }));
-
-    const hoja = XLSX.utils.json_to_sheet(filasConsolidadas);
     const libro = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(libro, hoja, "Matriz Consolidada SIGEL");
-    
+
+    // PESTAÑA 1: BASE DE DATOS MATRIZ CONSOLIDADA COMPLETA
+    const hoja1Data = universoCompletoVictimas.map(v => ({
+      "CODIGO EXPEDIENTE": v.id,
+      "NOMBRES Y APELLIDOS": v.nombre_completo,
+      "TIPO IDENTIFICACION": v.tipo_documento || 'CC',
+      "NUMERO IDENTIFICACION": v.identificacion,
+      "GÉNERO": v.datos_demograficos?.genero || 'No registra',
+      "ENFOQUE ÉTNICO": v.datos_demograficos?.grupo_etnico || 'Ninguno',
+      "CICLO VITAL": v.datos_demograficos?.etareo || 'Adulto',
+      "SITUACIÓN DISCAPACIDAD": v.datos_demograficos?.discapacidad || 'Ninguna',
+      "TELÉFONO CONTACTO": v.datos_contacto?.telefono || 'No registra',
+      "EMAIL": v.datos_contacto?.correo || 'No registra',
+      "DEPARTAMENTO RESIDENCIA": v.datos_contacto?.departamento || 'No registra',
+      "DIRECCIÓN DE CONTACTO": v.datos_contacto?.direccion || 'No registra',
+      "MACROCASOS JEP VINCULADOS": v.representacion?.caso?.join(', ') || 'Sin Macrocaso',
+      "BLOQUES / FRENTES": v.representacion?.bloque?.join(', ') || 'No registra',
+      "DELITOS SUFRIDOS (HECHOS)": v.representacion?.hechos_victimizantes?.join(', ') || 'No registra',
+      "CORREO JURÍDICO ASIGNADO": v.representacion?.juridico_asignado_id || 'Sin asignar',
+      "CORREO PSICOSOCIAL ASIGNADO": v.representacion?.psicosocial_asignado_id || 'Sin asignar',
+      "ESTADO ACREDITACIÓN JEP": v.estado_jep?.estado_acreditacion || 'No está acreditada',
+      "AUTO DE ACREDITACIÓN": v.estado_jep?.auto_acreditacion || 'N/A',
+      "RECONOCIMIENTO PERSONERÍA": v.estado_jep?.estado_reconocimiento_pj || 'Sin PJ',
+      "AUTO DE RECONOCIMIENTO": v.estado_jep?.auto_reconocimiento || 'N/A'
+    }));
+    const hoja1 = XLSX.utils.json_to_sheet(hoja1Data);
+    XLSX.utils.book_append_sheet(libro, hoja1, "1. Matriz Consolidada");
+
+    // PESTAÑA 2: CONTROL DE CARGAS LABORALES POR PROFESIONAL COHESIONADO
+    const balanceCargas: Record<string, { nombre: string, rol: string, juridicos: number, psicosociales: number }> = {};
+    users.forEach(u => {
+      balanceCargas[u.correo.toLowerCase()] = {
+        nombre: u.nombre_completo || 'Sin nombre registrado',
+        rol: u.rol.toUpperCase(),
+        juridicos: 0,
+        psicosociales: 0
+      };
+    });
+
+    universoCompletoVictimas.forEach(v => {
+      const jur = String(v.representacion?.juridico_asignado_id || '').toLowerCase().trim();
+      // CORRECCIÓN 2: Tipado saneado a 'psicosocial_asignado_id' removiendo propiedad inexistente en inglés
+      const psi = String(v.representacion?.psicosocial_asignado_id || '').toLowerCase().trim();
+      if (balanceCargas[jur]) balanceCargas[jur].juridicos++;
+      if (balanceCargas[psi]) balanceCargas[psi].psicosociales++;
+    });
+
+    const hoja2Data = Object.keys(balanceCargas).map(correo => ({
+      "EMAIL INSTITUCIONAL": correo,
+      "NOMBRE COMPLETO": balanceCargas[correo].nombre,
+      "ROL DE ACCESO": balanceCargas[correo].rol,
+      "CASOS ASIGNADOS COMO ABOGADO": balanceCargas[correo].juridicos,
+      "CASOS ASIGNADOS COMO PSICOSOCIAL": balanceCargas[correo].psicosociales,
+      "TOTAL EXPEDIENTES BAJO SUPERVISIÓN": balanceCargas[correo].juridicos + balanceCargas[correo].psicosociales
+    }));
+    const hoja2 = XLSX.utils.json_to_sheet(hoja2Data);
+    XLSX.utils.book_append_sheet(libro, hoja2, "2. Cargas de Trabajo");
+
+    // PESTAÑA 3: ANALÍTICA PREALIMENTADA DE ENFOQUES DIFERENCIALES
+    const hoja3Data: any[] = [];
+    if (pivotInterseccional) {
+      hoja3Data.push({ "INDICADOR DE ENFOQUE DIFERENCIAL": "--- ANÁLISIS DE ENFOQUE DIFERENCIAL E INTERSECCIONALIDAD ---", "ACREDITADAS": "", "RESTO ESTADOS JEP": "" });
+      Object.keys(pivotInterseccional).forEach(k => {
+        hoja3Data.push({
+          "INDICADOR DE ENFOQUE DIFERENCIAL": k,
+          "ACREDITADAS": pivotInterseccional[k]["Acreditada"],
+          "RESTO ESTADOS JEP": pivotInterseccional[k]["Resto Estados"]
+        });
+      });
+    }
+    const hoja3 = XLSX.utils.json_to_sheet(hoja3Data);
+    XLSX.utils.book_append_sheet(libro, hoja3, "3. Resumen Enfoques");
+
     const fecha = new Date().toISOString().split('T')[0];
-    XLSX.writeFile(libro, `Matriz_Consolidada_IIRESODH_${fecha}.xlsx`);
+    XLSX.writeFile(libro, `REPORTE_INTELIGENCIA_SIGEL_${fecha}.xlsx`);
   };
 
   const handleRoleChange = async (email: string, role: string) => {
@@ -238,7 +323,7 @@ const AdminDashboard = () => {
 
   return (
     <Box sx={{ p: 4 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4, flexWrap: 'wrap', gap: 2 }}>
         <Typography variant="h4" sx={{ fontWeight: 800, color: '#003366' }}>Administración Central SIGEL</Typography>
         <Box sx={{ display: 'flex', gap: 2 }}>
           <Button 
@@ -246,9 +331,9 @@ const AdminDashboard = () => {
             startIcon={<BarChartIcon />} 
             color="primary"
             onClick={cargarYGenerarTablasDinamicas}
-            sx={{ fontWeight: 'bold' }}
+            sx={{ fontWeight: 'bold', bgcolor: '#003366', '&:hover': { bgcolor: '#001a33' } }}
           >
-            {showPivotModule ? 'Ocultar Estadísticas' : 'Herramientas Estadísticas'}
+            {showPivotModule ? 'Ocultar Analíticas' : 'Inteligencia de Datos'}
           </Button>
           <Button 
             variant="contained" 
@@ -263,13 +348,18 @@ const AdminDashboard = () => {
       </Box>
 
       {showPivotModule && (
-        <Paper elevation={0} sx={{ p: 4, borderRadius: 3, border: '2px solid #3b82f6', bgcolor: '#f0f9ff', mb: 4 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <BarChartIcon sx={{ color: '#1d4ed8', fontSize: 32 }} />
-              <Typography variant="h6" sx={{ fontWeight: 800, color: '#1e3a8a' }}>
-                Módulo Analítico Corporativo: Inteligencia de Datos y Tablas Dinámicas
-              </Typography>
+        <Paper elevation={0} sx={{ p: 4, borderRadius: 3, border: '2px solid #003366', bgcolor: '#f8fafc', mb: 4 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4, flexWrap: 'wrap', gap: 2 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <AnalyticsIcon sx={{ color: '#003366', fontSize: 36 }} />
+              <Box>
+                <Typography variant="h5" sx={{ fontWeight: 800, color: '#003366' }}>
+                  Auditoría Analítica e Inteligencia de Casos
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Cómputos agregados en tiempo real sobre el portafolio consolidado de expedientes.
+                </Typography>
+              </Box>
             </Box>
             
             {!loadingPivot && universoCompletoVictimas.length > 0 && (
@@ -277,73 +367,131 @@ const AdminDashboard = () => {
                 variant="contained" 
                 color="success" 
                 startIcon={<CloudDownloadIcon />}
-                onClick={descargarMatrizConsolidadaCompleta}
-                sx={{ fontWeight: 'bold' }}
+                onClick={descargarLibroCorporativoExcel}
+                sx={{ fontWeight: 'bold', px: 3, py: 1 }}
               >
-                Exportar Matriz Consolidada (Excel)
+                Exportar Libro Analítico Completo (Excel)
               </Button>
             )}
           </Box>
 
           {loadingPivot ? (
-            <Box sx={{ display: 'flex', alignItems: 'center', py: 4, gap: 2 }}>
-              <CircularProgress size={26} />
-              <Typography variant="body1" sx={{ color: '#1e3a8a', fontWeight: 600 }}>
-                Compilando analíticas y calculando cruces dinámicos sobre ~2,900 expedientes...
+            <Box sx={{ display: 'flex', alignItems: 'center', py: 6, gap: 2, justifyContent: 'center' }}>
+              <CircularProgress size={30} />
+              <Typography variant="body1" sx={{ color: '#003366', fontWeight: 600 }}>
+                Ejecutando algoritmos cruzados sobre el portafolio institucional...
               </Typography>
             </Box>
           ) : (
             <Grid container spacing={4}>
               <Grid size={{ xs: 12, lg: 6 }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#1e3a8a', mb: 1 }}>
-                  Tabla Dinámica 1: Cobertura de Macrocasos vs. Estado de Acreditación JEP
-                </Typography>
-                <Table size="small" sx={{ bgcolor: 'white', borderRadius: 2, overflow: 'hidden', border: '1px solid #dbeafe' }}>
-                  <TableHead sx={{ bgcolor: '#dbeafe' }}>
-                    <TableRow>
-                      <TableCell sx={{ fontWeight: 'bold' }}>Fila: Macrocaso</TableCell>
-                      <TableCell align="center" sx={{ fontWeight: 'bold', color: '#16a34a' }}>Acreditada</TableCell>
-                      <TableCell align="center" sx={{ fontWeight: 'bold', color: '#ca8a04' }}>En Trámite</TableCell>
-                      <TableCell align="center" sx={{ fontWeight: 'bold', color: '#dc2626' }}>No Acreditada</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {matrizMacrocasoAcreditacion && Object.keys(matrizMacrocasoAcreditacion).map(caso => (
-                      <TableRow key={caso} hover>
-                        <TableCell sx={{ fontWeight: 700 }}>{caso}</TableCell>
-                        <TableCell align="center" sx={{ fontWeight: 600 }}>{matrizMacrocasoAcreditacion[caso]["Acreditada"]}</TableCell>
-                        <TableCell align="center" sx={{ fontWeight: 600 }}>{matrizMacrocasoAcreditacion[caso]["En trámite (despacho no ha resuelto)"]}</TableCell>
-                        <TableCell align="center" sx={{ fontWeight: 600 }}>{matrizMacrocasoAcreditacion[caso]["No está acreditada"]}</TableCell>
+                <Paper elevation={0} sx={{ p: 3, border: '1px solid #e2e8f0', borderRadius: 2, bgcolor: 'white' }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#003366', mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <GavelIcon fontSize="small"/> Macrocasos JEP vs Acreditación
+                  </Typography>
+                  <Table size="small">
+                    <TableHead sx={{ bgcolor: '#f1f5f9' }}>
+                      <TableRow>
+                        <TableCell sx={{ fontWeight: 'bold' }}>Macrocaso</TableCell>
+                        <TableCell align="center" sx={{ fontWeight: 'bold', color: 'success.main' }}>Acreditada</TableCell>
+                        <TableCell align="center" sx={{ fontWeight: 'bold', color: 'warning.main' }}>En Trámite</TableCell>
+                        <TableCell align="center" sx={{ fontWeight: 'bold', color: 'error.main' }}>No Acreditada</TableCell>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHead>
+                    <TableBody>
+                      {pivotMacrocasoAcreditacion && Object.keys(pivotMacrocasoAcreditacion).map(caso => (
+                        <TableRow key={caso} hover>
+                          <TableCell sx={{ fontWeight: 700 }}>{caso}</TableCell>
+                          <TableCell align="center" sx={{ fontWeight: 600 }}>{pivotMacrocasoAcreditacion[caso]["Acreditada"]}</TableCell>
+                          <TableCell align="center">{pivotMacrocasoAcreditacion[caso]["En trámite (despacho no ha resuelto)"]}</TableCell>
+                          <TableCell align="center">{pivotMacrocasoAcreditacion[caso]["No está acreditada"]}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </Paper>
               </Grid>
 
               <Grid size={{ xs: 12, lg: 6 }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#1e3a8a', mb: 1 }}>
-                  Tabla Dinámica 2: Despliegue de Bloques Territoriales vs. Identidad de Género
-                </Typography>
-                <Table size="small" sx={{ bgcolor: 'white', borderRadius: 2, overflow: 'hidden', border: '1px solid #dbeafe' }}>
-                  <TableHead sx={{ bgcolor: '#dbeafe' }}>
-                    <TableRow>
-                      <TableCell sx={{ fontWeight: 'bold' }}>Fila: Frente / Bloque</TableCell>
-                      <TableCell align="center" sx={{ fontWeight: 'bold' }}>Mujer</TableCell>
-                      <TableCell align="center" sx={{ fontWeight: 'bold' }}>Hombre</TableCell>
-                      <TableCell align="center" sx={{ fontWeight: 'bold', color: 'text.secondary' }}>Otro / S.R</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {matrizBloqueGenero && Object.keys(matrizBloqueGenero).map(bloque => (
-                      <TableRow key={bloque} hover>
-                        <TableCell sx={{ fontWeight: 700 }}>{bloque}</TableCell>
-                        <TableCell align="center">{matrizBloqueGenero[bloque]["Mujer"]}</TableCell>
-                        <TableCell align="center">{matrizBloqueGenero[bloque]["Hombre"]}</TableCell>
-                        <TableCell align="center" sx={{ color: 'text.secondary' }}>{matrizBloqueGenero[bloque]["Otro/No registra"]}</TableCell>
+                <Paper elevation={0} sx={{ p: 3, border: '1px solid #e2e8f0', borderRadius: 2, bgcolor: 'white' }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#003366', mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <PublicIcon fontSize="small"/> Frentes / Bloques vs Identidad de Género
+                  </Typography>
+                  <Table size="small">
+                    <TableHead sx={{ bgcolor: '#f1f5f9' }}>
+                      <TableRow>
+                        <TableCell sx={{ fontWeight: 'bold' }}>Frente / Bloque</TableCell>
+                        <TableCell align="center" sx={{ fontWeight: 'bold' }}>Mujer</TableCell>
+                        <TableCell align="center" sx={{ fontWeight: 'bold' }}>Hombre</TableCell>
+                        <TableCell align="center" sx={{ fontWeight: 'bold', color: 'text.secondary' }}>Otros</TableCell>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHead>
+                    <TableBody>
+                      {pivotBloqueGenero && Object.keys(pivotBloqueGenero).map(bloque => (
+                        <TableRow key={bloque} hover>
+                          <TableCell sx={{ fontWeight: 700 }}>{bloque}</TableCell>
+                          <TableCell align="center">{pivotBloqueGenero[bloque]["Mujer"]}</TableCell>
+                          <TableCell align="center">{pivotBloqueGenero[bloque]["Hombre"]}</TableCell>
+                          <TableCell align="center" sx={{ color: 'text.secondary' }}>{pivotBloqueGenero[bloque]["Otros"]}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </Paper>
+              </Grid>
+
+              <Grid size={{ xs: 12, lg: 6 }}>
+                <Paper elevation={0} sx={{ p: 3, border: '1px solid #e2e8f0', borderRadius: 2, bgcolor: 'white' }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#003366', mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <WarningAmberIcon fontSize="small" color="warning"/> Vulnerabilidad Crítica e Interseccionalidad
+                  </Typography>
+                  <Table size="small">
+                    <TableHead sx={{ bgcolor: '#f1f5f9' }}>
+                      <TableRow>
+                        <TableCell sx={{ fontWeight: 'bold' }}>Enfoque Diferencial Poblacional</TableCell>
+                        <TableCell align="center" sx={{ fontWeight: 'bold', color: 'success.main' }}>Acreditadas</TableCell>
+                        <TableCell align="center" sx={{ fontWeight: 'bold', color: 'text.secondary' }}>Pendientes / No</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {pivotInterseccional && Object.keys(pivotInterseccional).map(key => (
+                        <TableRow key={key} hover>
+                          <TableCell sx={{ fontWeight: 700 }}>{key}</TableCell>
+                          <TableCell align="center" sx={{ fontWeight: 600, color: 'success.dark' }}>{pivotInterseccional[key]["Acreditada"]}</TableCell>
+                          <TableCell align="center" sx={{ color: 'text.secondary' }}>{pivotInterseccional[key]["Resto Estados"]}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </Paper>
+              </Grid>
+
+              <Grid size={{ xs: 12, lg: 6 }}>
+                <Paper elevation={0} sx={{ p: 3, border: '1px solid #e2e8f0', borderRadius: 2, bgcolor: 'white', maxHeight: '275px', overflowY: 'auto' }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#003366', mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <PublicIcon fontSize="small"/> Concentración Territorial por Departamento
+                  </Typography>
+                  <Table size="small">
+                    <TableHead sx={{ bgcolor: '#f1f5f9', position: 'sticky', top: 0, zIndex: 1 }}>
+                      <TableRow>
+                        <TableCell sx={{ fontWeight: 'bold' }}>Departamento</TableCell>
+                        <TableCell align="center" sx={{ fontWeight: 'bold' }}>Caso 01</TableCell>
+                        <TableCell align="center" sx={{ fontWeight: 'bold' }}>Caso 10</TableCell>
+                        <TableCell align="center" sx={{ fontWeight: 'bold', color: 'text.secondary' }}>Otros</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {pivotGeografico && Object.keys(pivotGeografico).map(depto => (
+                        <TableRow key={depto} hover>
+                          <TableCell sx={{ fontWeight: 700 }}>{depto}</TableCell>
+                          <TableCell align="center">{pivotGeografico[depto]["Caso 01"]}</TableCell>
+                          <TableCell align="center">{pivotGeografico[depto]["Caso 10"]}</TableCell>
+                          <TableCell align="center" sx={{ color: 'text.secondary' }}>{pivotGeografico[depto]["Otros"]}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </Paper>
               </Grid>
             </Grid>
           )}
