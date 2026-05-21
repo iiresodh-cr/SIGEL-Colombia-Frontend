@@ -9,6 +9,7 @@ import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import FolderSharedIcon from '@mui/icons-material/FolderShared';
 import SearchIcon from '@mui/icons-material/Search';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import { useNavigate } from 'react-router-dom';
 import { adminService } from '../services/adminService';
 import { AdminStats } from '../components/AdminStats';
@@ -32,10 +33,6 @@ const MigracionUnificacion = () => {
   const [logs, setLogs] = useState<string[]>([]);
   const TARGET_COLLECTION = 'victimas';
 
-  // -----------------------------------------------------------------------
-  // CUADRO DE TRADUCCIÓN MAESTRO (PROVISTO POR EL USUARIO)
-  // El motor busca las claves normalizadas (sin tildes, minúsculas y sin espacios extras)
-  // -----------------------------------------------------------------------
   const DICCIONARIO_MANUAL: Record<string, string> = {
     "alejandra solano gallardo": "asolano@iiresodh.org",
     "adriana suarez vasquez": "asuarez@iiresodh.org",
@@ -76,13 +73,11 @@ const MigracionUnificacion = () => {
     setLogs(["🚀 Iniciando motor asíncrono secuencial con tolerancia a ex-empleados..."]);
 
     try {
-      // 1. Descargar lista de usuarios activos autorizados
       const usuariosSnapshot = await getDocs(collection(db, 'usuarios'));
       const listaUsuarios = usuariosSnapshot.docs.map(d => ({ uid: d.id, ...d.data() } as any));
       
       setLogs(prev => [...prev, `ℹ️ Se cargaron ${listaUsuarios.length} perfiles activos como referencia de sistema.`]);
 
-      // 2. Indexar mapas O(1) en memoria para máximo rendimiento
       const mapPorUid = new Map<string, any>();
       const mapPorCorreo = new Map<string, any>();
       const mapPorUsername = new Map<string, any>();
@@ -100,7 +95,6 @@ const MigracionUnificacion = () => {
         if (nombreNorm) mapPorNombreNormalizado.set(nombreNorm, u);
       });
 
-      // 3. Descargar el universo de víctimas
       setLogs(prev => [...prev, `🔍 Conectando con la colección '${TARGET_COLLECTION}' y descargando expedientes...`]);
       const victimasSnapshot = await getDocs(collection(db, TARGET_COLLECTION));
       
@@ -113,7 +107,6 @@ const MigracionUnificacion = () => {
       let batch = writeBatch(db);
       let operacionesBatch = 0;
 
-      // 4. Función resolutoria híbrida e inmune a fallos
       const resolverIdentificador = (idCrudo: string): { correo: string; nombre: string } => {
         if (!idCrudo || idCrudo.trim() === "") return { correo: "", nombre: "" };
 
@@ -121,7 +114,6 @@ const MigracionUnificacion = () => {
         const stringMinuscula = stringLimpio.toLowerCase();
         const nombreNorm = normalizar(stringLimpio);
 
-        // Intento 1: Buscar coincidencia en el diccionario manual provisto
         if (DICCIONARIO_MANUAL[nombreNorm]) {
           const emailDict = DICCIONARIO_MANUAL[nombreNorm];
           const userActivo = mapPorCorreo.get(emailDict);
@@ -133,36 +125,30 @@ const MigracionUnificacion = () => {
           return { correo: emailDict, nombre: userActivo ? (userActivo.nombre_completo || stringLimpio) : stringLimpio };
         }
 
-        // Intento 2: ¿Ya corresponde a un correo electrónico corporativo activo?
         if (mapPorCorreo.has(stringMinuscula)) {
           const user = mapPorCorreo.get(stringMinuscula);
           return { correo: user.correo, nombre: user.nombre_completo || "" };
         }
 
-        // Intento 3: Si ya viene con formato de correo pero no está en la lista de activos (Ex-empleado)
         if (stringMinuscula.includes('@')) {
           return { correo: stringMinuscula, nombre: stringLimpio };
         }
 
-        // Intento 4: Es un UID de un usuario activo
         if (mapPorUid.has(stringLimpio)) {
           const user = mapPorUid.get(stringLimpio);
           return { correo: user.correo, nombre: user.nombre_completo || "" };
         }
 
-        // Intento 5: Es un username institucional activo (sin @iiresodh.org)
         if (mapPorUsername.has(stringMinuscula)) {
           const user = mapPorUsername.get(stringMinuscula);
           return { correo: user.correo, nombre: user.nombre_completo || "" };
         }
 
-        // Intento 6: Coincidencia por nombre normalizado plano activo
         if (mapPorNombreNormalizado.has(nombreNorm)) {
           const user = mapPorNombreNormalizado.get(nombreNorm);
           return { correo: user.correo, nombre: user.nombre_completo || "" };
         }
 
-        // Intento 7: Fuzzy match preventivo sobre usuarios activos
         if (nombreNorm.length > 2) {
           const palabras = nombreNorm.split(/\s+/);
           const coincidenciaFuzzy = listaUsuarios.find(u => {
@@ -174,14 +160,12 @@ const MigracionUnificacion = () => {
           }
         }
 
-        // REGLA DE NEGOCIO FINAL PARA EX-EMPLEADOS / INCOMPATIBLES NO REGISTRADOS
         const slug = nombreNorm.replace(/[^a-z0-9]/g, '_').replace(/_+/g, '_');
         const fallbackEmail = `ex_empleado-${slug || 'desconocido'}@iiresodh.org`;
         totalExEmpleadosMapeados++;
         return { correo: fallbackEmail, nombre: stringLimpio };
       };
 
-      // 5. Ciclo For...Of Asíncrono Secuencial (Protección contra desbordamiento de memoria)
       for (const victimaDoc of victimasSnapshot.docs) {
         totalAnalizados++;
         const data = victimaDoc.data();
@@ -193,7 +177,6 @@ const MigracionUnificacion = () => {
         let necesitaUpdate = false;
         let camposUpdate: any = {};
 
-        // Evaluar y homologar Jurídico
         if (jurActual) {
           const resJur = resolverIdentificador(jurActual);
           if (jurActual !== resJur.correo || representacion.juridico_asignado_nombre !== resJur.nombre) {
@@ -203,7 +186,6 @@ const MigracionUnificacion = () => {
           }
         }
 
-        // Evaluar y homologar Psicosocial
         if (psiActual) {
           const resPsi = resolverIdentificador(psiActual);
           if (psiActual !== resPsi.correo || representacion.psicosocial_asignado_nombre !== resPsi.nombre) {
@@ -266,7 +248,7 @@ const MigracionUnificacion = () => {
         </Typography>
       </Box>
 
-      <Box sx={{ mt: 2, maxHeight: 220, overflowY: 'auto', bgcolor: '#1e293b', p: 2, borderRadius: 1 }}>
+      <Box sx={{ mt: 2, maxHeight: 150, overflowY: 'auto', bgcolor: '#1e293b', p: 2, borderRadius: 1 }}>
         {logs.map((log, i) => (
           <Typography 
             key={i} 
@@ -390,6 +372,12 @@ const AdminDashboard = () => {
     (u.nombre_completo && u.nombre_completo.toLowerCase().includes(userSearch.toLowerCase()))
   );
 
+  // FILTRO EN TIEMPO REAL PARA EL BUZÓN DE CASOS ESPECIALES (EX-EMPLEADOS)
+  const casosExEmpleados = allVictimas.filter(v => 
+    v.representacion?.juridico_asignado_id?.includes('ex_empleado') ||
+    v.representacion?.psicosocial_asignado_id?.includes('ex_empleado')
+  );
+
   if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', mt: 10 }}><CircularProgress /></Box>;
 
   return (
@@ -409,6 +397,66 @@ const AdminDashboard = () => {
       {/* RENDERIZADO SECUENCIAL DE AMBOS COMPONENTES DE MIGRACIÓN */}
       <MigracionLegacy />
       <MigracionUnificacion />
+
+      {/* NUEVO PANEL: BUZÓN DE CASOS ESPECIALES / EX-EMPLEADOS */}
+      {casosExEmpleados.length > 0 && (
+        <Paper elevation={0} sx={{ p: 4, borderRadius: 3, border: '2px solid #ef4444', bgcolor: '#fef2f2', mb: 4 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+            <WarningAmberIcon sx={{ color: '#dc2626', mr: 1, fontSize: 32 }} />
+            <Typography variant="h6" sx={{ fontWeight: 800, color: '#991b1b' }}>
+              Buzón de Casos Especiales y Ex-empleados ({casosExEmpleados.length} por resolver)
+            </Typography>
+          </Box>
+          <Typography variant="body2" sx={{ mb: 3, color: '#7f1d1d' }}>
+            Los siguientes expedientes están asignados a cuentas inactivas u homónimos no resueltos por el sistema. 
+            Haz clic en <strong>Ver y Reasignar</strong> para transferirlos individualmente a un profesional activo.
+          </Typography>
+          
+          <Table size="small" sx={{ bgcolor: 'white', borderRadius: 2, overflow: 'hidden', border: '1px solid #fee2e2' }}>
+            <TableHead sx={{ bgcolor: '#fee2e2' }}>
+              <TableRow>
+                <TableCell sx={{ fontWeight: 'bold', color: '#991b1b' }}>Víctima / Nombre</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', color: '#991b1b' }}>Cédula</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', color: '#991b1b' }}>Asignación Inactiva Detectada</TableCell>
+                <TableCell align="right" sx={{ fontWeight: 'bold', color: '#991b1b' }}>Acción</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {casosExEmpleados.map((v) => {
+                const jur = v.representacion?.juridico_asignado_id || '';
+                const psi = v.representacion?.psicosocial_asignado_id || '';
+                const exResponsable = jur.includes('ex_empleado') ? jur : psi;
+                return (
+                  <TableRow key={v.id} hover>
+                    <TableCell sx={{ fontWeight: 600 }}>{v.nombre_completo}</TableCell>
+                    <TableCell>{v.identificacion}</TableCell>
+                    <TableCell>
+                      <Chip 
+                        label={exResponsable} 
+                        size="small" 
+                        color="error" 
+                        variant="outlined" 
+                        sx={{ fontFamily: 'monospace', fontSize: '0.75rem' }} 
+                      />
+                    </TableCell>
+                    <TableCell align="right">
+                      <Button 
+                        size="small" 
+                        variant="contained" 
+                        color="error"
+                        onClick={() => navigate(`/victimas/${v.id}`)}
+                        sx={{ fontSize: '0.75rem', fontWeight: 'bold' }}
+                      >
+                        Ver y Reasignar
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </Paper>
+      )}
 
       {showSustitucion ? (
         <SustitucionMasiva 
