@@ -18,6 +18,7 @@ import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import GavelIcon from '@mui/icons-material/Gavel';
 import FolderSpecialIcon from '@mui/icons-material/FolderSpecial';
 import EditIcon from '@mui/icons-material/Edit';
+import HistoryIcon from '@mui/icons-material/History';
 
 import { jepService } from '../services/jepService';
 import { storageService, ArchivoJEP } from '../services/storageService';
@@ -30,12 +31,11 @@ import { Audiencia } from '../types/audiencia';
 import { Radicado } from '../types/radicado';
 import { useAuth } from '../context/AuthContext';
 import { useModal } from '../context/ModalContext';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, collection, addDoc, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '../config/firebase';
 
 const TIPOS_INTERACCION = ['Llamada de sentido del proceso', 'Asesoría jurídica', 'Acompañamiento psicosocial', 'Gestión de acreditación', 'Otra'];
 
-// COHESIÓN ESTÉTICA: Listas de selección idénticas a las del formulario de registro
 const CASOS_JEP = ['Caso 01', 'Caso 10'];
 const BLOQUES_JEP = ['BNOR', 'BSUR', 'BORI', 'BCAR', 'BCC', 'BMM', 'BOCC']; 
 const CALIDADES = ['Directa', 'Indirecta', 'Directa (Vocera)', 'Indirecta (Vocera)', 'Indirecta (No Vocera)', 'Ambas'];
@@ -46,6 +46,32 @@ const ETNICOS = ['Ninguno', 'Indígena', 'Afrodescendiente/Negro/Mulato', 'Rrom/
 const ETAREOS = ['Infancia (0-11)', 'Adolescencia (12-18)', 'Joven (18-28)', 'Adulto (28-60)', 'Adulto Mayor (60+)'];
 const DISCAPACIDADES = ['Ninguna', 'Física', 'Auditiva', 'Visual', 'Sordoceguera', 'Intelectual', 'Psicosocial (Mental)', 'Múltiple'];
 const DEPARTAMENTOS = ['Amazonas', 'Antioquia', 'Arauca', 'Atlántico', 'Bolívar', 'Boyacá', 'Caldas', 'Caquetá', 'Casanare', 'Cauca', 'Cesar', 'Chocó', 'Córdoba', 'Cundinamarca', 'Guainía', 'Guaviare', 'Huila', 'La Guajira', 'Magdalena', 'Meta', 'Nariño', 'Norte de Santander', 'Putumayo', 'Quindío', 'Risaralda', 'San Andrés y Providencia', 'Santander', 'Sucre', 'Tolima', 'Valle del Cauca', 'Vaupés', 'Vichada', 'Bogotá D.C.'];
+
+const traducirCampo = (campo: string) => {
+  const mapa: Record<string, string> = {
+    'nombre_completo': 'Nombre Completo',
+    'tipo_documento': 'Tipo de Documento',
+    'identificacion': 'Número de Identificación',
+    'datos_demograficos.genero': 'Género',
+    'datos_demograficos.orientacion_sexual': 'Orientación Sexual',
+    'datos_demograficos.grupo_etnico': 'Grupo Étnico',
+    'datos_demograficos.etareo': 'Ciclo Vital / Etáreo',
+    'datos_demograficos.discapacidad': 'Discapacidad',
+    'datos_contacto.telefono': 'Teléfono de Contacto',
+    'datos_contacto.correo': 'Correo Electrónico',
+    'datos_contacto.departamento': 'Departamento',
+    'datos_contacto.direccion': 'Dirección',
+    'representacion.caso': 'Macrocaso(s) JEP',
+    'representacion.bloque': 'Bloque(s)',
+    'representacion.hechos_victimizantes': 'Delitos / Hechos',
+    'representacion.calidad_victima': 'Calidad de Víctima',
+    'estado_jep.estado_acreditacion': 'Estado de Acreditación',
+    'estado_jep.estado_reconocimiento_pj': 'Reconocimiento Personería Jurídica',
+    'estado_jep.auto_acreditacion': 'Auto de Acreditación',
+    'estado_jep.auto_reconocimiento': 'Auto de Reconocimiento',
+  };
+  return mapa[campo] || campo;
+};
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -72,6 +98,7 @@ const VictimaDetalle = () => {
   const [interacciones, setInteracciones] = useState<Interaccion[]>([]);
   const [poderes, setPoderes] = useState<ArchivoJEP[]>([]);
   const [listaProfesionales, setListaProfesionales] = useState<{ abogados: Usuario[], psicosociales: Usuario[] }>({ abogados: [], psicosociales: [] });
+  const [historialCambios, setHistorialCambios] = useState<any[]>([]);
   
   const [audiencias, setAudiencias] = useState<Audiencia[]>([]);
   const [radicados, setRadicados] = useState<Radicado[]>([]);
@@ -80,22 +107,51 @@ const VictimaDetalle = () => {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
 
-  // Estados para el Modal de Seguimiento de Notas
   const [openNoteModal, setOpenNoteModal] = useState(false);
   const [newNote, setNewNote] = useState<Partial<Interaccion>>({ tipo: 'Llamada de sentido del proceso', estado_contacto: 'Contactado', observaciones: '', compromisos: '' });
 
-  // Estados para el Modal de Reasignación de Administración
   const [openReasignarModal, setOpenReasignarModal] = useState(false);
   const [reasignarData, setReasignarData] = useState({ juridico_nuevo_id: '', psicosocial_nuevo_id: '', motivo: '' });
 
-  // NUEVOS ESTADOS: Edición de la ficha completa de la víctima
   const [openEditModal, setOpenEditModal] = useState(false);
   const [editFormData, setEditFormData] = useState<any>(null);
 
   const isAdmin = role === 'admin' || role === 'superadmin';
   const isLector = role === 'lector';
   const canDelete = isAdmin; 
-  const canEdit = !isLector; // Cualquier rol operativo (abogado o psicosocial) puede editar la ficha
+  const canEdit = !isLector;
+
+  const obtenerCambios = (anterior: any, nuevo: any, prefijo = '') => {
+    let diferencias: any[] = [];
+    for (const llave in nuevo) {
+      const ruta = prefijo ? `${prefijo}.${llave}` : llave;
+      const valAnt = anterior ? anterior[llave] : undefined;
+      const valNue = nuevo[llave];
+
+      if (valNue !== null && typeof valNue === 'object' && !Array.isArray(valNue)) {
+        diferencias = diferencias.concat(obtenerCambios(valAnt, valNue, ruta));
+      } else if (Array.isArray(valNue)) {
+        const strAnt = JSON.stringify([...(valAnt || [])].sort());
+        const strNue = JSON.stringify([...valNue].sort());
+        if (strAnt !== strNue) {
+          diferencias.push({
+            campo: ruta,
+            valor_anterior: valAnt && valAnt.length > 0 ? valAnt.join(', ') : 'Ninguno',
+            valor_nuevo: valNue.length > 0 ? valNue.join(', ') : 'Ninguno'
+          });
+        }
+      } else {
+        if (valAnt !== valNue) {
+          diferencias.push({
+            campo: ruta,
+            valor_anterior: valAnt === undefined || valAnt === '' ? 'No registra' : String(valAnt),
+            valor_nuevo: valNue === '' ? 'Vacío' : String(valNue)
+          });
+        }
+      }
+    }
+    return diferencias;
+  };
 
   const loadData = async () => {
     if (!id) return;
@@ -113,6 +169,10 @@ const VictimaDetalle = () => {
       setInteracciones(notasData);
       setPoderes(archivosData);
       setListaProfesionales(profsData);
+
+      const historialRef = collection(db, `victimas/${id}/historial_cambios`);
+      const snapHistorial = await getDocs(query(historialRef, orderBy('fecha', 'desc')));
+      setHistorialCambios(snapHistorial.docs.map(d => ({ id: d.id, ...d.data() })));
 
       if (victimaData) {
         const audienciasFiltradas = allAudiencias.filter(a => 
@@ -139,7 +199,6 @@ const VictimaDetalle = () => {
 
   useEffect(() => { loadData(); }, [id]);
 
-  // INICIALIZADOR COMPLETO DEL DICCIONARIO DE EDICIÓN REACTIVO
   const handleOpenEdit = () => {
     if (!victima) return;
     setEditFormData({
@@ -160,11 +219,14 @@ const VictimaDetalle = () => {
         departamento: victima.datos_contacto?.departamento || ''
       },
       representacion: {
-        ...victima.representacion,
         caso: victima.representacion?.caso || [],
         bloque: victima.representacion?.bloque || [],
         hechos_victimizantes: victima.representacion?.hechos_victimizantes || [],
-        calidad_victima: victima.representacion?.calidad_victima || ''
+        calidad_victima: victima.representacion?.calidad_victima || '',
+        juridico_asignado_id: victima.representacion?.juridico_asignado_id || '',
+        psicosocial_asignado_id: victima.representacion?.psicosocial_asignado_id || '',
+        estado: victima.representacion?.estado || 'Activo',
+        fecha_asignacion: victima.representacion?.fecha_asignacion || ''
       },
       estado_jep: {
         estado_acreditacion: victima.estado_jep?.estado_acreditacion || 'No está acreditada',
@@ -176,19 +238,35 @@ const VictimaDetalle = () => {
     setOpenEditModal(true);
   };
 
-  // PERSISTENCIA DE CAMBIOS DE LA FICHA EN SERVIDOR (CUMPLIENDO REGLAS DE FIRESTORE)
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!id || !canEdit) return;
+    if (!id || !canEdit || !victima) return;
+
+    const diferencias = obtenerCambios(victima, editFormData);
+
+    if (diferencias.length === 0) {
+      showModal('Sin modificaciones', 'No se detectaron cambios en los campos de la ficha.', 'info');
+      setOpenEditModal(false);
+      return;
+    }
+
     try {
       const docRef = doc(db, 'victimas', id);
       await updateDoc(docRef, editFormData);
-      showModal('Éxito', 'Ficha de la víctima actualizada correctamente en el sistema.', 'success');
+      
+      const historialRef = collection(db, `victimas/${id}/historial_cambios`);
+      await addDoc(historialRef, {
+        fecha: new Date().toISOString(),
+        usuario_email: currentUser?.email || 'sistema',
+        cambios: diferencias
+      });
+
+      showModal('Éxito', 'Ficha actualizada e historial de auditoría registrado correctamente.', 'success');
       setOpenEditModal(false);
       await loadData();
     } catch (error) {
       console.error(error);
-      showModal('Error', 'No se pudieron guardar los cambios en la ficha.', 'error');
+      showModal('Error', 'No se pudieron guardar los cambios.', 'error');
     }
   };
 
@@ -304,13 +382,7 @@ const VictimaDetalle = () => {
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Button startIcon={<ArrowBackIcon />} onClick={() => navigate(-1)}>Volver</Button>
         {canEdit && (
-          <Button 
-            variant="contained" 
-            color="primary" 
-            startIcon={<EditIcon />} 
-            onClick={handleOpenEdit}
-            sx={{ fontWeight: 'bold' }}
-          >
+          <Button variant="contained" color="primary" startIcon={<EditIcon />} onClick={handleOpenEdit} sx={{ fontWeight: 'bold' }}>
             Editar Ficha Completa
           </Button>
         )}
@@ -329,6 +401,7 @@ const VictimaDetalle = () => {
           <Tab icon={<InfoIcon />} label="Vista General" iconPosition="start" />
           <Tab icon={<GavelIcon />} label={`Actuaciones Judiciales (${audiencias.length})`} iconPosition="start" />
           <Tab icon={<FolderSpecialIcon />} label={`Expediente Documental (${radicados.length})`} iconPosition="start" />
+          <Tab icon={<HistoryIcon />} label={`Historial de Cambios (${historialCambios.length})`} iconPosition="start" />
         </Tabs>
       </Box>
 
@@ -408,7 +481,7 @@ const VictimaDetalle = () => {
               </Grid>
             </Paper>
 
-            <Paper elevation={0} sx={{ p: 4, borderRadius: 3, border: '1px solid #e2e8f0' }}>
+            <Paper elevation={0} sx={{ p: 4, borderRadius: 3, border: '1px solid #e2e8f0', mb: 4 }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                 <Typography variant="subtitle1" sx={{ fontWeight: 700, color: 'primary.main' }}>Documentación y Poderes</Typography>
                 {canEdit && (
@@ -531,9 +604,48 @@ const VictimaDetalle = () => {
         </Paper>
       </TabPanel>
 
-      {/* =====================================================================
-          DIALOG: MODAL MAESTRO DE EDICIÓN DE LA FICHA DE LA VÍCTIMA
-          ===================================================================== */}
+      <TabPanel value={tabIndex} index={3}>
+        <Paper elevation={0} sx={{ p: 3, border: '1px solid #e2e8f0', borderRadius: 3 }}>
+          {historialCambios.length === 0 ? (
+            <Box sx={{ py: 6, textAlign: 'center', color: 'text.secondary' }}>
+              No se registran modificaciones de campos en este expediente (Ficha original).
+            </Box>
+          ) : (
+            historialCambios.map((log) => (
+              <Box key={log.id} sx={{ mb: 4, p: 3, border: '1px solid #e2e8f0', borderRadius: 2, bgcolor: '#f8fafc' }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2, alignItems: 'center' }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+                    Modificado por: {log.usuario_email}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {new Date(log.fecha).toLocaleString()}
+                  </Typography>
+                </Box>
+                <Table size="small" sx={{ bgcolor: 'white', border: '1px solid #e2e8f0', borderRadius: 1 }}>
+                  <TableHead sx={{ bgcolor: '#f1f5f9' }}>
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: 'bold' }}>Campo Modificado</TableCell>
+                      <TableCell sx={{ fontWeight: 'bold', color: 'error.main' }}>Valor Anterior</TableCell>
+                      <TableCell sx={{ fontWeight: 'bold', color: 'success.main' }}>Valor Nuevo</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {log.cambios?.map((c: any, idx: number) => (
+                      <TableRow key={idx}>
+                        <TableCell sx={{ fontWeight: 600 }}>{traducirCampo(c.campo)}</TableCell>
+                        <TableCell sx={{ color: 'error.dark', bgcolor: '#fff5f5' }}>{c.valor_anterior}</TableCell>
+                        <TableCell sx={{ color: 'success.dark', bgcolor: '#f0fdf4' }}>{c.valor_nuevo}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </Box>
+            ))
+          )}
+        </Paper>
+      </TabPanel>
+
+      {/* DIALOG DE EDICIÓN DE FICHA COMPLETA */}
       <Dialog open={openEditModal} onClose={() => setOpenEditModal(false)} maxWidth="md" fullWidth>
         <DialogTitle sx={{ fontWeight: 'bold', color: 'primary.main' }}>Editar Ficha de la Víctima</DialogTitle>
         <Box component="form" onSubmit={handleSaveEdit}>
@@ -604,10 +716,26 @@ const VictimaDetalle = () => {
               <Grid size={{ xs: 12, md: 4 }}>
                 <TextField select fullWidth size="small" label="Reconocimiento PJ" value={editFormData?.estado_jep?.estado_reconocimiento_pj || 'Sin PJ (no se ha recibido poder)'} onChange={(e) => setEditFormData({ ...editFormData, estado_jep: { ...editFormData.estado_jep, estado_reconocimiento_pj: e.target.value } })}><MenuItem value="Sin PJ (no se ha recibido poder)">Sin PJ</MenuItem><MenuItem value="Con PJ (poder recibido)">Con PJ</MenuItem></TextField>
               </Grid>
+              
+              {/* CORRECCIÓN: Estructuración limpia en múltiples líneas para evitar colisiones del parser de TSX */}
               <Grid size={{ xs: 12, md: 4 }}>
-                <TextField fullWidth size="small" label="Auto de Acreditación" value={editFormData?.estado_jep?.auto_acreditacion || ''} onChange={(e) => setEditFormData({ ...editFormData, estado_jep: { ...editFormData.estado_jep, auto_acreditacion: e.target.value } })} /></Grid>
+                <TextField 
+                  fullWidth 
+                  size="small" 
+                  label="Auto de Acreditación" 
+                  value={editFormData?.estado_jep?.auto_acreditacion || ''} 
+                  onChange={(e) => setEditFormData({ ...editFormData, estado_jep: { ...editFormData.estado_jep, auto_acreditacion: e.target.value } })} 
+                />
+              </Grid>
               <Grid size={{ xs: 12, md: 4 }}>
-                <TextField fullWidth size="small" label="Auto de Reconocimiento" value={editFormData?.estado_jep?.auto_reconocimiento || ''} onChange={(e) => setEditFormData({ ...editFormData, estado_jep: { ...editFormData.estado_jep, auto_reconocimiento: e.target.value } })} /></Grid>
+                <TextField 
+                  fullWidth 
+                  size="small" 
+                  label="Auto de Reconocimiento" 
+                  value={editFormData?.estado_jep?.auto_reconocimiento || ''} 
+                  onChange={(e) => setEditFormData({ ...editFormData, estado_jep: { ...editFormData.estado_jep, auto_reconocimiento: e.target.value } })} 
+                />
+              </Grid>
             </Grid>
           </DialogContent>
           <DialogActions sx={{ p: 2 }}>
