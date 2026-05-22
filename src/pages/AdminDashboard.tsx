@@ -15,6 +15,9 @@ import CloudDownloadIcon from '@mui/icons-material/CloudDownload';
 import AnalyticsIcon from '@mui/icons-material/Analytics';
 import GavelIcon from '@mui/icons-material/Gavel';
 import PublicIcon from '@mui/icons-material/Public';
+import AssignmentIcon from '@mui/icons-material/Assignment';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import { useNavigate } from 'react-router-dom';
 import { adminService } from '../services/adminService';
 import { AdminStats } from '../components/AdminStats';
@@ -43,16 +46,22 @@ const AdminDashboard = () => {
   const [victimasCarga, setVictimasCarga] = useState<Victima[]>([]);
   const [usuarioSupervisado, setUsuarioSupervisado] = useState('');
 
-  // ESTADOS AVANZADOS DE INTELIGENCIA DE DATOS
+  // ESTADOS AVANZADOS DE INTELIGENCIA DE DATOS Y GRÁFICOS
   const [showPivotModule, setShowPivotModule] = useState(false);
   const [loadingPivot, setLoadingPivot] = useState(false);
   const [universoCompletoVictimas, setUniversoCompletoVictimas] = useState<Victima[]>([]);
   
-  // Matrices multidimensionales calculadas
+  // Matrices multidimensionales
   const [pivotMacrocasoAcreditacion, setPivotMacrocasoAcreditacion] = useState<any>(null);
   const [pivotBloqueGenero, setPivotBloqueGenero] = useState<any>(null);
   const [pivotInterseccional, setPivotInterseccional] = useState<any>(null);
   const [pivotGeografico, setPivotGeografico] = useState<any>(null);
+  
+  // Nuevas métricas avanzadas para gráficos corporativos
+  const [tasaAcreditacionGlobal, setTasaAcreditacionGlobal] = useState(0);
+  const [topHechosVictimizantes, setTopHechosVictimizantes] = useState<any[]>([]);
+  const [avanceChecklistProfesionales, setAvanceChecklistProfesionales] = useState<any>(null);
+  const [proporcionPersoneria, setProporcionPersoneria] = useState({ conPJ: 0, sinPJ: 0 });
 
   const navigate = useNavigate();
   const { showModal } = useModal();
@@ -68,6 +77,8 @@ const AdminDashboard = () => {
       
       setUsers(userList);
       setUltimasVictimas(statsData.ultimasVictimas);
+      
+      // CORRECCIÓN: Asignación explícita de clave y valor corregida
       setStats({
         totalVictimas: statsData.totalVictimas,
         totalCaso01: statsData.totalCaso01,
@@ -95,7 +106,6 @@ const AdminDashboard = () => {
     loadDashboardData();
   }, []);
 
-  // MOTOR MULTIDIMENSIONAL DE ESTADÍSTICAS INSTITUCIONALES
   const cargarYGenerarTablasDinamicas = async () => {
     if (showPivotModule) {
       setShowPivotModule(false);
@@ -110,19 +120,18 @@ const AdminDashboard = () => {
       const docs = snap.docs.map(d => ({ id: d.id, ...d.data() } as Victima));
       setUniversoCompletoVictimas(docs);
 
-      // 1. MACROCASO VS ACREDITACIÓN
+      const totalDocs = docs.length || 1;
+
       const m1: Record<string, Record<string, number>> = {
         "Caso 01": { "Acreditada": 0, "En trámite (despacho no ha resuelto)": 0, "No está acreditada": 0 },
         "Caso 10": { "Acreditada": 0, "En trámite (despacho no ha resuelto)": 0, "No está acreditada": 0 },
         "Sin Macrocaso": { "Acreditada": 0, "En trámite (despacho no ha resuelto)": 0, "No está acreditada": 0 }
       };
 
-      // 2. FRENTE/BLOQUE VS GÉNERO
       const bloquesValidos = ['BNOR', 'BSUR', 'BORI', 'BCAR', 'BCC', 'BMM', 'BOCC', 'Sin Bloque'];
       const m2: Record<string, Record<string, number>> = {};
       bloquesValidos.forEach(b => { m2[b] = { "Mujer": 0, "Hombre": 0, "Otros": 0 }; });
 
-      // 3. ENFOQUE INTERSECCIONAL: ENFOQUE DIFERENCIAL (ÉTNICO/DISCAPACIDAD) VS ACREDITACIÓN
       const m3: Record<string, Record<string, number>> = {
         "Población Étnica (Afro/Indígena)": { "Acreditada": 0, "Resto Estados": 0 },
         "Víctimas con Discapacidad": { "Acreditada": 0, "Resto Estados": 0 },
@@ -130,8 +139,15 @@ const AdminDashboard = () => {
         "Sin Criterio Diferencial": { "Acreditada": 0, "Resto Estados": 0 }
       };
 
-      // 4. CONCENTRACIÓN TERRITORIAL CRÍTICA (TOP DEPARTAMENTOS VS MACROCASO)
       const m4: Record<string, Record<string, number>> = {};
+
+      let acreditadasGlobal = 0;
+      let conPersoneria = 0;
+      const mapaHechos: Record<string, number> = {};
+      
+      let totalPrimerContacto = 0;
+      let totalFirmaPoder = 0;
+      let totalDemandasVerdad = 0;
 
       docs.forEach(v => {
         const estAcreditacion = v.estado_jep?.estado_acreditacion || "No está acreditada";
@@ -139,15 +155,29 @@ const AdminDashboard = () => {
         const depto = v.datos_contacto?.departamento || 'No especificado';
         const casos = v.representacion?.caso || [];
         const bloques = v.representacion?.bloque || [];
+        const hechos = v.representacion?.hechos_victimizantes || [];
+        const personeria = v.estado_jep?.estado_reconocimiento_pj || '';
+        const sv = v.seguimiento_vista || { primer_contacto: false, firma_poder: false, demandas_verdad: false };
 
-        // Procesamiento Pivot 1 (Macrocasos)
+        if (estAcreditacion === 'Acreditada') acreditadasGlobal++;
+        if (personeria.toLowerCase().includes('con pj') || personeria.toLowerCase().includes('recibido')) conPersoneria++;
+
+        if (sv.primer_contacto) totalPrimerContacto++;
+        if (sv.firma_poder) totalFirmaPoder++;
+        if (sv.demandas_verdad) totalDemandasVerdad++;
+
+        hechos.forEach(h => {
+          if (h && h.trim() !== '') {
+            mapaHechos[h] = (mapaHechos[h] || 0) + 1;
+          }
+        });
+
         if (casos.length === 0) {
           if (m1["Sin Macrocaso"][estAcreditacion] !== undefined) m1["Sin Macrocaso"][estAcreditacion]++;
         } else {
           casos.forEach(c => { if (m1[c] && m1[c][estAcreditacion] !== undefined) m1[c][estAcreditacion]++; });
         }
 
-        // Procesamiento Pivot 2 (Bloques)
         let genKey = (genero === 'Mujer' || genero === 'Hombre') ? genero : 'Otros';
         if (bloques.length === 0) {
           m2["Sin Bloque"][genKey]++;
@@ -159,12 +189,10 @@ const AdminDashboard = () => {
           });
         }
 
-        // Procesamiento Pivot 3 (Interseccionalidad)
         let tieneDiferencial = false;
         const etnia = v.datos_demograficos?.grupo_etnico || 'Ninguno';
         const disc = v.datos_demograficos?.discapacidad || 'Ninguna';
         const edad = v.datos_demograficos?.etareo || 'Adulto';
-
         const estKey = estAcreditacion === 'Acreditada' ? 'Acreditada' : 'Resto Estados';
 
         if (etnia !== 'Ninguno' && etnia !== '') { m3["Población Étnica (Afro/Indígena)"][estKey]++; tieneDiferencial = true; }
@@ -172,10 +200,27 @@ const AdminDashboard = () => {
         if (edad.includes('60+')) { m3["Adulto Mayor (60+)"][estKey]++; tieneDiferencial = true; }
         if (!tieneDiferencial) { m3["Sin Criterio Diferencial"][estKey]++; }
 
-        // Procesamiento Pivot 4 (Territorial)
         if (!m4[depto]) { m4[depto] = { "Caso 01": 0, "Caso 10": 0, "Otros": 0 }; }
         if (casos.length === 0) { m4[depto]["Otros"]++; }
         else { casos.forEach(c => { if (m4[depto][c] !== undefined) m4[depto][c]++; }); }
+      });
+
+      const hechosOrdenados = Object.keys(mapaHechos)
+        .map(h => ({
+          hecho: h,
+          count: mapaHechos[h],
+          pct: Math.round((mapaHechos[h] / totalDocs) * 100)
+        }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 5);
+
+      setTasaAcreditacionGlobal(Math.round((acreditadasGlobal / totalDocs) * 100));
+      setTopHechosVictimizantes(hechosOrdenados);
+      setProporcionPersoneria({ conPJ: conPersoneria, sinPJ: totalDocs - conPersoneria });
+      setAvanceChecklistProfesionales({
+        primerContacto: Math.round((totalPrimerContacto / totalDocs) * 100),
+        firmaPoder: Math.round((totalFirmaPoder / totalDocs) * 100),
+        demandasVerdad: Math.round((totalDemandasVerdad / totalDocs) * 100)
       });
 
       setPivotMacrocasoAcreditacion(m1);
@@ -185,18 +230,15 @@ const AdminDashboard = () => {
 
     } catch (error) {
       console.error("Error computando analíticas:", error);
-    } finally { // CORRECCIÓN 1: 'file' reemplazado por 'finally' correcto
+    } finally {
       setLoadingPivot(false);
     }
   };
 
-  // GENERADOR DEL LIBRO CORPORATIVO MULTIPESTAÑA (3 TABLAS INDEPENDIENTES)
   const descargarLibroCorporativoExcel = () => {
     if (universoCompletoVictimas.length === 0) return;
-
     const libro = XLSX.utils.book_new();
 
-    // PESTAÑA 1: BASE DE DATOS MATRIZ CONSOLIDADA COMPLETA
     const hoja1Data = universoCompletoVictimas.map(v => ({
       "CODIGO EXPEDIENTE": v.id,
       "NOMBRES Y APELLIDOS": v.nombre_completo,
@@ -223,7 +265,6 @@ const AdminDashboard = () => {
     const hoja1 = XLSX.utils.json_to_sheet(hoja1Data);
     XLSX.utils.book_append_sheet(libro, hoja1, "1. Matriz Consolidada");
 
-    // PESTAÑA 2: CONTROL DE CARGAS LABORALES POR PROFESIONAL COHESIONADO
     const balanceCargas: Record<string, { nombre: string, rol: string, juridicos: number, psicosociales: number }> = {};
     users.forEach(u => {
       balanceCargas[u.correo.toLowerCase()] = {
@@ -233,15 +274,12 @@ const AdminDashboard = () => {
         psicosociales: 0
       };
     });
-
     universoCompletoVictimas.forEach(v => {
       const jur = String(v.representacion?.juridico_asignado_id || '').toLowerCase().trim();
-      // CORRECCIÓN 2: Tipado saneado a 'psicosocial_asignado_id' removiendo propiedad inexistente en inglés
       const psi = String(v.representacion?.psicosocial_asignado_id || '').toLowerCase().trim();
       if (balanceCargas[jur]) balanceCargas[jur].juridicos++;
       if (balanceCargas[psi]) balanceCargas[psi].psicosociales++;
     });
-
     const hoja2Data = Object.keys(balanceCargas).map(correo => ({
       "EMAIL INSTITUCIONAL": correo,
       "NOMBRE COMPLETO": balanceCargas[correo].nombre,
@@ -253,16 +291,11 @@ const AdminDashboard = () => {
     const hoja2 = XLSX.utils.json_to_sheet(hoja2Data);
     XLSX.utils.book_append_sheet(libro, hoja2, "2. Cargas de Trabajo");
 
-    // PESTAÑA 3: ANALÍTICA PREALIMENTADA DE ENFOQUES DIFERENCIALES
     const hoja3Data: any[] = [];
     if (pivotInterseccional) {
       hoja3Data.push({ "INDICADOR DE ENFOQUE DIFERENCIAL": "--- ANÁLISIS DE ENFOQUE DIFERENCIAL E INTERSECCIONALIDAD ---", "ACREDITADAS": "", "RESTO ESTADOS JEP": "" });
       Object.keys(pivotInterseccional).forEach(k => {
-        hoja3Data.push({
-          "INDICADOR DE ENFOQUE DIFERENCIAL": k,
-          "ACREDITADAS": pivotInterseccional[k]["Acreditada"],
-          "RESTO ESTADOS JEP": pivotInterseccional[k]["Resto Estados"]
-        });
+        hoja3Data.push({ "INDICADOR DE ENFOQUE DIFERENCIAL": k, "ACREDITADAS": pivotInterseccional[k]["Acreditada"], "RESTO ESTADOS JEP": pivotInterseccional[k]["Resto Estados"] });
       });
     }
     const hoja3 = XLSX.utils.json_to_sheet(hoja3Data);
@@ -384,6 +417,104 @@ const AdminDashboard = () => {
             </Box>
           ) : (
             <Grid container spacing={4}>
+              
+              <Grid size={{ xs: 12, md: 4 }}>
+                <Paper elevation={0} sx={{ p: 3, borderRadius: 2, bgcolor: '#ecfdf5', border: '1px solid #a7f3d0', display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <CheckCircleIcon sx={{ fontSize: 40, color: '#059669' }} />
+                  <Box>
+                    <Typography variant="h4" sx={{ fontWeight: 900, color: '#065f46' }}>{tasaAcreditacionGlobal}%</Typography>
+                    <Typography variant="caption" sx={{ fontWeight: 700, color: '#047857', display: 'block' }}>TASA DE ÉXITO EN ACREDITACIÓN</Typography>
+                  </Box>
+                </Paper>
+              </Grid>
+
+              <Grid size={{ xs: 12, md: 4 }}>
+                <Paper elevation={0} sx={{ p: 3, borderRadius: 2, bgcolor: '#eff6ff', border: '1px solid #bfdbfe', display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <TrendingUpIcon sx={{ fontSize: 40, color: '#1d4ed8' }} />
+                  <Box>
+                    <Typography variant="h4" sx={{ fontWeight: 900, color: '#1e40af' }}>
+                      {avanceChecklistProfesionales ? Math.round((avanceChecklistProfesionales.primerContacto + avanceChecklistProfesionales.firmaPoder + avanceChecklistProfesionales.demandasVerdad)/3) : 0}%
+                    </Typography>
+                    <Typography variant="caption" sx={{ fontWeight: 700, color: '#1d4ed8', display: 'block' }}>AVANCE OPERACIONAL PROMEDIO</Typography>
+                  </Box>
+                </Paper>
+              </Grid>
+
+              <Grid size={{ xs: 12, md: 4 }}>
+                <Paper elevation={0} sx={{ p: 3, borderRadius: 2, bgcolor: '#fffbeb', border: '1px solid #fef3c7', display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <AssignmentIcon sx={{ fontSize: 40, color: '#d97706' }} />
+                  <Box>
+                    <Typography variant="h4" sx={{ fontWeight: 900, color: '#92400e' }}>
+                      {Math.round((proporcionPersoneria.conPJ / (universoCompletoVictimas.length || 1)) * 100)}%
+                    </Typography>
+                    <Typography variant="caption" sx={{ fontWeight: 700, color: '#b45309', display: 'block' }}>RECONOCIMIENTO DE PERSONERÍA</Typography>
+                  </Box>
+                </Paper>
+              </Grid>
+
+              <Grid size={{ xs: 12, lg: 6 }}>
+                <Paper elevation={0} sx={{ p: 3, border: '1px solid #e2e8f0', borderRadius: 2, bgcolor: 'white', height: '100%' }}>
+                  <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#003366', mb: 3 }}>
+                    Índice de Litigio Estratégico: Top Delitos Recurrentes en el Portafolio
+                  </Typography>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+                    {topHechosVictimizantes.map((h, i) => (
+                      <Box key={i}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                          <Typography variant="body2" sx={{ fontWeight: 700, color: '#334155' }}>{h.hecho}</Typography>
+                          <Typography variant="body2" sx={{ fontWeight: 800, color: '#003366' }}>{h.count} ({h.pct}%)</Typography>
+                        </Box>
+                        <Box sx={{ width: '100%', height: 10, bgcolor: '#f1f5f9', borderRadius: 5, overflow: 'hidden' }}>
+                          <Box sx={{ width: `${h.pct}%`, height: '100%', bgcolor: i === 0 ? '#003366' : i === 1 ? '#0284c7' : i === 2 ? '#059669' : '#64748b', borderRadius: 5 }} />
+                        </Box>
+                      </Box>
+                    ))}
+                  </Box>
+                </Paper>
+              </Grid>
+
+              <Grid size={{ xs: 12, lg: 6 }}>
+                <Paper elevation={0} sx={{ p: 3, border: '1px solid #e2e8f0', borderRadius: 2, bgcolor: 'white', height: '100%' }}>
+                  <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#003366', mb: 3 }}>
+                    Auditoría de Procesos: Avance del Checklist Legal y de Acompañamiento
+                  </Typography>
+                  
+                  {avanceChecklistProfesionales && (
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                      <Box>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                          <Typography variant="body2" sx={{ fontWeight: 600 }}>Primer Contacto Realizado con la Víctima</Typography>
+                          <Typography variant="body2" sx={{ fontWeight: 800 }}>{avanceChecklistProfesionales.primerContacto}%</Typography>
+                        </Box>
+                        <Box sx={{ width: '100%', height: 12, bgcolor: '#f1f5f9', borderRadius: 5, overflow: 'hidden' }}>
+                          <Box sx={{ width: `${avanceChecklistProfesionales.primerContacto}%`, height: '100%', bgcolor: '#1d4ed8' }} />
+                        </Box>
+                      </Box>
+
+                      <Box>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                          <Typography variant="body2" sx={{ fontWeight: 600 }}>Firma y Recepción Física de Poderes</Typography>
+                          <Typography variant="body2" sx={{ fontWeight: 800 }}>{avanceChecklistProfesionales.firmaPoder}%</Typography>
+                        </Box>
+                        <Box sx={{ width: '100%', height: 12, bgcolor: '#f1f5f9', borderRadius: 5, overflow: 'hidden' }}>
+                          <Box sx={{ width: `${avanceChecklistProfesionales.firmaPoder}%`, height: '100%', bgcolor: '#d97706' }} />
+                        </Box>
+                      </Box>
+
+                      <Box>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                          <Typography variant="body2" sx={{ fontWeight: 600 }}>Demandas de Verdad Radicadas ante las Salas</Typography>
+                          <Typography variant="body2" sx={{ fontWeight: 800 }}>{avanceChecklistProfesionales.demandasVerdad}%</Typography>
+                        </Box>
+                        <Box sx={{ width: '100%', height: 12, bgcolor: '#f1f5f9', borderRadius: 5, overflow: 'hidden' }}>
+                          <Box sx={{ width: `${avanceChecklistProfesionales.demandasVerdad}%`, height: '100%', bgcolor: '#059669' }} />
+                        </Box>
+                      </Box>
+                    </Box>
+                  )}
+                </Paper>
+              </Grid>
+
               <Grid size={{ xs: 12, lg: 6 }}>
                 <Paper elevation={0} sx={{ p: 3, border: '1px solid #e2e8f0', borderRadius: 2, bgcolor: 'white' }}>
                   <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#003366', mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
