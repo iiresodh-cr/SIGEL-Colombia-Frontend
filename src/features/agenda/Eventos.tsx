@@ -7,10 +7,10 @@ import {
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EventIcon from '@mui/icons-material/Event';
-import { useAuth } from '../context/AuthContext';
-import { useModal } from '../context/ModalContext';
-import { eventoService } from '../services/eventoService';
-import { Evento, TipoEvento } from '../types/evento';
+import { useAuth } from '../../core/context/AuthContext';
+import { useModal } from '../../core/context/ModalContext';
+import { eventoService } from './eventoService';
+import { Evento, TipoEvento } from '../../core/types/evento';
 
 const TIPOS_EVENTO: TipoEvento[] = ['Taller', 'Capacitación', 'Jornada de Divulgación', 'Actividad', 'Reunión'];
 

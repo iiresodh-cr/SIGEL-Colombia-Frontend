@@ -8,10 +8,10 @@ import {
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import GavelIcon from '@mui/icons-material/Gavel';
-import { useAuth } from '../context/AuthContext';
-import { useModal } from '../context/ModalContext';
-import { audienciaService } from '../services/audienciaService';
-import { Audiencia, TipoAudiencia, DespachoJEP } from '../types/audiencia';
+import { useAuth } from '../../core/context/AuthContext';
+import { useModal } from '../../core/context/ModalContext';
+import { audienciaService } from './audienciaService';
+import { Audiencia, TipoAudiencia, DespachoJEP } from '../../core/types/audiencia';
 
 const TIPOS_AUDIENCIA: TipoAudiencia[] = ['Versión Voluntaria', 'Audiencia de Observaciones', 'Audiencia de Reconocimiento', 'Diligencia de Testimonio', 'Mesa de Trabajo JEP', 'Otra'];
 const DESPACHOS: DespachoJEP[] = ['SRVR', 'Sala de Amnistía', 'Sala de Definición', 'Sección de Primera Instancia', 'Sección de Apelación', 'UIA'];

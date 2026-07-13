@@ -3,7 +3,7 @@ import {
   Box, TextField, Button, Grid, Typography, Paper, 
   MenuItem, Select, InputLabel, FormControl, Chip, OutlinedInput 
 } from '@mui/material';
-import { Evento } from '../types/jep';
+import { Evento } from '../../core/types/jep';
 
 interface FormEventoProps {
   onSave: (data: Omit<Evento, 'id'>) => void;

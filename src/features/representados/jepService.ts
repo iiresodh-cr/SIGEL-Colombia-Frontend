@@ -10,8 +10,8 @@ import {
   limit,
   updateDoc
 } from 'firebase/firestore';
-import { db } from '../config/firebase';
-import { Victima, Interaccion, Evento } from '../types/jep';
+import { db } from '../../core/config/firebase';
+import { Victima, Interaccion, Evento } from '../../core/types/jep';
 
 export const jepService = {
   // --- SECCIÓN VÍCTIMAS ---

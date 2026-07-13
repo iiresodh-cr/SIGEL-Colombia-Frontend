@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Button, CircularProgress, Typography, Box } from '@mui/material';
 import { collection, getDocs, doc, writeBatch } from 'firebase/firestore';
-import { db } from '../config/firebase';
+import { db } from '../../core/config/firebase';
 
 // Diccionario para arreglar errores de dedo severos en la base de datos vieja
 const MAPPING_MANUAL: Record<string, string> = {

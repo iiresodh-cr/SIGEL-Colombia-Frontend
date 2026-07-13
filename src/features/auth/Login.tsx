@@ -1,23 +1,27 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { auth, googleProvider } from '../config/firebase';
+import { auth, googleProvider } from '../../core/config/firebase';
 import { signInWithRedirect, getRedirectResult } from 'firebase/auth';
 import { Box, Button, Typography, Paper, Container, CircularProgress } from '@mui/material';
 import GoogleIcon from '@mui/icons-material/Google';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../../core/context/AuthContext';
 
 // IMPORTACIÓN DEL LOGO
-import logoInst from '../assets/logo-iire.png';
+import logoInst from '../../assets/logo-iire.png';
 
 const Login = () => {
   const navigate = useNavigate();
   const { currentUser } = useAuth();
   const [isProcessing, setIsProcessing] = useState(true); 
 
+  // PRUEBA DE RENDERIZADO: Verificamos si el componente siquiera se monta
+  console.log("🚨 EL COMPONENTE LOGIN SE ESTÁ RENDERIZANDO");
+
   useEffect(() => {
     const processRedirect = async () => {
       try {
-        await getRedirectResult(auth);
+        const result = await getRedirectResult(auth);
+        console.log("RESULTADO DE FIREBASE:", result);
       } catch (error: any) {
         console.error("Error al procesar la redirección:", error);
         alert("Hubo un error al iniciar sesión: " + error.message);

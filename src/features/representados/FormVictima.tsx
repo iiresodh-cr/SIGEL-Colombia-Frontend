@@ -3,9 +3,9 @@ import {
   Box, TextField, Button, Grid, Typography, Paper, 
   MenuItem, Select, InputLabel, FormControl, Chip, OutlinedInput, Divider 
 } from '@mui/material';
-import { Victima } from '../types/jep';
-import { Usuario } from '../types/user';
-import { useModal } from '../context/ModalContext';
+import { Victima } from '../../core/types/jep';
+import { Usuario } from '../../core/types/user';
+import { useModal } from '../../core/context/ModalContext';
 
 interface FormVictimaProps {
   onSave: (data: Omit<Victima, 'id' | 'fecha_registro'>) => void;

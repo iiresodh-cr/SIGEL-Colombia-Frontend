@@ -3,12 +3,22 @@ import { getAuth, GoogleAuthProvider } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage"; 
 
+// 1. Capturamos el dominio actual en el que está el navegador
+const currentHost = window.location.hostname;
+
+// 2. Creamos una función para decidir qué authDomain usar
+const resolveAuthDomain = () => {
+  // Si estamos en desarrollo local, usamos el de por defecto de Firebase
+  if (currentHost === 'localhost' || currentHost === '127.0.0.1') {
+    return import.meta.env.VITE_FIREBASE_AUTH_DOMAIN;
+  }
+  // Para producción o vistas previas (*.web.app), usamos el dominio en el que estamos navegando
+  return currentHost;
+};
+
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  // EL CAMBIO MÁGICO: Lee el dominio de la barra de direcciones para evitar el bloqueo del navegador
-  authDomain: window.location.hostname === 'sigel.iiresodh.org' 
-    ? 'sigel.iiresodh.org' 
-    : import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  authDomain: resolveAuthDomain(), // 3. Ejecutamos la función aquí
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,

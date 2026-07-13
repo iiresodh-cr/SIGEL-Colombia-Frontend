@@ -4,10 +4,10 @@ import {
 } from '@mui/material';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
-import { adminService } from '../services/adminService';
-import { useAuth } from '../context/AuthContext';
-import { useModal } from '../context/ModalContext';
-import { Usuario } from '../types/user';
+import { adminService } from './adminService';
+import { useAuth } from '../../core/context/AuthContext';
+import { useModal } from '../../core/context/ModalContext';
+import { Usuario } from '../../core/types/user';
 
 interface SustitucionMasivaProps {
   usuarios: Usuario[];

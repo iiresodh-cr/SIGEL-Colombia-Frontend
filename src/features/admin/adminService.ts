@@ -12,9 +12,9 @@ import {
   orderBy,
   limit
 } from 'firebase/firestore';
-import { db } from '../config/firebase';
-import { Victima } from '../types/jep';
-import { Usuario, RolUsuario } from '../types/user';
+import { db } from '../../core/config/firebase';
+import { Victima } from '../../core/types/jep';
+import { Usuario, RolUsuario } from '../../core/types/user';
 
 export const adminService = {
   // 1. Obtener todos los usuarios autorizados

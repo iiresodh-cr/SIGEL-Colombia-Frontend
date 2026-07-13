@@ -1,6 +1,6 @@
 import { collection, addDoc, getDocs, query, orderBy, deleteDoc, doc } from 'firebase/firestore';
-import { db } from '../config/firebase';
-import { Evento } from '../types/evento';
+import { db } from '../../core/config/firebase';
+import { Evento } from '../../core/types/evento';
 
 const COLLECTION_NAME = 'eventos';
 

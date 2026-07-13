@@ -15,13 +15,13 @@ import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import CloudDownloadIcon from '@mui/icons-material/CloudDownload';
 import ReactMarkdown from 'react-markdown';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import { jepService } from '../services/jepService';
-import { adminService } from '../services/adminService';
+import { useAuth } from "../../core/context/AuthContext";
+import { jepService } from "../representados/jepService";
+import { adminService } from "../admin/adminService";
 import { collection, query, getDocs, limit, startAfter, endBefore, limitToLast, orderBy, where } from 'firebase/firestore';
-import { db } from '../config/firebase';
-import { Victima, Evento } from '../types/jep';
-import { Usuario } from '../types/user';
+import { db } from '../../core/config/firebase';
+import { Victima, Evento } from '../../core/types/jep';
+import { Usuario } from '../../core/types/user';
 
 // IMPORTACIÓN DEL MOTOR DE EXCEL
 import * as XLSX from 'xlsx';

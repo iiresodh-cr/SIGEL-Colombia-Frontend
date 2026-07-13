@@ -6,7 +6,7 @@ import {
 import LogoutIcon from '@mui/icons-material/Logout';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../core/context/AuthContext';
 
 // IMPORTACIÓN DEL LOGO
 import logoNavbar from '../assets/logo-iire-white.png';

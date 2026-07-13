@@ -1,18 +1,24 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider } from '../context/AuthContext';
-import { ModalProvider } from '../context/ModalContext';
-import { ProtectedRoute } from '../components/ProtectedRoute';
-import { RoleGuard } from '../components/RoleGuard';
+
+// Core & Layout
+import { AuthProvider } from '../core/context/AuthContext';
+import { ModalProvider } from '../core/context/ModalContext';
+import { ProtectedRoute } from '../core/components/ProtectedRoute';
+import { RoleGuard } from '../core/components/RoleGuard';
 import MainLayout from '../layouts/MainLayout';
-import Login from '../pages/Login';
-import Dashboard from '../pages/Dashboard';
-import AdminDashboard from '../pages/AdminDashboard';
-import Victimas from '../pages/Victimas';
-import VictimaDetalle from '../pages/VictimaDetalle';
-import Eventos from '../pages/Eventos';
-import Audiencias from '../pages/Audiencias';
-import ImportadorMasivo from '../pages/ImportadorMasivo';
-import Radicados from '../pages/Radicados';
+
+// Features
+import Login from '../features/auth/Login';
+import Dashboard from '../features/dashboard/Dashboard';
+import AdminDashboard from '../features/admin/AdminDashboard';
+import ImportadorMasivo from '../features/admin/ImportadorMasivo';
+import Victimas from '../features/representados/Victimas';
+import VictimaDetalle from '../features/representados/VictimaDetalle';
+import Eventos from '../features/agenda/Eventos';
+import Audiencias from '../features/agenda/Audiencias';
+import Radicados from '../features/agenda/Radicados';
+import Expedientes from '../features/expedientes/Expedientes';
+import ExpedienteDetalle from '../features/expedientes/ExpedienteDetalle';
 
 const AppRouter = () => {
   return (
@@ -20,38 +26,36 @@ const AppRouter = () => {
       <AuthProvider>
         <BrowserRouter>
           <Routes>
-            {/* Ruta pública */}
             <Route path="/login" element={<Login />} />
 
-            {/* Rutas Protegidas */}
             <Route element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
-              
-              {/* Dashboard común */}
+              {/* Dashboard del Profesional */}
               <Route path="/dashboard" element={<Dashboard />} />
               
-              {/* RUTAS DE ADMINISTRACIÓN: Protegidas por rol (superadmin, admin) */}
+              {/* Módulo: Administración */}
               <Route path="/admin" element={
                 <RoleGuard allowedRoles={['superadmin', 'admin']}>
                   <AdminDashboard />
                 </RoleGuard>
               } />
-              
               <Route path="/importar" element={
                 <RoleGuard allowedRoles={['superadmin', 'admin']}>
                   <ImportadorMasivo />
                 </RoleGuard>
               } />
               
-              {/* RUTAS COMUNES: Visibles para todos los usuarios autenticados */}
+              {/* Módulo: Gestión de Litigio y Representados */}
               <Route path="/victimas" element={<Victimas />} />
               <Route path="/victimas/:id" element={<VictimaDetalle />} />
+              <Route path="/expedientes" element={<Expedientes />} />
+              <Route path="/expedientes/:id" element={<ExpedienteDetalle />} />
+              
+              {/* Módulo: Agenda y Actuaciones */}
               <Route path="/eventos" element={<Eventos />} />
               <Route path="/audiencias" element={<Audiencias />} />
               <Route path="/radicados" element={<Radicados />} />
-
             </Route>
 
-            {/* Redirecciones y captura de errores */}
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="*" element={<Navigate to="/login" replace />} />
           </Routes>

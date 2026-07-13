@@ -8,10 +8,10 @@ import {
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import FolderSpecialIcon from '@mui/icons-material/FolderSpecial';
-import { useAuth } from '../context/AuthContext';
-import { useModal } from '../context/ModalContext';
-import { radicadoService } from '../services/radicadoService';
-import { Radicado, EmisorRadicado } from '../types/radicado';
+import { useAuth } from '../../core/context/AuthContext';
+import { useModal } from '../../core/context/ModalContext';
+import { radicadoService } from './radicadoService';
+import { Radicado, EmisorRadicado } from '../../core/types/radicado';
 
 const EMISORES: EmisorRadicado[] = ['JEP (SRVR)', 'JEP (Sala de Amnistía)', 'JEP (Sala de Definición)', 'JEP (UIA)', 'IIRESODH', 'Representación de Víctimas', 'Defensa', 'Otro'];
 const MACROCASOS = ['Caso 01', 'Caso 10', 'Institucional / Otro'];

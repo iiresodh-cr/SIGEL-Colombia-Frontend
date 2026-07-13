@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Box, TextField, Button, MenuItem, Typography, Paper, Grid } from '@mui/material';
-import { adminService } from '../services/adminService';
-import { useModal } from '../context/ModalContext';
+import { adminService } from './adminService';
+import { useModal } from '../../core/context/ModalContext';
 
 interface UserManagementProps {
   onUserAdded: () => void;

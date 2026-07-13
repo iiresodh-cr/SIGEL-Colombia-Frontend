@@ -20,19 +20,19 @@ import FolderSpecialIcon from '@mui/icons-material/FolderSpecial';
 import EditIcon from '@mui/icons-material/Edit';
 import HistoryIcon from '@mui/icons-material/History';
 
-import { jepService } from '../services/jepService';
-import { storageService, ArchivoJEP } from '../services/storageService';
-import { adminService } from '../services/adminService';
-import { audienciaService } from '../services/audienciaService';
-import { radicadoService } from '../services/radicadoService';
-import { Victima, Interaccion } from '../types/jep';
-import { Usuario } from '../types/user';
-import { Audiencia } from '../types/audiencia';
-import { Radicado } from '../types/radicado';
-import { useAuth } from '../context/AuthContext';
-import { useModal } from '../context/ModalContext';
+import { jepService } from './jepService';
+import { storageService, ArchivoJEP } from '../../core/services/storageService';
+import { adminService } from '../admin/adminService';
+import { audienciaService } from '../agenda/audienciaService';
+import { radicadoService } from '../agenda/radicadoService';
+import { Victima, Interaccion } from '../../core/types/jep';
+import { Usuario } from '../../core/types/user';
+import { Audiencia } from '../../core/types/audiencia';
+import { Radicado } from '../../core/types/radicado';
+import { useAuth } from '../../core/context/AuthContext';
+import { useModal } from '../../core/context/ModalContext';
 import { doc, updateDoc, collection, addDoc, getDocs, query, orderBy } from 'firebase/firestore';
-import { db } from '../config/firebase';
+import { db } from '../../core/config/firebase';
 
 const TIPOS_INTERACCION = ['Llamada de sentido del proceso', 'Asesoría jurídica', 'Acompañamiento psicosocial', 'Gestión de acreditación', 'Otra'];
 

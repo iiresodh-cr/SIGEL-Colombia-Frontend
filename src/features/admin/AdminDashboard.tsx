@@ -19,16 +19,16 @@ import AssignmentIcon from '@mui/icons-material/Assignment';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import { useNavigate } from 'react-router-dom';
-import { adminService } from '../services/adminService';
-import { AdminStats } from '../components/AdminStats';
-import { UserManagement } from '../components/UserManagement';
-import { SustitucionMasiva } from '../components/SustitucionMasiva';
-import { useModal } from '../context/ModalContext';
-import { useAuth } from '../context/AuthContext';
-import { Usuario } from '../types/user';
-import { Victima } from '../types/jep';
+import { adminService } from './adminService';
+import { AdminStats } from './AdminStats';
+import { UserManagement } from './UserManagement';
+import { SustitucionMasiva } from './SustitucionMasiva';
+import { useModal } from '../../core/context/ModalContext';
+import { useAuth } from '../../core/context/AuthContext';
+import { Usuario } from '../../core/types/user';
+import { Victima } from '../../core/types/jep';
 import { collection, getDocs, query, where } from 'firebase/firestore';
-import { db } from '../config/firebase';
+import { db } from '../../core/config/firebase';
 
 import * as XLSX from 'xlsx';
 

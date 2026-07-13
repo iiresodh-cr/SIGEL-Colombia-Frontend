@@ -7,19 +7,19 @@ import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import BuildIcon from '@mui/icons-material/Build';
 import * as XLSX from 'xlsx';
 import { writeBatch, doc, collection, getDocs } from 'firebase/firestore';
-import { db } from '../config/firebase';
-import { useAuth } from '../context/AuthContext';
-import { useModal } from '../context/ModalContext';
+import { db } from '../../core/config/firebase';
+import { useAuth } from '../../core/context/AuthContext';
+import { useModal } from '../../core/context/ModalContext';
 
-import { eventoService } from '../services/eventoService';
-import { audienciaService } from '../services/audienciaService';
-import { radicadoService } from '../services/radicadoService';
-import { adminService } from '../services/adminService';
-import { TipoEvento } from '../types/evento';
-import { TipoAudiencia, DespachoJEP } from '../types/audiencia';
-import { EmisorRadicado } from '../types/radicado';
-import { Victima } from '../types/jep';
-import { Usuario } from '../types/user';
+import { eventoService } from '../agenda/eventoService';
+import { audienciaService } from '../agenda/audienciaService';
+import { radicadoService } from '../agenda/radicadoService';
+import { adminService } from './adminService';
+import { TipoEvento } from '../../core/types/evento';
+import { TipoAudiencia, DespachoJEP } from '../../core/types/audiencia';
+import { EmisorRadicado } from '../../core/types/radicado';
+import { Victima } from '../../core/types/jep';
+import { Usuario } from '../../core/types/user';
 
 const ImportadorMasivo = () => {
   const { currentUser } = useAuth();

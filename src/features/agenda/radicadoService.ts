@@ -1,6 +1,6 @@
 import { collection, addDoc, getDocs, query, orderBy, deleteDoc, doc } from 'firebase/firestore';
-import { db } from '../config/firebase';
-import { Radicado } from '../types/radicado';
+import { db } from '../../core/config/firebase';
+import { Radicado } from '../../core/types/radicado';
 
 const COLLECTION_NAME = 'radicados';
 

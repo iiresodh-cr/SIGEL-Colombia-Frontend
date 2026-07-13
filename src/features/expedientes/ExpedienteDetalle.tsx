@@ -16,12 +16,12 @@ import {
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
-import { jepService } from '../services/jepService';
-import { adminService } from '../services/adminService';
-import { FormVictima } from '../components/FormVictima';
-import { useModal } from '../context/ModalContext';
-import { useAuth } from '../context/AuthContext';
-import { Usuario } from '../types/user';
+import { jepService } from '../representados/jepService';
+import { adminService } from '../admin/adminService';
+import { FormVictima } from '../representados/FormVictima';
+import { useModal } from '../../core/context/ModalContext';
+import { useAuth } from '../../core/context/AuthContext';
+import { Usuario } from '../../core/types/user';
 
 const ExpedienteDetalle = () => {
   const { id } = useParams<{ id: string }>();

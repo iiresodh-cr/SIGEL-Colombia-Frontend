@@ -1,6 +1,6 @@
 import { collection, addDoc, getDocs, query, orderBy, deleteDoc, doc } from 'firebase/firestore';
-import { db } from '../config/firebase';
-import { Audiencia } from '../types/audiencia';
+import { db } from '../../core/config/firebase';
+import { Audiencia } from '../../core/types/audiencia';
 
 const COLLECTION_NAME = 'audiencias';
 

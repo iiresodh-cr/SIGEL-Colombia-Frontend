@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Box, TextField, Button, MenuItem, Typography, Paper, Grid } from '@mui/material';
 // CORRECCIÓN: Importación redirigida al nuevo archivo de tipos legacy
-import { ExpedienteJEP } from '../types/legacy';
+import { ExpedienteJEP } from '../../core/types/legacy';
 
 interface Props {
   onSave: (data: Omit<ExpedienteJEP, 'id'>) => void;

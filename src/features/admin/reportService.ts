@@ -1,6 +1,6 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { VictimaJEP, ExpedienteJEP } from '../types/legacy';
+import { VictimaJEP, ExpedienteJEP } from '../../core/types/legacy';
 
 export const reportService = {
   async generarInformeCaso(expediente: ExpedienteJEP, victimas: VictimaJEP[]) {

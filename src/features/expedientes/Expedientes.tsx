@@ -6,7 +6,7 @@ import {
 import SearchIcon from '@mui/icons-material/Search';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import { useNavigate } from 'react-router-dom';
-import { jepService } from '../services/jepService';
+import { jepService } from '../representados/jepService';
 
 const Expedientes = () => {
   const [expedientes, setExpedientes] = useState<any[]>([]);
