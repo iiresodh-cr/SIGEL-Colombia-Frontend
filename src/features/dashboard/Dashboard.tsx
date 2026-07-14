@@ -378,7 +378,7 @@ const Dashboard = () => {
 
       <Card elevation={0} sx={{ mb: 5, background: 'linear-gradient(135deg, #f0f7ff 0%, #e0f2fe 100%)', border: '1px solid #bae6fd', borderRadius: 3, minHeight: '120px' }}>
         <CardContent sx={{ p: 3 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', justify_content: 'space-between', mb: 1.5 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
               <AutoAwesomeIcon sx={{ color: '#0284c7', fontSize: 28 }} />
               <Typography variant="h6" sx={{ fontWeight: 800, color: '#0369a1' }}>
