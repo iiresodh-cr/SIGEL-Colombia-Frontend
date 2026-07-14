@@ -5,7 +5,7 @@ import {
 import AddIcon from '@mui/icons-material/Add';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import CloudDownloadIcon from '@mui/icons-material/CloudDownload';
-import { DataGrid, GridColDef, GridRenderCellParams } from '@mui/x-data-grid';
+import { DataGrid, GridColDef } from '@mui/x-data-grid';
 import { useNavigate } from 'react-router-dom';
 import { jepService } from './jepService';
 import { adminService } from '../admin/adminService';
@@ -93,11 +93,10 @@ const Victimas = () => {
 
     const checkAndInit = () => {
       attempts++;
-      // Si pasan más de 5 segundos y Google no carga, cancelamos el estado de carga
       if (!(window as any).google?.accounts?.oauth2) {
         if (attempts > 50) {
           setExportingGoogle(false);
-          showModal('Error', 'No se pudo cargar el servicio de Google. Revise su conexión o bloqueadores de anuncios.', 'error');
+          showModal('Error', 'No se pudo cargar el servicio de Google. Revise su conexión.', 'error');
           return;
         }
         setTimeout(checkAndInit, 100);
@@ -107,22 +106,18 @@ const Victimas = () => {
       const client = (window as any).google.accounts.oauth2.initTokenClient({
         client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID || '',
         scope: 'https://www.googleapis.com/auth/spreadsheets',
-        // Captura si el navegador bloquea los Pop-ups
         error_callback: (error: any) => {
           setExportingGoogle(false);
           if (error?.type === 'popup_failed_to_open') {
             showModal('Bloqueo de Ventana', 'Tu navegador bloqueó la ventana de Google. Por favor, permite las ventanas emergentes (pop-ups) para este sitio.', 'error');
           } else {
-            showModal('Error', 'Error de comunicación con Google.', 'error');
+            // Cancelación pasiva: Si cierras la ventana, liberamos el botón limpiamente sin alertas molestas
+            console.warn('Operación cancelada o cerrada por el usuario de forma manual.');
           }
         },
         callback: async (tokenResponse: any) => {
-          // Captura estricta: Si hay error o si el usuario cierra la ventana manualmente
           if (tokenResponse.error) {
             setExportingGoogle(false);
-            if (tokenResponse.error !== 'popup_closed_by_user') {
-              showModal('Error', 'Permiso denegado por el usuario.', 'error');
-            }
             return;
           }
 
