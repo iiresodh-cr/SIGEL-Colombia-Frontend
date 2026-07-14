@@ -308,6 +308,45 @@ const Dashboard = () => {
         )}
       </Box>
 
+      <Card elevation={0} sx={{ mb: 4, background: 'linear-gradient(135deg, #f0f7ff 0%, #e0f2fe 100%)', border: '1px solid #bae6fd', borderRadius: 3, minHeight: '120px' }}>
+        <CardContent sx={{ p: 3 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <AutoAwesomeIcon sx={{ color: '#0284c7', fontSize: 28 }} />
+              <Typography variant="h6" sx={{ fontWeight: 800, color: '#0369a1' }}>
+                PIDA - Tu Asistente Inteligente
+              </Typography>
+            </Box>
+            {!loadingAi && (
+              <Button variant="contained" size="small" onClick={handlePidaClick} sx={{ bgcolor: '#0284c7', boxShadow: 0, '&:hover': { bgcolor: '#0369a1' } }}>
+                Actualizar Resumen
+              </Button>
+            )}
+          </Box>
+          {loadingAi ? (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 2 }}>
+              <CircularProgress size={20} />
+              <Typography variant="body2" color="text.secondary">Analizando agenda y portafolio...</Typography>
+            </Box>
+          ) : sugerenciaAi ? (
+            <Box 
+              sx={{ 
+                color: '#0f172a', 
+                mt: 1,
+                '& p': { variant: 'body1', lineHeight: 1.6, fontWeight: 500, mb: 1.5 },
+                '& ul, & ol': { pl: 3, mb: 1.5 },
+                '& li': { variant: 'body1', lineHeight: 1.5, mb: 0.5 },
+                '& strong': { color: '#0284c7', fontWeight: 700 }
+              }}
+            >
+              <ReactMarkdown>{sugerenciaAi}</ReactMarkdown>
+            </Box>
+          ) : (
+            <Typography variant="body2" sx={{ color: '#64748b', mt: 1 }}>Haz clic en el botón para generar un resumen estratégico.</Typography>
+          )}
+        </CardContent>
+      </Card>
+
       {/* RENDERIZADO DEL SEMÁFORO DE VENCIMIENTOS PROCESALES */}
       {!isAdmin && casosVencimientos.length > 0 && (
         <Paper elevation={0} sx={{ p: 3, mb: 4, border: '1px solid #fee2e2', bgcolor: '#fef2f2', borderRadius: 3 }}>
@@ -375,45 +414,6 @@ const Dashboard = () => {
           </Paper>
         </Grid>
       </Grid>
-
-      <Card elevation={0} sx={{ mb: 5, background: 'linear-gradient(135deg, #f0f7ff 0%, #e0f2fe 100%)', border: '1px solid #bae6fd', borderRadius: 3, minHeight: '120px' }}>
-        <CardContent sx={{ p: 3 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-              <AutoAwesomeIcon sx={{ color: '#0284c7', fontSize: 28 }} />
-              <Typography variant="h6" sx={{ fontWeight: 800, color: '#0369a1' }}>
-                PIDA - Tu Asistente Inteligente
-              </Typography>
-            </Box>
-            {!loadingAi && (
-              <Button variant="contained" size="small" onClick={handlePidaClick} sx={{ bgcolor: '#0284c7', boxShadow: 0, '&:hover': { bgcolor: '#0369a1' } }}>
-                Actualizar Resumen
-              </Button>
-            )}
-          </Box>
-          {loadingAi ? (
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 2 }}>
-              <CircularProgress size={20} />
-              <Typography variant="body2" color="text.secondary">Analizando agenda y portafolio...</Typography>
-            </Box>
-          ) : sugerenciaAi ? (
-            <Box 
-              sx={{ 
-                color: '#0f172a', 
-                mt: 1,
-                '& p': { variant: 'body1', lineHeight: 1.6, fontWeight: 500, mb: 1.5 },
-                '& ul, & ol': { pl: 3, mb: 1.5 },
-                '& li': { variant: 'body1', lineHeight: 1.5, mb: 0.5 },
-                '& strong': { color: '#0284c7', fontWeight: 700 }
-              }}
-            >
-              <ReactMarkdown>{sugerenciaAi}</ReactMarkdown>
-            </Box>
-          ) : (
-            <Typography variant="body2" sx={{ color: '#64748b', mt: 1 }}>Haz clic en el botón para generar un resumen estratégico.</Typography>
-          )}
-        </CardContent>
-      </Card>
 
       {isAdmin ? (
         <Box>
