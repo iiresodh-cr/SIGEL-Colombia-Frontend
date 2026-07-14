@@ -69,6 +69,7 @@ const traducirCampo = (campo: string) => {
     'estado_jep.estado_reconocimiento_pj': 'Reconocimiento Personería Jurídica',
     'estado_jep.auto_acreditacion': 'Auto de Acreditación',
     'estado_jep.auto_reconocimiento': 'Auto de Reconocimiento',
+    'estado_jep.fecha_vencimiento_termino': 'Fecha de Vencimiento de Término'
   };
   return mapa[campo] || campo;
 };
@@ -232,7 +233,9 @@ const VictimaDetalle = () => {
         estado_acreditacion: victima.estado_jep?.estado_acreditacion || 'No está acreditada',
         estado_reconocimiento_pj: victima.estado_jep?.estado_reconocimiento_pj || 'Sin PJ (no se ha recibido poder)',
         auto_acreditacion: victima.estado_jep?.auto_acreditacion || '',
-        auto_reconocimiento: victima.estado_jep?.auto_reconocimiento || ''
+        auto_reconocimiento: victima.estado_jep?.auto_reconocimiento || '',
+        fecha_vencimiento_termino: victima.estado_jep?.fecha_vencimiento_termino || '',
+        estado_termino: victima.estado_jep?.estado_termino || 'Abierto'
       }
     });
     setOpenEditModal(true);
@@ -376,6 +379,7 @@ const VictimaDetalle = () => {
 
   const sv = victima.seguimiento_vista || { primer_contacto: false, firma_poder: false, demandas_verdad: false, sol_desasignacion: false };
   const isDesasignado = victima.representacion.estado === 'Desasignado';
+  const estadoTermino = victima.estado_jep?.estado_termino || 'Abierto';
 
   return (
     <Box sx={{ p: 4 }}>
@@ -393,6 +397,15 @@ const VictimaDetalle = () => {
           <strong>Esta víctima se encuentra inactiva.</strong> <br/>
           Motivo registrado: {victima.representacion.motivo_desasignacion || 'No especificado'}. <br/>
           Fecha de desasignación: {victima.representacion.fecha_desasignacion || 'No registrada'}.
+        </Alert>
+      )}
+
+      {victima.estado_jep?.fecha_vencimiento_termino && (
+        <Alert 
+          severity={estadoTermino === 'Vencido' ? 'error' : (estadoTermino === 'Próximo a vencer' ? 'warning' : 'info')}
+          sx={{ mb: 3, borderRadius: 2, fontWeight: 'bold' }}
+        >
+          Término Procesal JEP: Límite fijado para el {victima.estado_jep.fecha_vencimiento_termino} (Estado: {estadoTermino})
         </Alert>
       )}
 
@@ -450,8 +463,8 @@ const VictimaDetalle = () => {
                 {isAdmin && (
                   <Button size="small" variant="contained" color="secondary" startIcon={<SwapHorizIcon />} onClick={() => {
                     setReasignarData({ 
-                      juridico_nuevo_id: victima.representacion.juridico_asignado_id || '', 
-                      psicosocial_nuevo_id: victima.representacion.psicosocial_asignado_id || '', 
+                      juridico_nuevo_id: victima.representacion.juridico_asignado_id || '',
+                      psicosocial_nuevo_id: victima.representacion.psicosocial_asignado_id || '',
                       motivo: '' 
                     });
                     setOpenReasignarModal(true);
@@ -645,7 +658,7 @@ const VictimaDetalle = () => {
         </Paper>
       </TabPanel>
 
-      {/* DIALOG DE EDICIÓN DE FICHA COMPLETA */}
+      {/* DIALOG DE EDICIÓN DE FICHA COMPLETA CON VENCIMIENTO */}
       <Dialog open={openEditModal} onClose={() => setOpenEditModal(false)} maxWidth="md" fullWidth>
         <DialogTitle sx={{ fontWeight: 'bold', color: 'primary.main' }}>Editar Ficha de la Víctima</DialogTitle>
         <Box component="form" onSubmit={handleSaveEdit}>
@@ -707,17 +720,16 @@ const VictimaDetalle = () => {
                 </FormControl>
               </Grid>
               
-              <Grid size={{ xs: 12, md: 6 }}>
+              <Grid size={{ xs: 12, md: 4 }}>
                 <TextField select fullWidth size="small" label="Calidad de Víctima" required value={editFormData?.representacion?.calidad_victima || ''} onChange={(e) => setEditFormData({ ...editFormData, representacion: { ...editFormData.representacion, calidad_victima: e.target.value } })}>{CALIDADES.map(c => <MenuItem key={c} value={c}>{c}</MenuItem>)}</TextField>
               </Grid>
-              <Grid size={{ xs: 12, md: 6 }}>
+              <Grid size={{ xs: 12, md: 4 }}>
                 <TextField select fullWidth size="small" label="Estado Acreditación" value={editFormData?.estado_jep?.estado_acreditacion || 'No está acreditada'} onChange={(e) => setEditFormData({ ...editFormData, estado_jep: { ...editFormData.estado_jep, estado_acreditacion: e.target.value } })}><MenuItem value="No está acreditada">No está acreditada</MenuItem><MenuItem value="Acreditada">Acreditada</MenuItem><MenuItem value="En trámite (despacho no ha resuelto)">En trámite (despacho no ha resuelto)</MenuItem></TextField>
               </Grid>
               <Grid size={{ xs: 12, md: 4 }}>
                 <TextField select fullWidth size="small" label="Reconocimiento PJ" value={editFormData?.estado_jep?.estado_reconocimiento_pj || 'Sin PJ (no se ha recibido poder)'} onChange={(e) => setEditFormData({ ...editFormData, estado_jep: { ...editFormData.estado_jep, estado_reconocimiento_pj: e.target.value } })}><MenuItem value="Sin PJ (no se ha recibido poder)">Sin PJ</MenuItem><MenuItem value="Con PJ (poder recibido)">Con PJ</MenuItem></TextField>
               </Grid>
               
-              {/* CORRECCIÓN: Estructuración limpia en múltiples líneas para evitar colisiones del parser de TSX */}
               <Grid size={{ xs: 12, md: 4 }}>
                 <TextField 
                   fullWidth 
@@ -734,6 +746,17 @@ const VictimaDetalle = () => {
                   label="Auto de Reconocimiento" 
                   value={editFormData?.estado_jep?.auto_reconocimiento || ''} 
                   onChange={(e) => setEditFormData({ ...editFormData, estado_jep: { ...editFormData.estado_jep, auto_reconocimiento: e.target.value } })} 
+                />
+              </Grid>
+              <Grid size={{ xs: 12, md: 4 }}>
+                <TextField 
+                  fullWidth 
+                  size="small" 
+                  type="date"
+                  label="Fecha Vencimiento Término" 
+                  slotProps={{ inputLabel: { shrink: true } }}
+                  value={editFormData?.estado_jep?.fecha_vencimiento_termino || ''} 
+                  onChange={(e) => setEditFormData({ ...editFormData, estado_jep: { ...editFormData.estado_jep, fecha_vencimiento_termino: e.target.value } })} 
                 />
               </Grid>
             </Grid>
