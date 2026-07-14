@@ -22,7 +22,7 @@ export interface DatosContacto {
 export interface Representacion {
   caso: string[]; 
   bloque: string[]; 
-  hechos_victimizantes?: string[]; // Propiedad agregada para el manejo de delitos
+  hechos_victimizantes?: string[]; 
   calidad_victima: string; 
   delito?: string;
   juridico_asignado_id: string; 
@@ -30,7 +30,6 @@ export interface Representacion {
   fecha_asignacion: string;
   estado: 'Activo' | 'Desasignado' | 'En Sustitución' | 'Fallecido';
   referencia_llegada?: string; 
-  // NUEVO: Campos para registrar el historial de la pestaña DESASIGNADAS
   motivo_desasignacion?: string;
   fecha_desasignacion?: string;
 }
@@ -57,11 +56,12 @@ export interface EstadoJEP {
   estado_reconocimiento_pj: 'Con PJ' | 'Sin PJ (no se ha recibido poder)' | string;
   auto_reconocimiento?: string;
   estado_sistema_vista?: EstadoSistemaVista;
+  fecha_vencimiento_termino?: string;
+  estado_termino?: 'Abierto' | 'Próximo a vencer' | 'Vencido';
 }
 
-// NUEVO: Estructura para la pestaña DESAPARICIÓN
 export interface FamiliarDesaparecido {
-  nombre_completo: string;
+  nombre_completo: string; // Corregido para solucionar el error de compilación
   parentesco: string;
 }
 
@@ -78,10 +78,9 @@ export interface Victima {
   datos_contacto: DatosContacto;
   representacion: Representacion;
   estado_jep: EstadoJEP;
-  seguimiento_vista?: SeguimientoVista; // Checklist de Actuaciones añadido
+  seguimiento_vista?: SeguimientoVista; 
   storage_folder_url?: string;
   fecha_registro: string;
-  // NUEVO: Campo opcional para vincular al familiar en casos de desaparición
   familiar_desaparecido?: FamiliarDesaparecido;
 }
 

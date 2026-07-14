@@ -23,7 +23,6 @@ import { db } from '../../core/config/firebase';
 import { Victima, Evento } from '../../core/types/jep';
 import { Usuario } from '../../core/types/user';
 
-// IMPORTACIÓN DEL MOTOR DE EXCEL
 import * as XLSX from 'xlsx';
 
 const PAGE_SIZE = 10;
@@ -136,11 +135,9 @@ const Dashboard = () => {
     fetchAdminVictimas(undefined, val);
   };
 
-  // FUNCIÓN: PERMITE AL PROFESIONAL DESCARGAR SU PORTAFOLIO EN EXCEL
   const descargarExcelProfesional = () => {
     if (victimasList.length === 0) return;
     
-    // Mapeo semántico de campos planos estructurados
     const filasFormateadas = victimasList.map(v => ({
       "Nombre Completo": v.nombre_completo,
       "Documento": `${v.tipo_documento || 'CC'} ${v.identificacion}`,
@@ -278,6 +275,10 @@ const Dashboard = () => {
     .filter(v => v.estado_jep?.estado_acreditacion !== 'Acreditada')
     .slice(0, 5);
 
+  const casosVencimientos = victimasList
+    .filter(v => v.estado_jep?.fecha_vencimiento_termino && v.estado_jep?.estado_termino === 'Próximo a vencer')
+    .slice(0, 5);
+
   if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', mt: 10 }}><CircularProgress /></Box>;
 
   return (
@@ -294,7 +295,6 @@ const Dashboard = () => {
           </Typography>
         </Box>
         
-        {/* BOTÓN OPERACIONAL EXCEL PROFESIONALES */}
         {!isAdmin && victimasList.length > 0 && (
           <Button 
             variant="contained" 
@@ -307,6 +307,37 @@ const Dashboard = () => {
           </Button>
         )}
       </Box>
+
+      {/* RENDERIZADO DEL SEMÁFORO DE VENCIMIENTOS PROCESALES */}
+      {!isAdmin && casosVencimientos.length > 0 && (
+        <Paper elevation={0} sx={{ p: 3, mb: 4, border: '1px solid #fee2e2', bgcolor: '#fef2f2', borderRadius: 3 }}>
+          <Typography variant="h6" sx={{ fontWeight: 800, color: '#991b1b', mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+            <WarningAmberIcon color="error" /> PLAZOS PROCESALES URGENTES (Próximos 3 días)
+          </Typography>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell sx={{ fontWeight: 'bold' }}>Víctima / Portafolio</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>Fecha Fatal JEP</TableCell>
+                <TableCell align="right" sx={{ fontWeight: 'bold' }}>Acción</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {casosVencimientos.map((v) => (
+                <TableRow key={v.id} hover>
+                  <TableCell sx={{ fontWeight: 600 }}>{v.nombre_completo}</TableCell>
+                  <TableCell sx={{ color: '#b91c1c', fontWeight: 700 }}>{v.estado_jep.fecha_vencimiento_termino}</TableCell>
+                  <TableCell align="right">
+                    <Button size="small" variant="contained" color="error" onClick={() => navigate(`/victimas/${v.id}`)}>
+                      Revisar
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </Paper>
+      )}
 
       <Grid container spacing={3} sx={{ mb: 4 }}>
         <Grid size={{ xs: 12, md: 4 }}>
@@ -347,7 +378,7 @@ const Dashboard = () => {
 
       <Card elevation={0} sx={{ mb: 5, background: 'linear-gradient(135deg, #f0f7ff 0%, #e0f2fe 100%)', border: '1px solid #bae6fd', borderRadius: 3, minHeight: '120px' }}>
         <CardContent sx={{ p: 3 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justify_content: 'space-between', mb: 1.5 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
               <AutoAwesomeIcon sx={{ color: '#0284c7', fontSize: 28 }} />
               <Typography variant="h6" sx={{ fontWeight: 800, color: '#0369a1' }}>
@@ -386,7 +417,7 @@ const Dashboard = () => {
 
       {isAdmin ? (
         <Box>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+          <Box sx={{ display: 'flex', justify_content: 'space-between', alignItems: 'center', mb: 2 }}>
             <Typography variant="h5" sx={{ fontWeight: 700 }}>Explorador y Buscador Paginado</Typography>
             <TextField 
               size="small"
@@ -449,7 +480,7 @@ const Dashboard = () => {
           </Paper>
 
           {search.trim() === '' && (
-            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 2, mt: 3 }}>
+            <Box sx={{ display: 'flex', justify_content: 'center', alignItems: 'center', gap: 2, mt: 3 }}>
               <Button variant="outlined" size="small" disabled={page === 1} onClick={() => handlePageChange('prev')}>Anterior</Button>
               <Typography variant="body2" sx={{ fontWeight: 600 }}>Página {page}</Typography>
               <Button variant="outlined" size="small" disabled={!hasMore} onClick={() => handlePageChange('next')}>Siguiente</Button>
@@ -459,7 +490,7 @@ const Dashboard = () => {
       ) : (
         <Grid container spacing={4}>
           <Grid size={{ xs: 12, lg: 6 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Box sx={{ display: 'flex', justify_content: 'space-between', alignItems: 'center', mb: 2 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <WarningAmberIcon color="warning" />
                 <Typography variant="h5" sx={{ fontWeight: 700 }}>Alertas de Acreditación</Typography>
@@ -498,7 +529,7 @@ const Dashboard = () => {
           </Grid>
 
           <Grid size={{ xs: 12, lg: 6 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Box sx={{ display: 'flex', justify_content: 'space-between', alignItems: 'center', mb: 2 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <CalendarMonthIcon color="primary" />
                 <Typography variant="h5" sx={{ fontWeight: 700 }}>Agenda JEP y Talleres</Typography>

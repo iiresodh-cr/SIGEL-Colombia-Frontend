@@ -48,7 +48,7 @@ export const FormVictima = ({ onSave, onCancel, profesionales, currentUserRole, 
       fecha_asignacion: new Date().toISOString().split('T')[0],
       estado: 'Activo'
     },
-    estado_jep: { estado_acreditacion: 'No está acreditada', estado_reconocimiento_pj: 'Sin PJ (no se ha recibido poder)', auto_acreditacion: '', auto_reconocimiento: '' },
+    estado_jep: { estado_acreditacion: 'No está acreditada', estado_reconocimiento_pj: 'Sin PJ (no se ha recibido poder)', auto_acreditacion: '', auto_reconocimiento: '', fecha_vencimiento_termino: '', estado_termino: 'Abierto' },
     seguimiento_vista: { primer_contacto: false, firma_poder: false, demandas_verdad: false, sol_desasignacion: false }
   });
 
@@ -57,7 +57,7 @@ export const FormVictima = ({ onSave, onCancel, profesionales, currentUserRole, 
 
   const handleSubmit = () => {
     if (!formData.representacion?.juridico_asignado_id && !formData.representacion?.psicosocial_asignado_id) {
-      showModal('Falta Asignación', 'Debe asignar al menos un responsable técnico (Jurídico o Psicosocial).', 'error');
+      showModal('Falta Asignación', 'Debe asignar al menos un responsable técnico (Verificar área Jurídica o Psicosocial).', 'error');
       return;
     }
     onSave(formData as any);
@@ -117,7 +117,7 @@ export const FormVictima = ({ onSave, onCancel, profesionales, currentUserRole, 
               </TextField>
             </Grid>
 
-            <Grid size={{ xs: 12 }} sx={{ mt: 2 }}><Typography variant="subtitle2" color="text.secondary">Cobertura Jurisdiccional (JEP)</Typography><Divider sx={{ mb: 2 }} /></Grid>
+            <Grid size={{ xs: 12 }} sx={{ mt: 2 }}><Typography variant="subtitle2" color="text.secondary">Cobertura Jurisdiccional y Plazos (JEP)</Typography><Divider sx={{ mb: 2 }} /></Grid>
             <Grid size={{ xs: 12, md: 4 }}>
               <FormControl fullWidth>
                 <InputLabel>Macrocaso(s)</InputLabel>
@@ -142,15 +142,25 @@ export const FormVictima = ({ onSave, onCancel, profesionales, currentUserRole, 
                 </Select>
               </FormControl>
             </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
+            <Grid size={{ xs: 12, md: 4 }}>
               <TextField select fullWidth label="Calidad de Víctima" required value={formData.representacion?.calidad_victima} onChange={(e) => setFormData({ ...formData, representacion: { ...formData.representacion!, calidad_victima: e.target.value } })}>{CALIDADES.map(c => <MenuItem key={c} value={c}>{c}</MenuItem>)}</TextField>
             </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
+            <Grid size={{ xs: 12, md: 4 }}>
               <TextField select fullWidth label="Estado Acreditación" value={formData.estado_jep?.estado_acreditacion} onChange={(e) => setFormData({ ...formData, estado_jep: { ...formData.estado_jep!, estado_acreditacion: e.target.value as any } })}>
                 <MenuItem value="No está acreditada">No está acreditada</MenuItem>
                 <MenuItem value="Acreditada">Acreditada</MenuItem>
                 <MenuItem value="En trámite (despacho no ha resuelto)">En trámite (despacho no ha resuelto)</MenuItem>
               </TextField>
+            </Grid>
+            <Grid size={{ xs: 12, md: 4 }}>
+              <TextField 
+                fullWidth 
+                type="date" 
+                label="Fecha Vencimiento Término" 
+                slotProps={{ inputLabel: { shrink: true } }} 
+                value={formData.estado_jep?.fecha_vencimiento_termino || ''} 
+                onChange={(e) => setFormData({ ...formData, estado_jep: { ...formData.estado_jep!, fecha_vencimiento_termino: e.target.value } })} 
+              />
             </Grid>
           </Grid>
         );
