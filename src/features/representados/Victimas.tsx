@@ -26,7 +26,6 @@ const Victimas = () => {
   const [showForm, setShowForm] = useState(false);
   const [profesionales, setProfesionales] = useState<{ abogados: Usuario[], psicosociales: Usuario[] }>({ abogados: [], psicosociales: [] });
 
-  // Control estricto de rol administrativo
   const isAdmin = role === 'admin' || role === 'superadmin';
 
   const loadData = async () => {
@@ -90,8 +89,17 @@ const Victimas = () => {
       document.body.appendChild(script);
     }
 
+    let attempts = 0;
+
     const checkAndInit = () => {
+      attempts++;
+      // Si pasan más de 5 segundos y Google no carga, cancelamos el estado de carga
       if (!(window as any).google?.accounts?.oauth2) {
+        if (attempts > 50) {
+          setExportingGoogle(false);
+          showModal('Error', 'No se pudo cargar el servicio de Google. Revise su conexión o bloqueadores de anuncios.', 'error');
+          return;
+        }
         setTimeout(checkAndInit, 100);
         return;
       }
@@ -99,10 +107,22 @@ const Victimas = () => {
       const client = (window as any).google.accounts.oauth2.initTokenClient({
         client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID || '',
         scope: 'https://www.googleapis.com/auth/spreadsheets',
+        // Captura si el navegador bloquea los Pop-ups
+        error_callback: (error: any) => {
+          setExportingGoogle(false);
+          if (error?.type === 'popup_failed_to_open') {
+            showModal('Bloqueo de Ventana', 'Tu navegador bloqueó la ventana de Google. Por favor, permite las ventanas emergentes (pop-ups) para este sitio.', 'error');
+          } else {
+            showModal('Error', 'Error de comunicación con Google.', 'error');
+          }
+        },
         callback: async (tokenResponse: any) => {
-          if (tokenResponse.error_code) {
-            showModal('Error', 'Permiso denegado por el usuario.', 'error');
+          // Captura estricta: Si hay error o si el usuario cierra la ventana manualmente
+          if (tokenResponse.error) {
             setExportingGoogle(false);
+            if (tokenResponse.error !== 'popup_closed_by_user') {
+              showModal('Error', 'Permiso denegado por el usuario.', 'error');
+            }
             return;
           }
 
@@ -119,6 +139,8 @@ const Victimas = () => {
                 properties: { title: `Matriz Consolidada SIGEL - ${new Date().toLocaleDateString()}` }
               })
             });
+
+            if (!createResponse.ok) throw new Error('Error al crear el documento en Drive');
 
             const spreadsheet = await createResponse.json();
             const spreadsheetId = spreadsheet.spreadsheetId;
@@ -230,7 +252,6 @@ const Victimas = () => {
           <Typography variant="body1" color="text.secondary">Base de datos de representación institucional y acreditaciones.</Typography>
         </Box>
         <Box sx={{ display: 'flex', gap: 2 }}>
-          {/* RENDERIZADO CONDICIONAL EXCLUSIVO PARA ADMINISTRADORES */}
           {isAdmin && (
             <Button 
               variant="contained" 
