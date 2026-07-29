@@ -8,13 +8,20 @@ import {
   getDoc, 
   orderBy, 
   limit,
-  updateDoc
+  updateDoc,
+  deleteDoc
 } from 'firebase/firestore';
 import { db } from '../../core/config/firebase';
 import { Victima, Interaccion, Evento } from '../../core/types/jep';
 
 export const jepService = {
   // --- SECCIÓN VÍCTIMAS ---
+
+  // Eliminar una víctima
+  deleteVictima: async (id: string) => {
+    const docRef = doc(db, 'victimas', id);
+    await deleteDoc(docRef);
+  },
 
   // 1. Crear una nueva víctima
   createVictima: async (data: Omit<Victima, 'id' | 'fecha_registro'>) => {

@@ -383,6 +383,21 @@ const VictimaDetalle = () => {
     return listaProfesionales.psicosociales.find(u => u.correo.toLowerCase() === correoId.toLowerCase())?.nombre_completo || correoId;
   };
 
+  const handleDeleteVictima = async () => {
+    if (!id || !canDelete) return;
+    showModal('¿Eliminar Ficha Definitivamente?', 'Esta acción borrará la víctima de la base de datos por completo y no se puede deshacer. ¿Estás seguro?', 'confirm', async () => {
+      try {
+        setLoading(true);
+        await jepService.deleteVictima(id);
+        showModal('Eliminada', 'La ficha ha sido eliminada correctamente.', 'success');
+        navigate('/victimas');
+      } catch (error) {
+        showModal('Error', 'No se pudo eliminar la ficha.', 'error');
+        setLoading(false);
+      }
+    });
+  };
+
   if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', mt: 10 }}><CircularProgress /></Box>;
   if (!victima) return <Box sx={{ p: 4 }}><Typography>Víctima no encontrada</Typography></Box>;
 
@@ -394,11 +409,18 @@ const VictimaDetalle = () => {
     <Box sx={{ p: 4 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Button startIcon={<ArrowBackIcon />} onClick={() => navigate(-1)}>Volver</Button>
-        {canEdit && (
-          <Button variant="contained" color="primary" startIcon={<EditIcon />} onClick={handleOpenEdit} sx={{ fontWeight: 'bold' }}>
-            Editar Ficha Completa
-          </Button>
-        )}
+        <Box sx={{ display: 'flex', gap: 2 }}>
+          {canDelete && (
+            <Button variant="contained" color="error" startIcon={<DeleteIcon />} onClick={handleDeleteVictima} sx={{ fontWeight: 'bold' }}>
+              Eliminar Víctima
+            </Button>
+          )}
+          {canEdit && (
+            <Button variant="contained" color="primary" startIcon={<EditIcon />} onClick={handleOpenEdit} sx={{ fontWeight: 'bold' }}>
+              Editar Ficha Completa
+            </Button>
+          )}
+        </Box>
       </Box>
 
       {isDesasignado && (
