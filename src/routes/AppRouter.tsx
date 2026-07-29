@@ -19,6 +19,7 @@ import Audiencias from '../features/agenda/Audiencias';
 import Radicados from '../features/agenda/Radicados';
 import Expedientes from '../features/expedientes/Expedientes';
 import ExpedienteDetalle from '../features/expedientes/ExpedienteDetalle';
+import AgendaMaster from '../features/agenda/AgendaMaster';
 
 const AppRouter = () => {
   return (
@@ -50,8 +51,8 @@ const AppRouter = () => {
               <Route path="/expedientes" element={<Expedientes />} />
               <Route path="/expedientes/:id" element={<ExpedienteDetalle />} />
               
-              {/* Módulo: Agenda y Actuaciones */}
-              <Route path="/eventos" element={<Eventos />} />
+              {/* Módulo: Agenda y Actuaciones Unificadas */}
+              <Route path="/eventos" element={<AgendaMaster />} />
               <Route path="/audiencias" element={<Audiencias />} />
               <Route path="/radicados" element={<Radicados />} />
             </Route>

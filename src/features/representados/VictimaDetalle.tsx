@@ -33,6 +33,7 @@ import { useAuth } from '../../core/context/AuthContext';
 import { useModal } from '../../core/context/ModalContext';
 import { doc, updateDoc, collection, addDoc, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '../../core/config/firebase';
+import { COLOMBIA_DATA } from '../../core/config/colombia';
 
 const TIPOS_INTERACCION = ['Llamada de sentido del proceso', 'Asesoría jurídica', 'Acompañamiento psicosocial', 'Gestión de acreditación', 'Otra'];
 
@@ -47,6 +48,12 @@ const ETAREOS = ['Infancia (0-11)', 'Adolescencia (12-18)', 'Joven (18-28)', 'Ad
 const DISCAPACIDADES = ['Ninguna', 'Física', 'Auditiva', 'Visual', 'Sordoceguera', 'Intelectual', 'Psicosocial (Mental)', 'Múltiple'];
 const DEPARTAMENTOS = ['Amazonas', 'Antioquia', 'Arauca', 'Atlántico', 'Bolívar', 'Boyacá', 'Caldas', 'Caquetá', 'Casanare', 'Cauca', 'Cesar', 'Chocó', 'Córdoba', 'Cundinamarca', 'Guainía', 'Guaviare', 'Huila', 'La Guajira', 'Magdalena', 'Meta', 'Nariño', 'Norte de Santander', 'Putumayo', 'Quindío', 'Risaralda', 'San Andrés y Providencia', 'Santander', 'Sucre', 'Tolima', 'Valle del Cauca', 'Vaupés', 'Vichada', 'Bogotá D.C.'];
 
+const getMunicipios = (departamento: string) => {
+  if (departamento === 'Bogotá D.C.') return ['Bogotá D.C.'];
+  const dep = COLOMBIA_DATA.find(d => d.departamento === departamento);
+  return dep ? dep.ciudades : [];
+};
+
 const traducirCampo = (campo: string) => {
   const mapa: Record<string, string> = {
     'nombre_completo': 'Nombre Completo',
@@ -60,6 +67,7 @@ const traducirCampo = (campo: string) => {
     'datos_contacto.telefono': 'Teléfono de Contacto',
     'datos_contacto.correo': 'Correo Electrónico',
     'datos_contacto.departamento': 'Departamento',
+    'datos_contacto.municipio': 'Municipio',
     'datos_contacto.direccion': 'Dirección',
     'representacion.caso': 'Macrocaso(s) JEP',
     'representacion.bloque': 'Bloque(s)',
@@ -217,7 +225,8 @@ const VictimaDetalle = () => {
         telefono: victima.datos_contacto?.telefono || '',
         correo: victima.datos_contacto?.correo || '',
         direccion: victima.datos_contacto?.direccion || '',
-        departamento: victima.datos_contacto?.departamento || ''
+        departamento: victima.datos_contacto?.departamento || '',
+        municipio: victima.datos_contacto?.municipio || ''
       },
       representacion: {
         caso: victima.representacion?.caso || [],
@@ -453,7 +462,7 @@ const VictimaDetalle = () => {
               <Grid container spacing={2} sx={{ mb: 3 }}>
                 <Grid size={{ xs: 6 }}><Typography variant="caption">Teléfono</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{victima.datos_contacto?.telefono || 'No registra'}</Typography></Grid>
                 <Grid size={{ xs: 6 }}><Typography variant="caption">Correo</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{victima.datos_contacto?.correo || 'No registra'}</Typography></Grid>
-                <Grid size={{ xs: 12 }}><Typography variant="caption">Ubicación</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{victima.datos_contacto?.departamento} - {victima.datos_contacto?.direccion}</Typography></Grid>
+                <Grid size={{ xs: 12 }}><Typography variant="caption">Ubicación</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{victima.datos_contacto?.departamento}{victima.datos_contacto?.municipio ? ` - ${victima.datos_contacto.municipio}` : ''} - {victima.datos_contacto?.direccion}</Typography></Grid>
               </Grid>
 
               <Divider sx={{ my: 3 }} />
@@ -679,8 +688,17 @@ const VictimaDetalle = () => {
               <Grid size={{ xs: 12 }}><Divider textAlign="left"><Typography variant="subtitle2" color="text.secondary">Información de Contacto</Typography></Divider></Grid>
               <Grid size={{ xs: 12, md: 4 }}><TextField fullWidth size="small" label="Teléfono" value={editFormData?.datos_contacto?.telefono || ''} onChange={(e) => setEditFormData({ ...editFormData, datos_contacto: { ...editFormData.datos_contacto, telefono: e.target.value } })} /></Grid>
               <Grid size={{ xs: 12, md: 4 }}><TextField fullWidth size="small" label="Correo Electrónico" value={editFormData?.datos_contacto?.correo || ''} onChange={(e) => setEditFormData({ ...editFormData, datos_contacto: { ...editFormData.datos_contacto, correo: e.target.value } })} /></Grid>
-              <Grid size={{ xs: 12, md: 4 }}><TextField select fullWidth size="small" label="Departamento" value={editFormData?.datos_contacto?.departamento || ''} onChange={(e) => setEditFormData({ ...editFormData, datos_contacto: { ...editFormData.datos_contacto, departamento: e.target.value } })}>{DEPARTAMENTOS.map(d => <MenuItem key={d} value={d}>{d}</MenuItem>)}</TextField></Grid>
-              <Grid size={{ xs: 12 }}><TextField fullWidth size="small" label="Dirección de Residencia" value={editFormData?.datos_contacto?.direccion || ''} onChange={(e) => setEditFormData({ ...editFormData, datos_contacto: { ...editFormData.datos_contacto, direccion: e.target.value } })} /></Grid>
+              <Grid size={{ xs: 12, md: 4 }}>
+                <TextField select fullWidth size="small" label="Departamento" value={editFormData?.datos_contacto?.departamento || ''} onChange={(e) => setEditFormData({ ...editFormData, datos_contacto: { ...editFormData.datos_contacto, departamento: e.target.value, municipio: '' } })}>
+                  {DEPARTAMENTOS.map(d => <MenuItem key={d} value={d}>{d}</MenuItem>)}
+                </TextField>
+              </Grid>
+              <Grid size={{ xs: 12, md: 4 }}>
+                <TextField select fullWidth size="small" label="Municipio" value={editFormData?.datos_contacto?.municipio || ''} onChange={(e) => setEditFormData({ ...editFormData, datos_contacto: { ...editFormData.datos_contacto, municipio: e.target.value } })} disabled={!editFormData?.datos_contacto?.departamento}>
+                  {getMunicipios(editFormData?.datos_contacto?.departamento || '').map(m => <MenuItem key={m} value={m}>{m}</MenuItem>)}
+                </TextField>
+              </Grid>
+              <Grid size={{ xs: 12, md: 8 }}><TextField fullWidth size="small" label="Dirección de Residencia" value={editFormData?.datos_contacto?.direccion || ''} onChange={(e) => setEditFormData({ ...editFormData, datos_contacto: { ...editFormData.datos_contacto, direccion: e.target.value } })} /></Grid>
 
               <Grid size={{ xs: 12 }}><Divider textAlign="left"><Typography variant="subtitle2" color="text.secondary">Proceso y Cobertura JEP</Typography></Divider></Grid>
               <Grid size={{ xs: 12, md: 4 }}>

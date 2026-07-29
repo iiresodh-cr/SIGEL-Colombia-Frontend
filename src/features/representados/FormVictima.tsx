@@ -7,6 +7,7 @@ import {
 import { Victima } from '../../core/types/jep';
 import { Usuario } from '../../core/types/user';
 import { useModal } from '../../core/context/ModalContext';
+import { COLOMBIA_DATA } from '../../core/config/colombia';
 
 interface FormVictimaProps {
   onSave: (data: Omit<Victima, 'id' | 'fecha_registro'>) => void;
@@ -26,6 +27,12 @@ const ETNICOS = ['Ninguno', 'Indígena', 'Afrodescendiente/Negro/Mulato', 'Rrom/
 const ETAREOS = ['Infancia (0-11)', 'Adolescencia (12-18)', 'Joven (18-28)', 'Adulto (28-60)', 'Adulto Mayor (60+)'];
 const DISCAPACIDADES = ['Ninguna', 'Física', 'Auditiva', 'Visual', 'Sordoceguera', 'Intelectual', 'Psicosocial (Mental)', 'Múltiple'];
 const DEPARTAMENTOS = ['Amazonas', 'Antioquia', 'Arauca', 'Atlántico', 'Bogotá D.C.', 'Bolívar', 'Boyacá', 'Caldas', 'Caquetá', 'Casanare', 'Cauca', 'Cesar', 'Chocó', 'Córdoba', 'Cundinamarca', 'Guainía', 'Guaviare', 'Huila', 'La Guajira', 'Magdalena', 'Meta', 'Nariño', 'Norte de Santander', 'Putumayo', 'Quindío', 'Risaralda', 'San Andrés y Providencia', 'Santander', 'Sucre', 'Tolima', 'Valle del Cauca', 'Vaupés', 'Vichada'];
+
+const getMunicipios = (departamento: string) => {
+  if (departamento === 'Bogotá D.C.') return ['Bogotá D.C.'];
+  const dep = COLOMBIA_DATA.find(d => d.departamento === departamento);
+  return dep ? dep.ciudades : [];
+};
 
 const STEPS = ['Identificación Básica', 'Perfil Demográfico', 'Contacto y Ubicación', 'Expediente JEP'];
 
@@ -96,8 +103,30 @@ export const FormVictima = ({ onSave, onCancel, profesionales, currentUserRole, 
           <Grid container spacing={3}>
             <Grid size={{ xs: 12, md: 4 }}><TextField fullWidth label="Teléfono" value={formData.datos_contacto?.telefono} onChange={(e) => setFormData({ ...formData, datos_contacto: { ...formData.datos_contacto!, telefono: e.target.value } })} /></Grid>
             <Grid size={{ xs: 12, md: 4 }}><TextField fullWidth label="Correo Electrónico" value={formData.datos_contacto?.correo} onChange={(e) => setFormData({ ...formData, datos_contacto: { ...formData.datos_contacto!, correo: e.target.value } })} /></Grid>
-            <Grid size={{ xs: 12, md: 4 }}><TextField select fullWidth label="Departamento" value={formData.datos_contacto?.departamento} onChange={(e) => setFormData({ ...formData, datos_contacto: { ...formData.datos_contacto!, departamento: e.target.value } })}>{DEPARTAMENTOS.map(d => <MenuItem key={d} value={d}>{d}</MenuItem>)}</TextField></Grid>
-            <Grid size={{ xs: 12 }}><TextField fullWidth label="Dirección de Residencia" value={formData.datos_contacto?.direccion} onChange={(e) => setFormData({ ...formData, datos_contacto: { ...formData.datos_contacto!, direccion: e.target.value } })} /></Grid>
+            <Grid size={{ xs: 12, md: 4 }}>
+              <TextField 
+                select 
+                fullWidth 
+                label="Departamento" 
+                value={formData.datos_contacto?.departamento || ''} 
+                onChange={(e) => setFormData({ ...formData, datos_contacto: { ...formData.datos_contacto!, departamento: e.target.value, municipio: '' } })}
+              >
+                {DEPARTAMENTOS.map(d => <MenuItem key={d} value={d}>{d}</MenuItem>)}
+              </TextField>
+            </Grid>
+            <Grid size={{ xs: 12, md: 4 }}>
+              <TextField 
+                select 
+                fullWidth 
+                label="Municipio" 
+                value={formData.datos_contacto?.municipio || ''} 
+                onChange={(e) => setFormData({ ...formData, datos_contacto: { ...formData.datos_contacto!, municipio: e.target.value } })}
+                disabled={!formData.datos_contacto?.departamento}
+              >
+                {getMunicipios(formData.datos_contacto?.departamento || '').map(m => <MenuItem key={m} value={m}>{m}</MenuItem>)}
+              </TextField>
+            </Grid>
+            <Grid size={{ xs: 12, md: 8 }}><TextField fullWidth label="Dirección de Residencia" value={formData.datos_contacto?.direccion} onChange={(e) => setFormData({ ...formData, datos_contacto: { ...formData.datos_contacto!, direccion: e.target.value } })} /></Grid>
           </Grid>
         );
       case 3:

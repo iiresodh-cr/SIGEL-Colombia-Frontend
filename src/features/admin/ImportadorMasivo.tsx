@@ -161,9 +161,10 @@ const ImportadorMasivo = () => {
             },
             datos_contacto: {
               telefono: String(getVal(row, 'Teléfono', 'TELEFONO')),
-              correo: String(getVal(row, 'Correo', 'CORREO ELECTRÓNICO')),
+              correo: String(getVal(row, 'Correo', 'CORREO')),
               direccion: String(getVal(row, 'Dirección', 'DIRECCION')),
-              departamento: String(getVal(row, 'DEPARTAMENTO RESIDENCIA', 'DEPARTAMENTO')),
+              departamento: String(getVal(row, 'Departamento', 'DEPARTAMENTO')),
+              municipio: String(getVal(row, 'Municipio', 'MUNICIPIO')),
             },
             representacion: {
               caso: nombreHoja.includes('01') ? ['Caso 01'] : (nombreHoja.includes('10') ? ['Caso 10'] : []),

@@ -251,6 +251,7 @@ const AdminDashboard = () => {
       "TELÉFONO CONTACTO": v.datos_contacto?.telefono || 'No registra',
       "EMAIL": v.datos_contacto?.correo || 'No registra',
       "DEPARTAMENTO RESIDENCIA": v.datos_contacto?.departamento || 'No registra',
+      "MUNICIPIO RESIDENCIA": v.datos_contacto?.municipio || 'No registra',
       "DIRECCIÓN DE CONTACTO": v.datos_contacto?.direccion || 'No registra',
       "MACROCASOS JEP VINCULADOS": v.representacion?.caso?.join(', ') || 'Sin Macrocaso',
       "BLOQUES / FRENTES": v.representacion?.bloque?.join(', ') || 'No registra',

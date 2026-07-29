@@ -146,7 +146,7 @@ const Dashboard = () => {
       "Ciclo Vital": v.datos_demograficos?.etareo || 'Adulto',
       "Teléfono": v.datos_contacto?.telefono || 'No registra',
       "Correo Electrónico": v.datos_contacto?.correo || 'No registra',
-      "Ubicación": `${v.datos_contacto?.departamento || ''} - ${v.datos_contacto?.direccion || ''}`,
+      "Ubicación": `${v.datos_contacto?.departamento || ''}${v.datos_contacto?.municipio ? ` - ${v.datos_contacto.municipio}` : ''} - ${v.datos_contacto?.direccion || ''}`,
       "Macrocaso(s) JEP": v.representacion?.caso?.join(', ') || 'Sin vincular',
       "Bloque(s)": v.representacion?.bloque?.join(', ') || 'No registra',
       "Calidad de Víctima": v.representacion?.calidad_victima || 'No registra',
