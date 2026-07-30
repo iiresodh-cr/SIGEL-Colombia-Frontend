@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { 
-  Box, Typography, Paper, Button, IconButton, Chip, CircularProgress 
+  Box, Typography, Paper, Button, IconButton, Chip, CircularProgress, TextField, InputAdornment 
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import CloudDownloadIcon from '@mui/icons-material/CloudDownload';
+import SearchIcon from '@mui/icons-material/Search';
 import { DataGrid, GridColDef } from '@mui/x-data-grid';
 import { useNavigate } from 'react-router-dom';
 import { jepService } from './jepService';
@@ -21,6 +22,7 @@ const Victimas = () => {
   const { showModal } = useModal();
   
   const [victimas, setVictimas] = useState<Victima[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [exportingGoogle, setExportingGoogle] = useState(false);
   const [showForm, setShowForm] = useState(false);
@@ -282,29 +284,53 @@ const Victimas = () => {
           />
         </Box>
       ) : (
-        <Paper elevation={0} sx={{ flexGrow: 1, width: '100%', border: '1px solid', borderColor: 'divider', borderRadius: 3, overflow: 'hidden' }}>
-          <DataGrid
-            rows={victimas}
-            columns={columns}
-            loading={loading}
-            initialState={{
-              pagination: { paginationModel: { pageSize: 25 } },
-            }}
-            pageSizeOptions={[25, 50, 100]}
-            disableRowSelectionOnClick
-            sx={{
-              border: 'none',
-              '& .MuiDataGrid-columnHeaders': { 
-                backgroundColor: '#f8fafc', 
-                fontWeight: 800, 
-                color: '#1e293b' 
-              },
-              '& .MuiDataGrid-row:hover': { 
-                backgroundColor: '#f1f5f9' 
-              }
-            }}
-          />
-        </Paper>
+        <Box sx={{ display: 'flex', flexDirection: 'column', flexGrow: 1 }}>
+          <Box sx={{ mb: 2 }}>
+            <TextField
+              fullWidth
+              size="small"
+              placeholder="Buscar por cédula o nombre de víctima..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              slotProps={{
+                input: {
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon color="action" />
+                    </InputAdornment>
+                  ),
+                },
+              }}
+              sx={{ bgcolor: 'background.paper', borderRadius: 1 }}
+            />
+          </Box>
+          <Paper elevation={0} sx={{ flexGrow: 1, width: '100%', border: '1px solid', borderColor: 'divider', borderRadius: 3, overflow: 'hidden' }}>
+            <DataGrid
+              rows={victimas.filter(v => 
+                (v.nombre_completo || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
+                (v.identificacion || '').includes(searchTerm)
+              )}
+              columns={columns}
+              loading={loading}
+              initialState={{
+                pagination: { paginationModel: { pageSize: 25 } },
+              }}
+              pageSizeOptions={[25, 50, 100]}
+              disableRowSelectionOnClick
+              sx={{
+                border: 'none',
+                '& .MuiDataGrid-columnHeaders': { 
+                  backgroundColor: '#f8fafc', 
+                  fontWeight: 800, 
+                  color: '#1e293b' 
+                },
+                '& .MuiDataGrid-row:hover': { 
+                  backgroundColor: '#f1f5f9' 
+                }
+              }}
+            />
+          </Paper>
+        </Box>
       )}
     </Box>
   );
