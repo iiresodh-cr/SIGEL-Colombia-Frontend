@@ -49,7 +49,7 @@ const DISCAPACIDADES = ['Ninguna', 'Física', 'Auditiva', 'Visual', 'Sordoceguer
 const DEPARTAMENTOS = ['Amazonas', 'Antioquia', 'Arauca', 'Atlántico', 'Bolívar', 'Boyacá', 'Caldas', 'Caquetá', 'Casanare', 'Cauca', 'Cesar', 'Chocó', 'Córdoba', 'Cundinamarca', 'Guainía', 'Guaviare', 'Huila', 'La Guajira', 'Magdalena', 'Meta', 'Nariño', 'Norte de Santander', 'Putumayo', 'Quindío', 'Risaralda', 'San Andrés y Providencia', 'Santander', 'Sucre', 'Tolima', 'Valle del Cauca', 'Vaupés', 'Vichada', 'Bogotá D.C.'];
 
 const PAISES = ['Colombia', 'Venezuela', 'Ecuador', 'Perú', 'Panamá', 'España', 'Estados Unidos', 'Otro'];
-const CODIGOS_PAIS = ['+57', '+58', '+593', '+51', '+507', '+34', '+1', '+Otro'];
+const CODIGOS_PAIS = ['+57 (Colombia)', '+58 (Venezuela)', '+593 (Ecuador)', '+51 (Perú)', '+507 (Panamá)', '+34 (España)', '+1 (EE.UU.)', '+Otro'];
 
 const getMunicipios = (departamento: string) => {
   if (departamento === 'Bogotá D.C.') return ['Bogotá D.C.'];

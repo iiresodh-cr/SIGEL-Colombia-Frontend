@@ -35,7 +35,7 @@ const getMunicipios = (departamento: string) => {
 };
 
 const PAISES = ['Colombia', 'Venezuela', 'Ecuador', 'Perú', 'Panamá', 'España', 'Estados Unidos', 'Otro'];
-const CODIGOS_PAIS = ['+57', '+58', '+593', '+51', '+507', '+34', '+1', '+Otro'];
+const CODIGOS_PAIS = ['+57 (Colombia)', '+58 (Venezuela)', '+593 (Ecuador)', '+51 (Perú)', '+507 (Panamá)', '+34 (España)', '+1 (EE.UU.)', '+Otro'];
 
 const STEPS = ['Identificación Básica', 'Perfil Demográfico', 'Contacto y Ubicación', 'Expediente JEP'];
 
@@ -50,7 +50,7 @@ export const FormVictima = ({ onSave, onCancel, profesionales, currentUserRole, 
     tipo_documento: 'CC',
     identificacion: '',
     datos_demograficos: { genero: '', orientacion_sexual: '', grupo_etnico: 'Ninguno', etareo: 'Adulto', discapacidad: 'Ninguna' },
-    datos_contacto: { codigo_pais_telefono: '+57', telefono: '', correo: '', pais: 'Colombia', direccion: '', departamento: '', municipio: '' },
+    datos_contacto: { codigo_pais_telefono: '+57 (Colombia)', telefono: '', correo: '', pais: 'Colombia', direccion: '', departamento: '', municipio: '' },
     representacion: {
       caso: [], bloque: [], hechos_victimizantes: [], calidad_victima: '',
       juridico_asignado_id: (currentUserRole === 'abogado') ? currentUserEmail : '',
