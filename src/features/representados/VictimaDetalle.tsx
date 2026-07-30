@@ -118,6 +118,9 @@ const VictimaDetalle = () => {
 
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [selectedFileForUpload, setSelectedFileForUpload] = useState<File | null>(null);
+  const [customFileName, setCustomFileName] = useState('');
+  const [openUploadDialog, setOpenUploadDialog] = useState(false);
 
   const [openNoteModal, setOpenNoteModal] = useState(false);
   const [newNote, setNewNote] = useState<Partial<Interaccion>>({ tipo: 'Llamada de sentido del proceso', estado_contacto: 'Contactado', observaciones: '', compromisos: '' });
@@ -332,18 +335,41 @@ const VictimaDetalle = () => {
     }
   };
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file || !id || !canEdit) return;
+    if (file) {
+      setSelectedFileForUpload(file);
+      setCustomFileName(file.name);
+      setOpenUploadDialog(true);
+    }
+    // Limpiar input para permitir seleccionar el mismo archivo nuevamente si se cancela
+    event.target.value = '';
+  };
+
+  const confirmFileUpload = async () => {
+    if (!selectedFileForUpload || !id || !canEdit) return;
     try {
       setUploading(true);
-      await storageService.uploadFile(id, file, 'poderes');
+      setOpenUploadDialog(false);
+      let fileToUpload = selectedFileForUpload;
+      let finalName = customFileName.trim() || selectedFileForUpload.name;
+      
+      const originalExt = selectedFileForUpload.name.split('.').pop() || 'pdf';
+      if (!finalName.toLowerCase().endsWith(`.${originalExt.toLowerCase()}`)) {
+          finalName += `.${originalExt}`;
+      }
+      
+      fileToUpload = new File([selectedFileForUpload], finalName, { type: selectedFileForUpload.type });
+      
+      await storageService.uploadFile(id, fileToUpload, 'poderes');
       showModal('Éxito', 'Archivo cargado.', 'success');
       await loadData();
     } catch (error) {
       showModal('Error', 'No se pudo subir.', 'error');
     } finally {
       setUploading(false);
+      setSelectedFileForUpload(null);
+      setCustomFileName('');
     }
   };
 
@@ -532,11 +558,11 @@ const VictimaDetalle = () => {
 
             <Paper elevation={0} sx={{ p: 4, borderRadius: 3, border: '1px solid #e2e8f0', mb: 4 }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                <Typography variant="subtitle1" sx={{ fontWeight: 700, color: 'primary.main' }}>Documentación y Poderes</Typography>
+                <Typography variant="subtitle1" sx={{ fontWeight: 700, color: 'primary.main' }}>Documentación</Typography>
                 {canEdit && (
                   <Button component="label" variant="outlined" startIcon={<CloudUploadIcon />} disabled={uploading}>
                     {uploading ? 'Subiendo...' : 'Subir PDF'}
-                    <input type="file" hidden accept=".pdf" onChange={handleFileUpload} />
+                    <input type="file" hidden accept=".pdf" onChange={handleFileSelect} />
                   </Button>
                 )}
               </Box>
@@ -544,7 +570,19 @@ const VictimaDetalle = () => {
                 {poderes.map((archivo, index) => (
                   <ListItem key={index} sx={{ border: '1px solid #e2e8f0', borderRadius: 2, mb: 1 }}>
                     <PictureAsPdfIcon color="error" sx={{ mr: 2 }} />
-                    <ListItemText primary={archivo.name} />
+                    <ListItemText 
+                      primary={
+                        <Typography 
+                          component="a" 
+                          href={archivo.url} 
+                          target="_blank" 
+                          rel="noopener noreferrer" 
+                          sx={{ textDecoration: 'none', color: 'inherit', fontWeight: 500, '&:hover': { color: 'primary.main', textDecoration: 'underline' } }}
+                        >
+                          {archivo.name.includes('_') ? archivo.name.substring(archivo.name.indexOf('_') + 1) : archivo.name}
+                        </Typography>
+                      } 
+                    />
                     {canDelete && (
                       <IconButton color="error" onClick={() => handleDeleteFile(archivo.fullPath)}>
                         <DeleteIcon />
@@ -872,6 +910,25 @@ const VictimaDetalle = () => {
         <DialogActions sx={{ p: 2 }}>
           <Button onClick={() => setOpenReasignarModal(false)} color="secondary">Cancelar</Button>
           <Button onClick={handleReasignar} variant="contained" color="primary">Confirmar Cambio</Button>
+        </DialogActions>
+      </Dialog>
+      <Dialog open={openUploadDialog} onClose={() => setOpenUploadDialog(false)} fullWidth maxWidth="sm">
+        <DialogTitle sx={{ fontWeight: 'bold' }}>Nombrar Documento</DialogTitle>
+        <DialogContent dividers>
+          <Typography variant="body2" sx={{ mb: 2 }}>
+            Ingrese el nombre con el que desea guardar el documento. Por defecto se usará el nombre original.
+          </Typography>
+          <TextField
+            fullWidth
+            size="small"
+            label="Nombre del documento"
+            value={customFileName}
+            onChange={(e) => setCustomFileName(e.target.value)}
+          />
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setOpenUploadDialog(false)} color="secondary">Cancelar</Button>
+          <Button onClick={confirmFileUpload} variant="contained" color="primary">Guardar Documento</Button>
         </DialogActions>
       </Dialog>
     </Box>

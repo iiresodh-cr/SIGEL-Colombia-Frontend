@@ -10,8 +10,8 @@ export interface ArchivoJEP {
 export const storageService = {
   // Sube un archivo a una carpeta específica de la víctima
   uploadFile: async (victimaId: string, file: File, folder: 'poderes' | 'documentos' | 'autos'): Promise<string> => {
-    // Crea una ruta segura limpiando el nombre del archivo
-    const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+    // Crea una ruta segura limpiando el nombre del archivo permitiendo espacios
+    const safeName = file.name.replace(/[^a-zA-Z0-9.\-_ ]/g, '_');
     const fileRef = ref(storage, `victimas/${victimaId}/${folder}/${Date.now()}_${safeName}`);
     
     await uploadBytes(fileRef, file);
