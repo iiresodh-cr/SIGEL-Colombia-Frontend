@@ -34,6 +34,9 @@ const getMunicipios = (departamento: string) => {
   return dep ? dep.ciudades : [];
 };
 
+const PAISES = ['Colombia', 'Venezuela', 'Ecuador', 'Perú', 'Panamá', 'España', 'Estados Unidos', 'Otro'];
+const CODIGOS_PAIS = ['+57', '+58', '+593', '+51', '+507', '+34', '+1', '+Otro'];
+
 const STEPS = ['Identificación Básica', 'Perfil Demográfico', 'Contacto y Ubicación', 'Expediente JEP'];
 
 export const FormVictima = ({ onSave, onCancel, profesionales, currentUserRole, currentUserEmail }: FormVictimaProps) => {
@@ -47,7 +50,7 @@ export const FormVictima = ({ onSave, onCancel, profesionales, currentUserRole, 
     tipo_documento: 'CC',
     identificacion: '',
     datos_demograficos: { genero: '', orientacion_sexual: '', grupo_etnico: 'Ninguno', etareo: 'Adulto', discapacidad: 'Ninguna' },
-    datos_contacto: { telefono: '', correo: '', direccion: '', departamento: '' },
+    datos_contacto: { codigo_pais_telefono: '+57', telefono: '', correo: '', pais: 'Colombia', direccion: '', departamento: '', municipio: '' },
     representacion: {
       caso: [], bloque: [], hechos_victimizantes: [], calidad_victima: '',
       juridico_asignado_id: (currentUserRole === 'abogado') ? currentUserEmail : '',
@@ -101,32 +104,77 @@ export const FormVictima = ({ onSave, onCancel, profesionales, currentUserRole, 
       case 2:
         return (
           <Grid container spacing={3}>
-            <Grid size={{ xs: 12, md: 4 }}><TextField fullWidth label="Teléfono" value={formData.datos_contacto?.telefono} onChange={(e) => setFormData({ ...formData, datos_contacto: { ...formData.datos_contacto!, telefono: e.target.value } })} /></Grid>
-            <Grid size={{ xs: 12, md: 4 }}><TextField fullWidth label="Correo Electrónico" value={formData.datos_contacto?.correo} onChange={(e) => setFormData({ ...formData, datos_contacto: { ...formData.datos_contacto!, correo: e.target.value } })} /></Grid>
+            <Grid size={{ xs: 12, md: 2 }}>
+              <TextField 
+                select 
+                fullWidth 
+                label="Cód. País" 
+                value={formData.datos_contacto?.codigo_pais_telefono || '+57'} 
+                onChange={(e) => setFormData({ ...formData, datos_contacto: { ...formData.datos_contacto!, codigo_pais_telefono: e.target.value } })}
+              >
+                {CODIGOS_PAIS.map(c => <MenuItem key={c} value={c}>{c}</MenuItem>)}
+              </TextField>
+            </Grid>
+            <Grid size={{ xs: 12, md: 5 }}>
+              <TextField fullWidth label="Teléfono" value={formData.datos_contacto?.telefono} onChange={(e) => setFormData({ ...formData, datos_contacto: { ...formData.datos_contacto!, telefono: e.target.value } })} />
+            </Grid>
+            <Grid size={{ xs: 12, md: 5 }}>
+              <TextField fullWidth label="Correo Electrónico" value={formData.datos_contacto?.correo} onChange={(e) => setFormData({ ...formData, datos_contacto: { ...formData.datos_contacto!, correo: e.target.value } })} />
+            </Grid>
+            
             <Grid size={{ xs: 12, md: 4 }}>
               <TextField 
                 select 
                 fullWidth 
-                label="Departamento" 
-                value={formData.datos_contacto?.departamento || ''} 
-                onChange={(e) => setFormData({ ...formData, datos_contacto: { ...formData.datos_contacto!, departamento: e.target.value, municipio: '' } })}
+                label="País de Residencia" 
+                value={formData.datos_contacto?.pais || 'Colombia'} 
+                onChange={(e) => setFormData({ ...formData, datos_contacto: { ...formData.datos_contacto!, pais: e.target.value, departamento: '', municipio: '' } })}
               >
-                {DEPARTAMENTOS.map(d => <MenuItem key={d} value={d}>{d}</MenuItem>)}
+                {PAISES.map(p => <MenuItem key={p} value={p}>{p}</MenuItem>)}
               </TextField>
             </Grid>
-            <Grid size={{ xs: 12, md: 4 }}>
-              <TextField 
-                select 
-                fullWidth 
-                label="Municipio" 
-                value={formData.datos_contacto?.municipio || ''} 
-                onChange={(e) => setFormData({ ...formData, datos_contacto: { ...formData.datos_contacto!, municipio: e.target.value } })}
-                disabled={!formData.datos_contacto?.departamento}
-              >
-                {getMunicipios(formData.datos_contacto?.departamento || '').map(m => <MenuItem key={m} value={m}>{m}</MenuItem>)}
-              </TextField>
+            
+            {formData.datos_contacto?.pais === 'Colombia' ? (
+              <>
+                <Grid size={{ xs: 12, md: 4 }}>
+                  <TextField 
+                    select 
+                    fullWidth 
+                    label="Departamento" 
+                    value={formData.datos_contacto?.departamento || ''} 
+                    onChange={(e) => setFormData({ ...formData, datos_contacto: { ...formData.datos_contacto!, departamento: e.target.value, municipio: '' } })}
+                  >
+                    {DEPARTAMENTOS.map(d => <MenuItem key={d} value={d}>{d}</MenuItem>)}
+                  </TextField>
+                </Grid>
+                <Grid size={{ xs: 12, md: 4 }}>
+                  <TextField 
+                    select 
+                    fullWidth 
+                    label="Municipio" 
+                    value={formData.datos_contacto?.municipio || ''} 
+                    onChange={(e) => setFormData({ ...formData, datos_contacto: { ...formData.datos_contacto!, municipio: e.target.value } })}
+                    disabled={!formData.datos_contacto?.departamento}
+                  >
+                    {getMunicipios(formData.datos_contacto?.departamento || '').map(m => <MenuItem key={m} value={m}>{m}</MenuItem>)}
+                  </TextField>
+                </Grid>
+              </>
+            ) : (
+              <Grid size={{ xs: 12, md: 8 }}>
+                <TextField 
+                  fullWidth 
+                  label="Estado / Provincia / Ciudad" 
+                  value={formData.datos_contacto?.departamento || ''} 
+                  onChange={(e) => setFormData({ ...formData, datos_contacto: { ...formData.datos_contacto!, departamento: e.target.value, municipio: '' } })}
+                  placeholder="Ingrese el estado o ciudad de residencia"
+                />
+              </Grid>
+            )}
+            
+            <Grid size={{ xs: 12, md: 12 }}>
+              <TextField fullWidth label="Dirección de Residencia" value={formData.datos_contacto?.direccion} onChange={(e) => setFormData({ ...formData, datos_contacto: { ...formData.datos_contacto!, direccion: e.target.value } })} />
             </Grid>
-            <Grid size={{ xs: 12, md: 8 }}><TextField fullWidth label="Dirección de Residencia" value={formData.datos_contacto?.direccion} onChange={(e) => setFormData({ ...formData, datos_contacto: { ...formData.datos_contacto!, direccion: e.target.value } })} /></Grid>
           </Grid>
         );
       case 3:

@@ -12,11 +12,13 @@ export interface DatosDemograficos {
 }
 
 export interface DatosContacto {
+  codigo_pais_telefono?: string;
   telefono: string;
   correo: string;
-  direccion: string;
-  municipio?: string;
+  pais?: string;
   departamento: string;
+  municipio?: string;
+  direccion: string;
 }
 
 export interface Representacion {
