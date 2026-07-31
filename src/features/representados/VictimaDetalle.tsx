@@ -427,6 +427,13 @@ const VictimaDetalle = () => {
     return listaProfesionales.psicosociales.find(u => u.correo.toLowerCase() === correoId.toLowerCase())?.nombre_completo || correoId;
   };
 
+  const getNombreResponsable = (uid: string) => {
+    if (!uid) return 'Usuario desconocido';
+    const allProfs = [...listaProfesionales.abogados, ...listaProfesionales.psicosociales];
+    const user = allProfs.find(u => u.uid === uid);
+    return user?.nombre_completo || 'Usuario del sistema';
+  };
+
   const handleDeleteVictima = async () => {
     if (!id || !canDelete) return;
     showModal('¿Eliminar Ficha Definitivamente?', 'Esta acción borrará la víctima de la base de datos por completo y no se puede deshacer. ¿Estás seguro?', 'confirm', async () => {
@@ -641,6 +648,9 @@ const VictimaDetalle = () => {
                         )}
                       </Box>
                     </Box>
+                    <Typography variant="caption" sx={{ display: 'block', mb: 1, color: 'text.secondary', fontStyle: 'italic' }}>
+                      Registrado por: {getNombreResponsable(nota.responsable_id)}
+                    </Typography>
                     <Typography variant="body2" sx={{ mt: 1 }}>{nota.observaciones}</Typography>
                     {nota.compromisos && (
                       <Typography variant="caption" sx={{ display: 'block', mt: 1, color: 'secondary.main', fontWeight: 600 }}>
