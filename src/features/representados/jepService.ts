@@ -95,6 +95,12 @@ export const jepService = {
     await addDoc(interaccionesRef, data);
   },
 
+  // 6.5 Eliminar interacción/nota
+  deleteInteraccion: async (victimaId: string, interaccionId: string) => {
+    const docRef = doc(db, `victimas/${victimaId}/interacciones`, interaccionId);
+    await deleteDoc(docRef);
+  },
+
   // 7. Obtener interacciones recientes
   getInteraccionesRecientes: async (victimaId: string) => {
     const interaccionesRef = collection(db, `victimas/${victimaId}/interacciones`);

@@ -386,6 +386,19 @@ const VictimaDetalle = () => {
     });
   };
 
+  const handleDeleteNote = async (interaccionId: string) => {
+    if (!id || !canDelete) return;
+    showModal('¿Eliminar Nota?', 'Esta acción no se puede deshacer y solo puede ser realizada por coordinación.', 'confirm', async () => {
+      try {
+        await jepService.deleteInteraccion(id, interaccionId);
+        showModal('Eliminado', 'Nota eliminada correctamente.', 'success');
+        await loadData();
+      } catch (error) {
+        showModal('Error', 'No se pudo borrar la nota.', 'error');
+      }
+    });
+  };
+
   const handleToggleChecklist = async (campo: string, valor: boolean) => {
     if (!id || !victima || !canEdit) return;
     try {
@@ -619,7 +632,14 @@ const VictimaDetalle = () => {
                   <Paper key={nota.id} elevation={0} sx={{ p: 2, mb: 2, border: '1px solid #e2e8f0' }}>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                       <Chip label={nota.tipo} size="small" variant="outlined" color="primary" />
-                      <Typography variant="caption">{new Date(nota.fecha).toLocaleDateString()}</Typography>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Typography variant="caption">{new Date(nota.fecha).toLocaleDateString()}</Typography>
+                        {canDelete && (
+                          <IconButton size="small" color="error" onClick={() => handleDeleteNote(nota.id!)}>
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        )}
+                      </Box>
                     </Box>
                     <Typography variant="body2" sx={{ mt: 1 }}>{nota.observaciones}</Typography>
                     {nota.compromisos && (
