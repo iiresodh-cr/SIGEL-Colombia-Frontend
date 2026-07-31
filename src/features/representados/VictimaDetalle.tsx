@@ -296,7 +296,7 @@ const VictimaDetalle = () => {
       const interaccionToSave: Omit<Interaccion, 'id'> = {
         fecha: new Date().toISOString(),
         tipo: newNote.tipo || 'Otra',
-        responsable_id: currentUser.uid,
+        responsable_id: currentUser.email || currentUser.uid,
         rol_responsable: role === 'psicosocial' ? 'Psicosocial' : 'Jurídico',
         estado_contacto: newNote.estado_contacto as any,
         observaciones: newNote.observaciones,
@@ -427,10 +427,22 @@ const VictimaDetalle = () => {
     return listaProfesionales.psicosociales.find(u => u.correo.toLowerCase() === correoId.toLowerCase())?.nombre_completo || correoId;
   };
 
-  const getNombreResponsable = (uid: string) => {
-    if (!uid) return 'Usuario desconocido';
+  const getNombreResponsable = (identificador: string) => {
+    if (!identificador) return 'Usuario desconocido';
+    
+    const idLower = identificador.toLowerCase();
     const allProfs = [...listaProfesionales.abogados, ...listaProfesionales.psicosociales];
-    const user = allProfs.find(u => u.uid === uid);
+    
+    const user = allProfs.find(u => 
+      (u.uid && u.uid.toLowerCase() === idLower) || 
+      (u.correo && u.correo.toLowerCase() === idLower)
+    );
+    
+    // Si no está en la lista de profesionales, usar el nombre del usuario logueado si coincide
+    if (!user && currentUser?.email && currentUser.email.toLowerCase() === idLower) {
+      return currentUser.displayName || currentUser.email;
+    }
+
     return user?.nombre_completo || 'Usuario del sistema';
   };
 
